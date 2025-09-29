@@ -1,5 +1,8 @@
 // FTMS Hybrid Workout App - Main JavaScript Module
 
+// Import FTMS Bluetooth module
+import { ftms } from './ftms.js';
+
 // 1) GLOBAL VARS / STATE / UTILS
 (function (H) {
 
@@ -28,6 +31,7 @@
         connectButton: document.getElementById('connect-button'),
         startWorkoutButton: document.getElementById('start-workout-button'),
         skipStepButton: document.getElementById('skip-step-button'),
+        debugBluetoothButton: document.getElementById('debug-bluetooth-button'),
         connectionStatus: document.getElementById('connection-status'),
 
         powerDisplay: document.getElementById('power-display'),
@@ -42,6 +46,9 @@
         targetDisplay: document.getElementById('target-display'),
         simSegmentSelect: document.getElementById('sim-segment')
     };
+
+    // ---- FTMS instance
+    H.ftms = ftms;
 
     // ---- app state
     H.state = {
@@ -338,6 +345,7 @@
         D.connectButton.addEventListener('click', H.handlers.connectTrainer);
         D.startWorkoutButton.addEventListener('click', H.handlers.startWorkout);
         D.skipStepButton.addEventListener('click', H.handlers.skipStep);
+        D.debugBluetoothButton.addEventListener('click', H.handlers.openBluetoothDebug);
 
         D.stepTypeSelect.addEventListener('change', () => {
             if (D.stepTypeSelect.value === 'erg') { D.ergInputsDiv.classList.remove('hidden'); D.simInputsDiv.classList.add('hidden'); }
@@ -364,7 +372,7 @@
         }
         try {
             const pwr = Math.max(0, Math.min(2000, Math.round(power)));
-            await window.ftms.setErgWatts(pwr);
+            await H.ftms.setErgWatts(pwr);
             console.log(`ERG power set to ${pwr}W`);
         } catch (e) {
             console.error('Failed to set ERG power:', e);
@@ -469,7 +477,7 @@
         setSimGrade.__lastGrade = realisticGrade;
 
         try {
-            await window.ftms.setSim({ 
+            await H.ftms.setSim({ 
                 gradePct: realisticGrade, 
                 crr, 
                 cwa: cw, 
@@ -632,10 +640,13 @@
         try {
             D.connectionStatus.textContent = 'Status: Connecting...';
             
-            await window.ftms.connect({ 
+            await H.ftms.connect({ 
                 nameHint: 'KICKR',  // You can adjust this or make it configurable
                 log: (msg) => console.log('[FTMS]', msg)
             });
+            
+            // Set up event listeners for FTMS data
+            H.ftms.on('ibd', H.handlers.handleFtmsData);
             
             // No need for custom parsing - ftms.js is now fixed!
             
@@ -902,6 +913,10 @@
         startWorkout: H.workout.startWorkout,
         runWorkoutStep: H.workout.runWorkoutStep,
         skipStep: H.workout.skipStep,
-        endWorkout: H.workout.endWorkout
+        endWorkout: H.workout.endWorkout,
+        openBluetoothDebug: () => {
+            // Open the Bluetooth debug page in a new tab/window
+            window.open('dev/bluetooth-test.html', '_blank', 'width=800,height=600');
+        }
     };
 })(window.Hybrid);

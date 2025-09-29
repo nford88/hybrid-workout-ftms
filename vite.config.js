@@ -14,7 +14,8 @@ export default defineConfig({
     // Rollup options for optimization
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'src/index.html')
+        main: resolve(__dirname, 'src/index.html'),
+        debug: resolve(__dirname, 'src/dev/bluetooth-test.html')
       }
     },
     

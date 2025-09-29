@@ -60,7 +60,10 @@ class FTMSClient extends Emitter {
 
     const options = nameHint
       ? { filters: [{ namePrefix: nameHint }], optionalServices: [UUID.FTMS_SERVICE, UUID.ZWIFT_SERVICE] }
-      : { acceptAllDevices: true, optionalServices: [UUID.FTMS_SERVICE, UUID.ZWIFT_SERVICE] };
+      : { 
+          filters: [{ services: [UUID.FTMS_SERVICE] }], 
+          optionalServices: [UUID.FTMS_SERVICE, UUID.ZWIFT_SERVICE] 
+        };
 
     this.device = await navigator.bluetooth.requestDevice(options);
     this.device.addEventListener('gattserverdisconnected', () => {
