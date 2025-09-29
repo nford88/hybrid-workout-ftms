@@ -1,0 +1,54 @@
+name: Debug Build
+
+on:
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [ main ]
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Debug Info
+        run: |
+          echo "Node.js version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Current directory: $(pwd)"
+          echo "Files in root:"
+          ls -la
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Check package.json
+        run: |
+          echo "Package.json contents:"
+          cat package.json
+          echo "Lock file exists:"
+          ls -la package-lock.json || echo "No lock file"
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: List installed packages
+        run: |
+          echo "Installed packages:"
+          npm list --depth=0
+          
+      - name: Check source files
+        run: |
+          echo "Source directory:"
+          ls -la src/
+          echo "JavaScript files:"
+          ls -la src/js/
+          
+      - name: Run build (dry run)
+        run: |
+          echo "Testing build command:"
+          npm run build --dry-run || npm run build
