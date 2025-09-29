@@ -104,15 +104,15 @@ This project is configured for automatic deployment to GitHub Pages using GitHub
    - Source: "GitHub Actions"
    - The workflow will automatically build and deploy
 
-3. **Update Repository Name** (if different):
-   - Edit `vite.config.js` and change `/ftms-hybrid-workout/` to `/your-repo-name/`
+3. **Repository URL**: https://github.com/nford88/hybrid-workout-ftms
+4. **Live App**: https://nford88.github.io/hybrid-workout-ftms/
 
 #### Deployment Process:
 - ✅ Installs dependencies with `npm ci`
 - ✅ Runs all 45 tests with `npm test`
 - ✅ Builds optimized files with `npm run build`
 - ✅ Deploys `/dist` folder to GitHub Pages
-- ✅ Available at: `https://username.github.io/repository-name/`
+- ✅ Available at: `https://nford88.github.io/hybrid-workout-ftms/`
 
 ### Building for Production
 
