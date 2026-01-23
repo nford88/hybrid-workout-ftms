@@ -171,7 +171,7 @@
             <span id="error-text"></span>
         </div>
 
-        <!-- Route Import Section -->
+                <!-- Route Import Section -->
         <div class="section-card">
             <h2 class="section-title">Import Garmin Route</h2>
             
@@ -250,6 +250,21 @@
 
     <!-- Main application script (imports ftms.js internally) -->
     <script type="module" src="js/main.js"></script>
+    
+    <!-- Build version indicator -->
+    <script type="module">
+      const version = typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'dev';
+      const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'local';
+      console.log(`%c🚴 FTMS Hybrid Workout | Build: ${version} | ${buildTime}`, 'color: #3b82f6; font-weight: bold;');
+      
+      // Add version to footer for easy verification
+      document.addEventListener('DOMContentLoaded', () => {
+        const footer = document.createElement('div');
+        footer.className = 'text-center text-xs text-gray-400 py-2 mt-4';
+        footer.textContent = `Build: ${version}`;
+        document.querySelector('.max-w-6xl')?.appendChild(footer);
+      });
+    </script>
 
 </body>
 </html>

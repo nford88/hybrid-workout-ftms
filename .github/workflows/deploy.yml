@@ -44,6 +44,9 @@ jobs:
         
       - name: Build with Vite
         run: npm run build
+        env:
+          VITE_BUILD_HASH: ${{ github.sha }}
+          VITE_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
         
       - name: Setup Pages
         uses: actions/configure-pages@v4

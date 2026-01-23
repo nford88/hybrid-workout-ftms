@@ -1,7 +1,16 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
 
+// Get build hash from environment or generate one
+const buildHash = process.env.VITE_BUILD_HASH?.slice(0, 7) || Date.now().toString(36)
+
 export default defineConfig({
+  // Make build hash available to the app
+  define: {
+    '__BUILD_HASH__': JSON.stringify(buildHash),
+    '__BUILD_TIME__': JSON.stringify(process.env.VITE_BUILD_TIME || new Date().toISOString())
+  },
+  
   // Use src as the root directory
   root: 'src',
   
@@ -17,6 +26,12 @@ export default defineConfig({
         main: resolve(__dirname, 'src/index.html'),
         debug: resolve(__dirname, 'src/dev/bluetooth-test.html'),
         shifting: resolve(__dirname, 'src/dev/zwift-virtual-shifting.html')
+      },
+      output: {
+        // Use content hash + build hash for better cache busting
+        entryFileNames: `assets/[name]-[hash]-${buildHash}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${buildHash}.js`,
+        assetFileNames: `assets/[name]-[hash]-${buildHash}.[ext]`
       }
     },
     
