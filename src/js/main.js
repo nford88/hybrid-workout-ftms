@@ -54,8 +54,8 @@ import './ftms.js';
         graphZeroLine: document.getElementById('graph-zero-line')
     };
 
-    // ---- FTMS instance
-    H.ftms = ftms;
+    // ---- FTMS instance (from window global set by ftms.js)
+    H.ftms = window.ftms;
 
     // ---- app state
     H.state = {
