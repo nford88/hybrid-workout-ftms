@@ -233,6 +233,41 @@
                 Add Step
             </button>
 
+            <!-- Saved Workouts Section -->
+            <div class="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 class="text-sm sm:text-base font-semibold text-gray-700 mb-3">Saved Workouts</h3>
+                
+                <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <!-- Load saved workout -->
+                    <div class="flex-1">
+                        <select id="saved-workouts-select" class="form-select text-sm">
+                            <option value="">— Select saved workout —</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button id="load-workout-button" class="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            Load
+                        </button>
+                        <button id="delete-saved-workout-button" class="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Save current workout -->
+                <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-3 pt-3 border-t border-gray-200">
+                    <div class="flex-1">
+                        <input type="text" id="save-workout-name" class="form-input text-sm" placeholder="Enter workout name...">
+                    </div>
+                    <button id="save-workout-button" class="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        Save Current
+                    </button>
+                </div>
+                
+                <p id="saved-workouts-count" class="text-xs text-gray-500 mt-2">No saved workouts</p>
+            </div>
+
             <!-- Workout Plan Display -->
             <div class="mt-4 sm:mt-6">
                 <div class="flex items-center justify-between mb-3 sm:mb-4">

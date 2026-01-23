@@ -51,7 +51,15 @@ import './ftms.js';
         graphPositionMarker: document.getElementById('graph-position-marker'),
         graphStepDividers: document.getElementById('graph-step-dividers'),
         graphEmptyMessage: document.getElementById('graph-empty-message'),
-        graphZeroLine: document.getElementById('graph-zero-line')
+        graphZeroLine: document.getElementById('graph-zero-line'),
+        
+        // Saved workouts elements
+        savedWorkoutsSelect: document.getElementById('saved-workouts-select'),
+        loadWorkoutButton: document.getElementById('load-workout-button'),
+        deleteSavedWorkoutButton: document.getElementById('delete-saved-workout-button'),
+        saveWorkoutName: document.getElementById('save-workout-name'),
+        saveWorkoutButton: document.getElementById('save-workout-button'),
+        savedWorkoutsCount: document.getElementById('saved-workouts-count')
     };
 
     // ---- FTMS instance (from window global set by ftms.js)
@@ -264,6 +272,242 @@ import './ftms.js';
 })(window.Hybrid);
 
 
+// 2.5) SAVED WORKOUTS - Manage multiple workout plans
+(function (H) {
+    const STORAGE_KEY_PREFIX = 'savedWorkout_';
+    const SAVED_WORKOUTS_INDEX_KEY = 'savedWorkoutsIndex';
+
+    // Get list of all saved workout names
+    function getSavedWorkoutsList() {
+        const indexStr = localStorage.getItem(SAVED_WORKOUTS_INDEX_KEY);
+        if (!indexStr) return [];
+        try {
+            return JSON.parse(indexStr);
+        } catch (e) {
+            console.error('Failed to parse saved workouts index:', e);
+            return [];
+        }
+    }
+
+    // Save the list of workout names
+    function saveSavedWorkoutsList(list) {
+        localStorage.setItem(SAVED_WORKOUTS_INDEX_KEY, JSON.stringify(list));
+    }
+
+    // Save current workout with a name
+    function saveWorkout(name) {
+        if (!name || !name.trim()) {
+            H.utils.showError('Please enter a workout name');
+            return false;
+        }
+        
+        const trimmedName = name.trim();
+        const plan = H.state.workoutPlan;
+        
+        if (!plan || plan.length === 0) {
+            H.utils.showError('No workout steps to save');
+            return false;
+        }
+
+        // Save workout data
+        const workoutData = {
+            name: trimmedName,
+            plan: plan,
+            routeName: H.state.garminRoute?.name || null,
+            savedAt: new Date().toISOString()
+        };
+        
+        localStorage.setItem(STORAGE_KEY_PREFIX + trimmedName, JSON.stringify(workoutData));
+        
+        // Update index
+        const list = getSavedWorkoutsList();
+        if (!list.includes(trimmedName)) {
+            list.push(trimmedName);
+            saveSavedWorkoutsList(list);
+        }
+        
+        console.log(`Saved workout: "${trimmedName}" with ${plan.length} steps`);
+        H.utils.hideError();
+        updateSavedWorkoutsUI();
+        return true;
+    }
+
+    // Load a saved workout by name
+    function loadWorkout(name) {
+        if (!name) return false;
+        
+        const dataStr = localStorage.getItem(STORAGE_KEY_PREFIX + name);
+        if (!dataStr) {
+            H.utils.showError(`Workout "${name}" not found`);
+            return false;
+        }
+        
+        try {
+            const workoutData = JSON.parse(dataStr);
+            
+            // Load the workout plan
+            H.state.workoutPlan = workoutData.plan || [];
+            localStorage.setItem('workoutPlan', JSON.stringify(H.state.workoutPlan));
+            
+            // Render the workout
+            H.route.renderWorkoutPlan();
+            
+            console.log(`Loaded workout: "${name}" with ${H.state.workoutPlan.length} steps`);
+            
+            // Show success message
+            if (workoutData.routeName && (!H.state.garminRoute || H.state.garminRoute.name !== workoutData.routeName)) {
+                H.utils.showError(`Note: This workout uses route "${workoutData.routeName}" which may need to be imported`);
+                setTimeout(() => H.utils.hideError(), 5000);
+            } else {
+                H.utils.hideError();
+            }
+            
+            return true;
+        } catch (e) {
+            console.error('Failed to load workout:', e);
+            H.utils.showError('Failed to load workout');
+            return false;
+        }
+    }
+
+    // Delete a saved workout
+    function deleteWorkout(name) {
+        if (!name) return false;
+        
+        localStorage.removeItem(STORAGE_KEY_PREFIX + name);
+        
+        const list = getSavedWorkoutsList();
+        const index = list.indexOf(name);
+        if (index > -1) {
+            list.splice(index, 1);
+            saveSavedWorkoutsList(list);
+        }
+        
+        console.log(`Deleted workout: "${name}"`);
+        updateSavedWorkoutsUI();
+        return true;
+    }
+
+    // Update the saved workouts dropdown and count
+    function updateSavedWorkoutsUI() {
+        const D = H.dom;
+        if (!D.savedWorkoutsSelect) return;
+        
+        const list = getSavedWorkoutsList();
+        
+        // Update dropdown
+        D.savedWorkoutsSelect.innerHTML = '<option value="">— Select saved workout —</option>';
+        
+        list.forEach(name => {
+            const dataStr = localStorage.getItem(STORAGE_KEY_PREFIX + name);
+            let stepCount = 0;
+            let savedAt = '';
+            
+            if (dataStr) {
+                try {
+                    const data = JSON.parse(dataStr);
+                    stepCount = data.plan?.length || 0;
+                    if (data.savedAt) {
+                        const date = new Date(data.savedAt);
+                        savedAt = ` (${date.toLocaleDateString()})`;
+                    }
+                } catch (e) {}
+            }
+            
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = `${name} - ${stepCount} steps${savedAt}`;
+            D.savedWorkoutsSelect.appendChild(option);
+        });
+        
+        // Update count
+        if (D.savedWorkoutsCount) {
+            D.savedWorkoutsCount.textContent = list.length === 0 
+                ? 'No saved workouts' 
+                : `${list.length} saved workout${list.length > 1 ? 's' : ''}`;
+        }
+        
+        // Update button states
+        updateButtonStates();
+    }
+
+    // Update load/delete button states based on selection
+    function updateButtonStates() {
+        const D = H.dom;
+        const hasSelection = D.savedWorkoutsSelect && D.savedWorkoutsSelect.value !== '';
+        
+        if (D.loadWorkoutButton) {
+            D.loadWorkoutButton.disabled = !hasSelection;
+        }
+        if (D.deleteSavedWorkoutButton) {
+            D.deleteSavedWorkoutButton.disabled = !hasSelection;
+        }
+    }
+
+    // Initialize saved workouts UI
+    function initSavedWorkouts() {
+        const D = H.dom;
+        
+        // Update UI on load
+        updateSavedWorkoutsUI();
+        
+        // Event: Selection change
+        if (D.savedWorkoutsSelect) {
+            D.savedWorkoutsSelect.addEventListener('change', updateButtonStates);
+        }
+        
+        // Event: Save button
+        if (D.saveWorkoutButton) {
+            D.saveWorkoutButton.addEventListener('click', () => {
+                const name = D.saveWorkoutName.value;
+                if (saveWorkout(name)) {
+                    D.saveWorkoutName.value = '';
+                }
+            });
+        }
+        
+        // Event: Load button
+        if (D.loadWorkoutButton) {
+            D.loadWorkoutButton.addEventListener('click', () => {
+                const name = D.savedWorkoutsSelect.value;
+                if (name && confirm(`Load workout "${name}"? This will replace your current workout.`)) {
+                    loadWorkout(name);
+                }
+            });
+        }
+        
+        // Event: Delete button
+        if (D.deleteSavedWorkoutButton) {
+            D.deleteSavedWorkoutButton.addEventListener('click', () => {
+                const name = D.savedWorkoutsSelect.value;
+                if (name && confirm(`Delete workout "${name}"? This cannot be undone.`)) {
+                    deleteWorkout(name);
+                }
+            });
+        }
+        
+        // Event: Enter key in name input
+        if (D.saveWorkoutName) {
+            D.saveWorkoutName.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    D.saveWorkoutButton.click();
+                }
+            });
+        }
+    }
+
+    H.savedWorkouts = {
+        getSavedWorkoutsList,
+        saveWorkout,
+        loadWorkout,
+        deleteWorkout,
+        updateSavedWorkoutsUI,
+        initSavedWorkouts
+    };
+})(window.Hybrid);
+
+
 // 3) UI-SPECIFIC UPDATES
 (function (H) {
 
@@ -419,6 +663,11 @@ import './ftms.js';
                 H.graph.renderWorkoutGraph();
             }
         }, 100);
+
+        // Initialize saved workouts feature
+        if (H.savedWorkouts && H.savedWorkouts.initSavedWorkouts) {
+            H.savedWorkouts.initSavedWorkouts();
+        }
     }
 
     document.addEventListener('DOMContentLoaded', boot);
