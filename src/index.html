@@ -35,34 +35,33 @@
         </div>
 
         <!-- Real-time Data Display -->
-        <!-- Responsive grid: 2 cols on mobile, 3 on tablet, 5 on desktop -->
-        <div class="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6 mb-6 sm:mb-8">
-            <div class="metric-card">
+        <!-- All 5 metrics in a row at all screen sizes -->
+        <div class="grid grid-cols-5 gap-1 sm:gap-3 md:gap-6 mb-4 sm:mb-8">
+            <div class="metric-card-compact">
                 <h3>Power</h3>
                 <div id="power-display" class="metric-value text-blue-600">—</div>
                 <div class="metric-unit">watts</div>
             </div>
             
-            <div class="metric-card">
+            <div class="metric-card-compact">
                 <h3>Speed</h3>
                 <div id="speed-display" class="metric-value text-green-600">—</div>
                 <div class="metric-unit">kph</div>
             </div>
             
-            <div class="metric-card">
+            <div class="metric-card-compact">
                 <h3>Cadence</h3>
                 <div id="cadence-display" class="metric-value text-yellow-600">—</div>
                 <div class="metric-unit">rpm</div>
             </div>
             
-            <div class="metric-card">
+            <div class="metric-card-compact">
                 <h3>Time</h3>
                 <div id="time-display" class="metric-value text-purple-600">00:00</div>
                 <div class="metric-unit">mm:ss</div>
             </div>
             
-            <!-- Gradient card spans full width on 2-col mobile to center it -->
-            <div class="metric-card col-span-2 sm:col-span-1">
+            <div class="metric-card-compact">
                 <h3>Gradient</h3>
                 <div id="gradient-display" class="metric-value text-gray-600">—</div>
                 <div class="metric-unit">%</div>

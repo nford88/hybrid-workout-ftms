@@ -2,21 +2,30 @@
 
 /* Custom component classes for the FTMS app */
 @layer components {
-  /* Metric card - used for power, speed, cadence, etc. */
+  /* Metric card - compact version for 5-in-a-row layout */
+  .metric-card-compact {
+    @apply bg-white rounded-lg sm:rounded-xl shadow-md p-1.5 sm:p-3 md:p-6 text-center;
+  }
+  
+  .metric-card-compact h3 {
+    @apply text-[10px] sm:text-xs md:text-lg font-semibold text-gray-800 mb-0.5 sm:mb-1 md:mb-2 truncate;
+  }
+  
+  .metric-value {
+    @apply text-base sm:text-xl md:text-3xl font-bold leading-tight;
+  }
+  
+  .metric-unit {
+    @apply text-[8px] sm:text-xs md:text-sm text-gray-500;
+  }
+  
+  /* Standard metric card - for larger layouts */
   .metric-card {
     @apply bg-white rounded-xl shadow-md p-4 sm:p-6 text-center;
   }
   
   .metric-card h3 {
     @apply text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2;
-  }
-  
-  .metric-value {
-    @apply text-2xl sm:text-3xl font-bold;
-  }
-  
-  .metric-unit {
-    @apply text-xs sm:text-sm text-gray-500;
   }
 
   /* Section card - used for main content sections */
