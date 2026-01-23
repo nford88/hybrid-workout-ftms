@@ -97,3 +97,39 @@
     display: none;
   }
 }
+
+/* Workout Graph Styles */
+#workout-graph-container {
+  min-height: 100px;
+  max-height: 200px;
+}
+
+#workout-graph {
+  height: 100%;
+  min-height: 100px;
+}
+
+/* Graph profile styling */
+#graph-profile {
+  transition: d 0.3s ease-out;
+}
+
+/* Position marker animation */
+#graph-position-marker {
+  transition: transform 0.5s linear;
+}
+
+#graph-position-marker line {
+  filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
+}
+
+/* Responsive graph sizing */
+@media (max-width: 640px) {
+  #workout-graph-container {
+    min-height: 80px;
+  }
+  
+  #workout-graph {
+    min-height: 80px;
+  }
+}

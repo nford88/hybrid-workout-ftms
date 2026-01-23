@@ -74,7 +74,81 @@
             
             <div class="mb-4">
                 <div id="workout-progress-text" class="text-base sm:text-lg font-medium text-gray-700 mb-2">Ready to start workout</div>
-                <div class="w-full bg-gray-200 rounded-full h-2 sm:h-3">
+                
+                <!-- Workout Profile Graph -->
+                <div id="workout-graph-container" class="w-full bg-gray-50 rounded-lg border border-gray-200 mb-4 overflow-hidden">
+                    <svg id="workout-graph" class="w-full" viewBox="0 0 800 150" preserveAspectRatio="xMidYMid meet">
+                        <!-- Background -->
+                        <rect x="0" y="0" width="800" height="150" fill="#f9fafb"/>
+                        
+                        <!-- Zero line for gradient reference -->
+                        <line id="graph-zero-line" x1="50" y1="75" x2="750" y2="75" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4"/>
+                        
+                        <!-- Left Y-axis labels (Power for ERG) -->
+                        <g id="graph-y-labels-left" fill="#3b82f6" font-size="9">
+                            <text x="45" y="20" text-anchor="end" font-weight="bold">W</text>
+                            <text x="45" y="35" text-anchor="end">—</text>
+                            <text x="45" y="140" text-anchor="end">0</text>
+                        </g>
+                        
+                        <!-- Right Y-axis labels (Gradient for SIM) -->
+                        <g id="graph-y-labels-right" fill="#f97316" font-size="9">
+                            <text x="755" y="20" text-anchor="start" font-weight="bold">%</text>
+                            <text x="755" y="35" text-anchor="start">+15</text>
+                            <text x="755" y="78" text-anchor="start">0</text>
+                            <text x="755" y="140" text-anchor="start">-10</text>
+                        </g>
+                        
+                        <!-- ERG profile paths (blue) -->
+                        <g id="graph-erg-profiles"></g>
+                        
+                        <!-- SIM profile paths (orange) -->
+                        <g id="graph-sim-profiles"></g>
+                        
+                        <!-- Step dividers -->
+                        <g id="graph-step-dividers"></g>
+                        
+                        <!-- Current position marker -->
+                        <g id="graph-position-marker" transform="translate(50, 0)">
+                            <line x1="0" y1="5" x2="0" y2="145" stroke="#ef4444" stroke-width="2.5"/>
+                            <polygon points="-6,5 6,5 0,15" fill="#ef4444"/>
+                        </g>
+                        
+                        <!-- Gradient definitions -->
+                        <defs>
+                            <linearGradient id="erg-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.7"/>
+                                <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.2"/>
+                            </linearGradient>
+                            <linearGradient id="sim-gradient-up" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#f97316;stop-opacity:0.7"/>
+                                <stop offset="100%" style="stop-color:#f97316;stop-opacity:0.2"/>
+                            </linearGradient>
+                            <linearGradient id="sim-gradient-down" x1="0%" y1="100%" x2="0%" y2="0%">
+                                <stop offset="0%" style="stop-color:#22c55e;stop-opacity:0.7"/>
+                                <stop offset="100%" style="stop-color:#22c55e;stop-opacity:0.2"/>
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Empty state message -->
+                        <text id="graph-empty-message" x="400" y="80" text-anchor="middle" fill="#9ca3af" font-size="14">
+                            Add workout steps to see profile
+                        </text>
+                    </svg>
+                    
+                    <!-- Legend -->
+                    <div class="flex justify-center gap-4 py-1 text-xs text-gray-600 border-t border-gray-200">
+                        <span class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-sm bg-blue-500 opacity-70"></span> ERG Power
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-sm bg-orange-500 opacity-70"></span> SIM Gradient
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Legacy progress bar (hidden but kept for compatibility) -->
+                <div class="w-full bg-gray-200 rounded-full h-2 sm:h-3 hidden">
                     <div id="progress-bar" class="bg-blue-600 h-2 sm:h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
                 </div>
             </div>

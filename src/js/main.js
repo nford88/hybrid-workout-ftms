@@ -44,7 +44,14 @@
         workoutProgressText: document.getElementById('workout-progress-text'),
         progressBar: document.getElementById('progress-bar'),
         targetDisplay: document.getElementById('target-display'),
-        simSegmentSelect: document.getElementById('sim-segment')
+        simSegmentSelect: document.getElementById('sim-segment'),
+        
+        // Workout graph elements
+        workoutGraph: document.getElementById('workout-graph'),
+        graphPositionMarker: document.getElementById('graph-position-marker'),
+        graphStepDividers: document.getElementById('graph-step-dividers'),
+        graphEmptyMessage: document.getElementById('graph-empty-message'),
+        graphZeroLine: document.getElementById('graph-zero-line')
     };
 
     // ---- FTMS instance
@@ -240,6 +247,11 @@
                 renderWorkoutPlan();
             });
         });
+
+        // Update workout graph when plan changes
+        if (H.graph && H.graph.renderWorkoutGraph) {
+            H.graph.renderWorkoutGraph();
+        }
     }
 
     function clearWorkout() {
@@ -332,6 +344,20 @@
                 const stepDurationSec = currentStep.duration * 60;
                 const stepProgress = Math.min(100, (stepElapsedSec / stepDurationSec) * 100);
                 D.progressBar.style.width = `${stepProgress}%`;
+                
+                // FIX: Backup auto-advance check
+                // This ensures step advances even if setTimeout was throttled by browser
+                // (common when tab is in background or device is sleeping)
+                if (stepElapsedSec >= stepDurationSec) {
+                    console.log(`[ERG] Step duration exceeded (${stepElapsedSec}s >= ${stepDurationSec}s), auto-advancing...`);
+                    // Clear any pending timeout to avoid double-skip
+                    if (H.timers.ergTimeout) {
+                        clearTimeout(H.timers.ergTimeout);
+                        H.timers.ergTimeout = null;
+                    }
+                    // Use setTimeout to avoid blocking the interval
+                    setTimeout(() => H.handlers.skipStep(), 0);
+                }
             } else if (currentStep.type === 'sim') {
                 // SIM step: show route completion progress
                 const route = H.state.garminRoute;
@@ -347,6 +373,11 @@
             }
         } else {
             D.progressBar.style.width = '100%';
+        }
+
+        // Update graph position marker
+        if (H.graph && H.graph.updatePositionMarker) {
+            H.graph.updatePositionMarker();
         }
     }
 
@@ -381,11 +412,359 @@
         // workout clock
         if (H.timers.totalWorkoutTimeInterval) clearInterval(H.timers.totalWorkoutTimeInterval);
         H.timers.totalWorkoutTimeInterval = setInterval(updateWorkoutTime, 1000);
+
+        // Render workout graph on boot (after a short delay to ensure graph module is loaded)
+        setTimeout(() => {
+            if (H.graph && H.graph.renderWorkoutGraph) {
+                H.graph.renderWorkoutGraph();
+            }
+        }, 100);
     }
 
     document.addEventListener('DOMContentLoaded', boot);
 
     H.ui = { updateWorkoutTime, updateWorkoutDisplays, boot };
+})(window.Hybrid);
+
+
+// 3.5) WORKOUT GRAPH - Visual representation of workout profile
+(function (H) {
+    const GRAPH_CONFIG = {
+        width: 800,
+        height: 150,
+        paddingLeft: 50,
+        paddingRight: 50,  // More space for right axis
+        paddingTop: 15,
+        paddingBottom: 10,
+        // For power display (ERG) - left axis
+        minPower: 0,
+        maxPower: 400,  // Will be adjusted dynamically
+        // For gradient display (SIM) - right axis
+        minGrade: -10,
+        maxGrade: 15
+    };
+
+    // Calculate total workout duration/distance for x-axis scaling
+    function calculateWorkoutMetrics() {
+        const plan = H.state.workoutPlan;
+        const route = H.state.garminRoute;
+        let totalDuration = 0;
+        const steps = [];
+
+        for (const step of plan) {
+            if (step.type === 'erg') {
+                const durationSec = (step.duration || 0) * 60;
+                steps.push({
+                    type: 'erg',
+                    power: step.power || 0,
+                    startTime: totalDuration,
+                    endTime: totalDuration + durationSec,
+                    duration: durationSec
+                });
+                totalDuration += durationSec;
+            } else if (step.type === 'sim') {
+                // Estimate SIM duration based on route distance and assumed speed
+                const routeDistance = route ? route.totalDistance : 5000;
+                const assumedSpeedKph = 25; // Assume 25 kph average
+                const estimatedDuration = (routeDistance / 1000) / assumedSpeedKph * 3600;
+                steps.push({
+                    type: 'sim',
+                    segmentName: step.segmentName,
+                    startTime: totalDuration,
+                    endTime: totalDuration + estimatedDuration,
+                    duration: estimatedDuration,
+                    routeDistance: routeDistance
+                });
+                totalDuration += estimatedDuration;
+            }
+        }
+
+        // Calculate max power for ERG scaling
+        let maxPower = GRAPH_CONFIG.maxPower;
+        for (const step of steps) {
+            if (step.type === 'erg' && step.power > maxPower) {
+                maxPower = Math.ceil((step.power + 50) / 50) * 50; // Round up to nearest 50
+            }
+        }
+
+        return { totalDuration, steps, maxPower };
+    }
+
+    // Generate ERG profile paths (separate from SIM)
+    function generateErgPaths(metrics) {
+        const { totalDuration, steps, maxPower } = metrics;
+        if (!steps.length || totalDuration === 0) return '';
+
+        const config = GRAPH_CONFIG;
+        const graphWidth = config.width - config.paddingLeft - config.paddingRight;
+        const graphHeight = config.height - config.paddingTop - config.paddingBottom;
+        const baseY = config.height - config.paddingBottom;
+
+        const timeToX = (t) => config.paddingLeft + (t / totalDuration) * graphWidth;
+        const powerToY = (power) => {
+            const normalized = power / maxPower;
+            return baseY - (normalized * graphHeight);
+        };
+
+        let paths = '';
+
+        for (const step of steps) {
+            if (step.type !== 'erg') continue;
+
+            const x1 = timeToX(step.startTime);
+            const x2 = timeToX(step.endTime);
+            const y = powerToY(step.power);
+
+            // Create filled rectangle for ERG step
+            const pathData = `M ${x1} ${baseY} L ${x1} ${y} L ${x2} ${y} L ${x2} ${baseY} Z`;
+            paths += `<path d="${pathData}" fill="url(#erg-gradient)" stroke="#3b82f6" stroke-width="2"/>`;
+        }
+
+        return paths;
+    }
+
+    // Generate SIM profile paths (separate from ERG)
+    function generateSimPaths(metrics) {
+        const { totalDuration, steps } = metrics;
+        if (!steps.length || totalDuration === 0) return '';
+
+        const config = GRAPH_CONFIG;
+        const graphWidth = config.width - config.paddingLeft - config.paddingRight;
+        const graphHeight = config.height - config.paddingTop - config.paddingBottom;
+        
+        // SIM uses middle as zero line
+        const zeroY = config.paddingTop + graphHeight / 2;
+        const gradeRange = config.maxGrade - config.minGrade; // 25% total range
+
+        const timeToX = (t) => config.paddingLeft + (t / totalDuration) * graphWidth;
+        const gradeToY = (grade) => {
+            // Clamp grade to range
+            const clampedGrade = Math.max(config.minGrade, Math.min(config.maxGrade, grade));
+            // Normalize: +15 at top, -10 at bottom
+            const normalized = (clampedGrade - config.minGrade) / gradeRange;
+            return config.height - config.paddingBottom - (normalized * graphHeight);
+        };
+
+        let paths = '';
+
+        for (const step of steps) {
+            if (step.type !== 'sim') continue;
+
+            const x1 = timeToX(step.startTime);
+            const x2 = timeToX(step.endTime);
+            const stepWidth = x2 - x1;
+
+            // Get route data for gradient profile
+            const routeData = H.state.preprocessedRoute;
+            
+            if (routeData && routeData.length > 1) {
+                const routeDistance = step.routeDistance || routeData[routeData.length - 1].distance;
+                
+                // Sample route at regular intervals
+                const numSamples = Math.min(100, Math.max(20, routeData.length));
+                const pathPoints = [];
+                
+                // Start at zero line
+                pathPoints.push(`M ${x1} ${zeroY}`);
+                
+                for (let j = 0; j <= numSamples; j++) {
+                    const sampleDist = (j / numSamples) * routeDistance;
+                    const grade = H.route.getGradeForDistance(sampleDist);
+                    const x = x1 + (j / numSamples) * stepWidth;
+                    const y = gradeToY(grade);
+                    pathPoints.push(`L ${x} ${y}`);
+                }
+                
+                // Close back to zero line
+                pathPoints.push(`L ${x2} ${zeroY}`);
+                pathPoints.push('Z');
+                
+                const pathData = pathPoints.join(' ');
+                paths += `<path d="${pathData}" fill="url(#sim-gradient-up)" stroke="#f97316" stroke-width="1.5"/>`;
+            } else {
+                // No route data, show flat line at zero
+                const pathData = `M ${x1} ${zeroY} L ${x1} ${zeroY} L ${x2} ${zeroY} L ${x2} ${zeroY} Z`;
+                paths += `<path d="${pathData}" fill="url(#sim-gradient-up)" stroke="#f97316" stroke-width="1.5"/>`;
+            }
+        }
+
+        return paths;
+    }
+
+    // Generate step divider lines and labels
+    function generateStepDividers(metrics) {
+        const { totalDuration, steps } = metrics;
+        if (!steps.length) return '';
+
+        const config = GRAPH_CONFIG;
+        const graphWidth = config.width - config.paddingLeft - config.paddingRight;
+        const timeToX = (t) => config.paddingLeft + (t / totalDuration) * graphWidth;
+
+        let dividers = '';
+        
+        // Add first step label with color coding
+        if (steps.length > 0) {
+            const color = steps[0].type === 'erg' ? '#3b82f6' : '#f97316';
+            dividers += `<text x="${config.paddingLeft + 5}" y="${config.paddingTop + 10}" fill="${color}" font-size="10" font-weight="bold">${steps[0].type.toUpperCase()}</text>`;
+        }
+        
+        for (let i = 1; i < steps.length; i++) {
+            const x = timeToX(steps[i].startTime);
+            
+            // Divider line
+            dividers += `<line x1="${x}" y1="${config.paddingTop}" x2="${x}" y2="${config.height - config.paddingBottom}" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4"/>`;
+            
+            // Step label with color coding
+            const color = steps[i].type === 'erg' ? '#3b82f6' : '#f97316';
+            dividers += `<text x="${x + 5}" y="${config.paddingTop + 10}" fill="${color}" font-size="10" font-weight="bold">${steps[i].type.toUpperCase()}</text>`;
+        }
+
+        return dividers;
+    }
+
+    // Update Y-axis labels based on workout content
+    function updateYLabels(metrics) {
+        const { steps, maxPower } = metrics;
+        const hasErg = steps.some(s => s.type === 'erg');
+        const hasSim = steps.some(s => s.type === 'sim');
+
+        // Update left axis (Power for ERG)
+        const leftLabels = document.getElementById('graph-y-labels-left');
+        if (leftLabels) {
+            if (hasErg) {
+                leftLabels.innerHTML = `
+                    <text x="45" y="20" text-anchor="end" font-weight="bold" fill="#3b82f6">W</text>
+                    <text x="45" y="35" text-anchor="end" fill="#3b82f6">${maxPower}</text>
+                    <text x="45" y="140" text-anchor="end" fill="#3b82f6">0</text>
+                `;
+                leftLabels.style.opacity = '1';
+            } else {
+                leftLabels.style.opacity = '0.3';
+            }
+        }
+
+        // Update right axis (Gradient for SIM)
+        const rightLabels = document.getElementById('graph-y-labels-right');
+        if (rightLabels) {
+            if (hasSim) {
+                rightLabels.innerHTML = `
+                    <text x="755" y="20" text-anchor="start" font-weight="bold" fill="#f97316">%</text>
+                    <text x="755" y="35" text-anchor="start" fill="#f97316">+15</text>
+                    <text x="755" y="78" text-anchor="start" fill="#f97316">0</text>
+                    <text x="755" y="140" text-anchor="start" fill="#f97316">-10</text>
+                `;
+                rightLabels.style.opacity = '1';
+            } else {
+                rightLabels.style.opacity = '0.3';
+            }
+        }
+    }
+
+    // Render the complete workout graph
+    function renderWorkoutGraph() {
+        const D = H.dom;
+        const ergProfiles = document.getElementById('graph-erg-profiles');
+        const simProfiles = document.getElementById('graph-sim-profiles');
+        
+        if (!ergProfiles || !simProfiles) return;
+
+        const plan = H.state.workoutPlan;
+        
+        // Show/hide empty message
+        if (!plan || plan.length === 0) {
+            if (D.graphEmptyMessage) D.graphEmptyMessage.style.display = 'block';
+            ergProfiles.innerHTML = '';
+            simProfiles.innerHTML = '';
+            if (D.graphStepDividers) D.graphStepDividers.innerHTML = '';
+            if (D.graphPositionMarker) D.graphPositionMarker.style.display = 'none';
+            return;
+        }
+
+        if (D.graphEmptyMessage) D.graphEmptyMessage.style.display = 'none';
+        
+        const metrics = calculateWorkoutMetrics();
+        
+        // Render ERG paths (blue)
+        ergProfiles.innerHTML = generateErgPaths(metrics);
+        
+        // Render SIM paths (orange)
+        simProfiles.innerHTML = generateSimPaths(metrics);
+        
+        // Render step dividers
+        if (D.graphStepDividers) {
+            D.graphStepDividers.innerHTML = generateStepDividers(metrics);
+        }
+        
+        // Update Y-axis labels
+        updateYLabels(metrics);
+        
+        // Reset position marker
+        if (D.graphPositionMarker) {
+            D.graphPositionMarker.setAttribute('transform', `translate(${GRAPH_CONFIG.paddingLeft}, 0)`);
+            D.graphPositionMarker.style.display = 'none';
+        }
+
+        // Store metrics for position updates
+        H.state.graphMetrics = metrics;
+    }
+
+    // Update position marker during workout
+    function updatePositionMarker() {
+        const D = H.dom;
+        const S = H.state.workout;
+        const metrics = H.state.graphMetrics;
+        
+        if (!D.graphPositionMarker || !metrics || !S.isRunning) {
+            if (D.graphPositionMarker) D.graphPositionMarker.style.display = 'none';
+            return;
+        }
+
+        const config = GRAPH_CONFIG;
+        const graphWidth = config.width - config.paddingLeft - config.paddingRight;
+        const { totalDuration, steps } = metrics;
+
+        // Calculate current position in the workout
+        let elapsedTime = 0;
+        
+        // Sum up completed steps
+        for (let i = 0; i < S.currentStepIndex && i < steps.length; i++) {
+            elapsedTime += steps[i].duration;
+        }
+        
+        // Add current step progress
+        if (S.currentStepIndex < steps.length) {
+            const currentStep = steps[S.currentStepIndex];
+            const stepElapsed = (Date.now() - S.stepStartTime) / 1000;
+            
+            if (currentStep.type === 'erg') {
+                // ERG: use time elapsed
+                elapsedTime += Math.min(stepElapsed, currentStep.duration);
+            } else if (currentStep.type === 'sim') {
+                // SIM: use distance traveled as fraction of route
+                const route = H.state.garminRoute;
+                if (route && route.totalDistance > 0) {
+                    const fraction = Math.min(1, (S.simDistanceTraveled || 0) / route.totalDistance);
+                    elapsedTime += fraction * currentStep.duration;
+                } else {
+                    elapsedTime += Math.min(stepElapsed, currentStep.duration);
+                }
+            }
+        }
+
+        // Convert to X position
+        const fraction = Math.min(1, elapsedTime / totalDuration);
+        const x = config.paddingLeft + fraction * graphWidth;
+        
+        D.graphPositionMarker.setAttribute('transform', `translate(${x}, 0)`);
+        D.graphPositionMarker.style.display = 'block';
+    }
+
+    H.graph = { 
+        renderWorkoutGraph, 
+        updatePositionMarker,
+        calculateWorkoutMetrics,
+        GRAPH_CONFIG
+    };
 })(window.Hybrid);
 
 
@@ -715,9 +1094,14 @@
         }
         if (W.isRunning) return;
 
+        // FIX: Reset stepStartTime BEFORE setting isRunning to prevent race condition
+        // where updateWorkoutTime could use stale stepStartTime from previous workout
+        const now = Date.now();
+        W.stepStartTime = now;  // Initialize to prevent stale time issues
+        W.workoutStartTime = now;
+        
         W.isRunning = true;
         W.currentStepIndex = 0;
-        W.workoutStartTime = Date.now();
         W.lastSimUpdateTs = 0;
         W.simDistanceTraveled = 0;
         W.stepSimDistance = 0;
@@ -726,6 +1110,11 @@
 
         console.log('=== WORKOUT STARTED ===');
         console.log(`Total steps: ${S.workoutPlan.length}`);
+
+        // Show position marker on graph
+        if (H.graph && H.dom.graphPositionMarker) {
+            H.dom.graphPositionMarker.style.display = 'block';
+        }
 
         runWorkoutStep();
 
@@ -884,6 +1273,9 @@
 
         try { await H.erg.setErgModePower(0); } catch { }
 
+        // Hide position marker on graph (keep it at final position)
+        // Position marker stays visible but stops updating
+        
         // Generate workout summary
         generateWorkoutSummary();
     }
