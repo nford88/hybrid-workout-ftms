@@ -1,7 +1,7 @@
 // FTMS Hybrid Workout App - Main JavaScript Module
 
-// Note: ftms is available globally after including ftms.js script
-// No import needed - ftms.js exports to window.ftms
+// Import ftms module to ensure it's loaded before main.js runs
+import './ftms.js';
 
 // 1) GLOBAL VARS / STATE / UTILS
 (function (H) {
