@@ -1,7 +1,7 @@
 // FTMS Hybrid Workout App - Main JavaScript Module
 
-// Import FTMS Bluetooth module
-import { ftms } from './ftms.js';
+// Note: ftms is available globally after including ftms.js script
+// No import needed - ftms.js exports to window.ftms
 
 // 1) GLOBAL VARS / STATE / UTILS
 (function (H) {
@@ -69,7 +69,7 @@ import { ftms } from './ftms.js';
             stepSummary: [], // Track each step's performance
             stepSimDistance: 0, // Track distance within current SIM step only
             summary: null, // Store workout summary here instead of global
-            
+
             // Enhanced SIM mode state for realistic gradients
             currentGrade: 0, // Currently applied grade
             targetGrade: 0,  // Target grade from route
@@ -86,10 +86,10 @@ import { ftms } from './ftms.js';
     H.utils = {
         // Math utilities
         clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
-        
+
         // Earth radius for route calculations
         R: 6371e3,
-        
+
         // Haversine distance calculation for route processing
         haversineDistance: (lat1, lon1, lat2, lon2) => {
             const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
@@ -99,11 +99,11 @@ import { ftms } from './ftms.js';
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return H.utils.R * c;
         },
-        
+
         // UI utilities
         showError: (m) => { H.dom.errorText.textContent = m; H.dom.errorDiv.classList.remove('hidden'); },
         hideError: () => H.dom.errorDiv.classList.add('hidden'),
-        
+
         // Format time for display
         formatTime: (seconds) => {
             const minutes = Math.floor(seconds / 60);
@@ -222,13 +222,13 @@ import { ftms } from './ftms.js';
 
         S.workoutPlan.forEach((step, index) => {
             const el = document.createElement('div');
-            el.className = 'flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm';
+            el.className = 'flex items-center justify-between p-3 sm:p-4 bg-white rounded-lg border border-gray-200 shadow-sm text-sm sm:text-base';
             let content = '';
             if (step.type === 'erg') { content = `<span class="font-bold text-gray-800">ERG:</span> ${step.duration} min at ${step.power}W`; S.workout.totalWorkoutDuration += step.duration * 60; }
-            else if (step.type === 'sim') { content = `<span class="font-bold text-gray-800">SIM:</span> ${step.segmentName}`; }
+            else if (step.type === 'sim') { content = `<span class="font-bold text-gray-800">SIM:</span> <span class="hidden xs:inline">${step.segmentName}</span><span class="xs:hidden">Route</span>`; }
             el.innerHTML = `
-        <div><span class="text-gray-500 font-medium">Step ${index + 1}:</span> ${content}</div>
-        <button class="remove-step-button text-red-600 hover:text-red-800 transition-colors" data-index="${index}">&times;</button>`;
+        <div class="flex-1 min-w-0"><span class="text-gray-500 font-medium">Step ${index + 1}:</span> ${content}</div>
+        <button class="remove-step-button text-red-600 hover:text-red-800 transition-colors ml-2 text-lg sm:text-xl flex-shrink-0" data-index="${index}">&times;</button>`;
             D.workoutListDiv.appendChild(el);
         });
 
@@ -254,42 +254,42 @@ import { ftms } from './ftms.js';
 
 // 3) UI-SPECIFIC UPDATES
 (function (H) {
-    
+
     // Update workout-specific displays (gradient, step distance)
     function updateWorkoutDisplays() {
         const D = H.dom;
         const S = H.state.workout;
         const plan = H.state.workoutPlan;
-        
+
         if (!S.isRunning || !plan.length) {
             D.gradientDisplay.textContent = '—';
             D.stepDistanceDisplay.textContent = '—';
             return;
         }
-        
+
         const currentStep = plan[S.currentStepIndex];
         if (!currentStep) return;
-        
+
         if (currentStep.type === 'sim') {
             // Show current gradient from route
             const routeGrade = H.route.getGradeForDistance(S.simDistanceTraveled || 0);
             const gradePct = Number.isFinite(routeGrade) ? routeGrade : 0;
-            
+
             if (Math.abs(gradePct) >= 0.1) { // Only show if gradient is significant
                 D.gradientDisplay.textContent = `${gradePct > 0 ? '+' : ''}${gradePct.toFixed(1)}`;
-                D.gradientDisplay.className = gradePct > 0 ? 'text-3xl font-bold text-red-600' : 
-                                              gradePct < 0 ? 'text-3xl font-bold text-blue-600' : 
-                                              'text-3xl font-bold text-green-600';
+                D.gradientDisplay.className = gradePct > 0 ? 'text-3xl font-bold text-red-600' :
+                    gradePct < 0 ? 'text-3xl font-bold text-blue-600' :
+                        'text-3xl font-bold text-green-600';
             } else {
                 D.gradientDisplay.textContent = '0.0';
                 D.gradientDisplay.className = 'text-3xl font-bold text-green-600';
             }
-            
+
             // Show distance progress: route distance vs total step distance
             const route = H.state.garminRoute;
             const routeDistance = Math.round(S.simDistanceTraveled || 0);
             const totalDistance = Math.round(S.stepSimDistance || 0);
-            
+
             if (route && S.routeCompleted) {
                 // Show route completed with extra distance
                 const extraDistance = totalDistance - route.totalDistance;
@@ -305,7 +305,7 @@ import { ftms } from './ftms.js';
         } else {
             // ERG mode - no gradient
             D.gradientDisplay.textContent = '—';
-            
+
             // Show elapsed time converted to distance estimate (using current speed)
             const stepElapsedSec = (Date.now() - S.stepStartTime) / 1000;
             const currentSpeedKph = parseFloat(D.speedDisplay.textContent) || 0;
@@ -313,15 +313,41 @@ import { ftms } from './ftms.js';
             D.stepDistanceDisplay.textContent = Math.round(estimatedDistance);
         }
     }
-    
+
     function updateWorkoutTime() {
         const D = H.dom, S = H.state.workout;
         if (!S.isRunning) return;
         const now = Date.now();
         const elapsedOverallSec = Math.floor((now - S.workoutStartTime) / 1000);
         D.timeDisplay.textContent = H.utils.formatTime(elapsedOverallSec);
-        const totalDurationSec = H.state.workoutPlan.reduce((sum, step) => sum + (step.duration || 0), 0) * 60;
-        D.progressBar.style.width = totalDurationSec > 0 ? `${Math.min(100, (elapsedOverallSec / totalDurationSec) * 100)}%` : '0%';
+
+        // Calculate per-step progress instead of overall workout progress
+        const plan = H.state.workoutPlan;
+        if (plan.length > 0 && S.currentStepIndex < plan.length) {
+            const currentStep = plan[S.currentStepIndex];
+            const stepElapsedSec = Math.floor((now - S.stepStartTime) / 1000);
+
+            if (currentStep.type === 'erg' && currentStep.duration) {
+                // ERG step: show time-based progress
+                const stepDurationSec = currentStep.duration * 60;
+                const stepProgress = Math.min(100, (stepElapsedSec / stepDurationSec) * 100);
+                D.progressBar.style.width = `${stepProgress}%`;
+            } else if (currentStep.type === 'sim') {
+                // SIM step: show route completion progress
+                const route = H.state.garminRoute;
+                if (route && route.totalDistance > 0) {
+                    const routeProgress = Math.min(100, ((S.simDistanceTraveled || 0) / route.totalDistance) * 100);
+                    D.progressBar.style.width = `${routeProgress}%`;
+                } else {
+                    // No route data, show as indeterminate
+                    D.progressBar.style.width = '0%';
+                }
+            } else {
+                D.progressBar.style.width = '0%';
+            }
+        } else {
+            D.progressBar.style.width = '100%';
+        }
     }
 
     function boot() {
@@ -366,9 +392,9 @@ import { ftms } from './ftms.js';
 // 4) ERG CONTROLS (using ftms module)
 (function (H) {
     async function setErgModePower(power) {
-        if (!H.state.ftmsConnected) { 
-            console.error("FTMS not connected."); 
-            return; 
+        if (!H.state.ftmsConnected) {
+            console.error("FTMS not connected.");
+            return;
         }
         try {
             const pwr = Math.max(0, Math.min(2000, Math.round(power)));
@@ -389,7 +415,7 @@ import { ftms } from './ftms.js';
     function calculateRealisticGrade(rawGradePct, currentSpeedKph, currentDistance) {
         const W = H.state.workout;
         const now = Date.now();
-        
+
         // Initialize if first call
         if (!W.lastGradeUpdate) {
             W.currentGrade = rawGradePct;
@@ -398,63 +424,63 @@ import { ftms } from './ftms.js';
             W.lastGradeDistance = currentDistance || 0;
             return rawGradePct;
         }
-        
+
         // Calculate distance-based gradient smoothing
         const distanceTraveled = (currentDistance || 0) - (W.lastGradeDistance || 0);
         const GRADIENT_RAMP_DISTANCE = 10; // Change grade every 10 meters
-        
+
         // Only update target grade if we've traveled enough distance
         if (distanceTraveled >= GRADIENT_RAMP_DISTANCE) {
             // Smooth the target grade to prevent GPS noise spikes
             const gradeDiff = rawGradePct - W.currentGrade;
-            
+
             // Limit grade changes to realistic increments
             const MAX_GRADE_CHANGE_PER_RAMP = 1.5; // Max 1.5% change per 10m
             const smoothedGradeDiff = H.utils.clamp(gradeDiff, -MAX_GRADE_CHANGE_PER_RAMP, MAX_GRADE_CHANGE_PER_RAMP);
-            
+
             W.targetGrade = W.currentGrade + smoothedGradeDiff;
             W.lastGradeDistance = currentDistance;
-            
+
             console.log(`[GRADE RAMP] ${distanceTraveled.toFixed(0)}m: ${W.currentGrade.toFixed(1)}% -> ${W.targetGrade.toFixed(1)}% (raw: ${rawGradePct.toFixed(1)}%)`);
         } else {
             // If we haven't traveled enough distance, keep the target at current grade
             W.targetGrade = W.currentGrade;
         }
-        
+
         // Apply time-based smoothing to the target grade
         const timeSinceUpdate = now - W.lastGradeUpdate;
         const MAX_CHANGE_PER_SECOND = 0.5; // Slower grade changes: 0.5% per second
-        
+
         // If we just updated the target grade due to distance, apply the change more aggressively
         const justUpdatedTarget = distanceTraveled >= GRADIENT_RAMP_DISTANCE;
-        const maxChange = justUpdatedTarget ? 
+        const maxChange = justUpdatedTarget ?
             Math.abs(W.targetGrade - W.currentGrade) : // Apply the full distance-based change
             Math.max(0.1, (timeSinceUpdate / 1000) * MAX_CHANGE_PER_SECOND); // Ensure minimum change for tests
-        
+
         const gradeDiff = W.targetGrade - W.currentGrade;
         const actualChange = H.utils.clamp(gradeDiff, -maxChange, maxChange);
-        
+
         // Calculate momentum factor (higher speed = more momentum assistance)
         const momentumFactor = Math.min(1.0, currentSpeedKph / 12); // Adjusted for more realistic speeds
         const momentumReduction = 0.25 * momentumFactor; // Up to 25% easier with momentum
-        
+
         // Apply momentum-assisted grade
         const newGrade = W.currentGrade + actualChange;
         const momentumAssistedGrade = newGrade * (1 - momentumReduction);
-        
+
         // Prevent negative grades from being too easy (keep some downhill resistance)
         const finalGrade = Math.max(-2, momentumAssistedGrade); // Allow slight negative grades
-        
+
         W.currentGrade = newGrade; // Track actual grade
         W.lastGradeUpdate = now;
-        
+
         return finalGrade;
     }
 
     async function setSimGrade(rawGradePct, opts = {}) {
-        if (!H.state.ftmsConnected) { 
-            console.warn("SIM: FTMS not connected."); 
-            return; 
+        if (!H.state.ftmsConnected) {
+            console.warn("SIM: FTMS not connected.");
+            return;
         }
 
         const { windMS = 0.0, crr = 0.003, cw = 0.45, currentSpeed = 0, currentDistance = 0 } = opts;
@@ -466,26 +492,26 @@ import { ftms } from './ftms.js';
         const now = Date.now();
         if (!setSimGrade.__lastTs) setSimGrade.__lastTs = 0;
         if (now - setSimGrade.__lastTs < 3000) return; // 3 second throttle for smoother changes
-        
+
         // Check if the grade change is significant enough to warrant an update
         if (setSimGrade.__lastGrade !== undefined) {
             const gradeDiff = Math.abs(realisticGrade - setSimGrade.__lastGrade);
             if (gradeDiff < 0.3) return; // Smaller threshold for smoother experience
         }
-        
+
         setSimGrade.__lastTs = now;
         setSimGrade.__lastGrade = realisticGrade;
 
         try {
-            await H.ftms.setSim({ 
-                gradePct: realisticGrade, 
-                crr, 
-                cwa: cw, 
-                windMps: windMS 
+            await H.ftms.setSim({
+                gradePct: realisticGrade,
+                crr,
+                cwa: cw,
+                windMps: windMS
             });
             console.log(`[SIM] Raw: ${rawGradePct.toFixed(1)}% -> Applied: ${realisticGrade.toFixed(1)}% (momentum assist) | speed=${currentSpeed.toFixed(1)}kph`);
-        } catch (err) { 
-            console.warn('SIM: grade setting failed:', err); 
+        } catch (err) {
+            console.warn('SIM: grade setting failed:', err);
         }
     }
 
@@ -502,14 +528,14 @@ import { ftms } from './ftms.js';
         try {
             // Use ftms rampSim for smooth grade transition
             const fromPct = Math.sign(targetPct) * Math.max(0, Math.abs(targetPct) - 2);
-            await window.ftms.rampSim({ 
-                fromPct, 
-                toPct: targetPct, 
-                stepPct: 1, 
+            await window.ftms.rampSim({
+                fromPct,
+                toPct: targetPct,
+                stepPct: 1,
                 dwellMs: 1800,
-                crr: 0.003, 
-                cwa: 0.45, 
-                windMps: 0.0 
+                crr: 0.003,
+                cwa: 0.45,
+                windMps: 0.0
             });
         } catch (err) {
             console.warn('SIM: ramp failed, setting direct grade:', err);
@@ -521,10 +547,10 @@ import { ftms } from './ftms.js';
         const S = H.state.workout;
         const plan = H.state.workoutPlan;
         const step = plan[S.currentStepIndex];
-        
+
         // Only run if we're actually in a SIM step
         if (!step || step.type !== 'sim') return;
-        
+
         // Don't interfere if we're not running a workout
         if (!S.isRunning) return;
 
@@ -534,29 +560,31 @@ import { ftms } from './ftms.js';
         // Get route info for completion detection
         const route = H.state.garminRoute;
         const routeMaxDistance = route ? route.totalDistance : Infinity;
-        
+
         if (Number.isFinite(currentSpeedKph)) {
             const dtSec = Math.max(0, (now - S.lastSimUpdateTs) / 1000);
             const mps = (currentSpeedKph * 1000) / 3600;
             const distanceIncrement = mps * dtSec;
-            
+
             // Always update total step distance (for recording purposes)
             S.stepSimDistance = (S.stepSimDistance || 0) + distanceIncrement;
-            
+
             // Only update route position if we haven't completed the route
             const currentRouteDistance = S.simDistanceTraveled || 0;
             if (currentRouteDistance < routeMaxDistance) {
                 const newRouteDistance = currentRouteDistance + distanceIncrement;
                 S.simDistanceTraveled = Math.min(newRouteDistance, routeMaxDistance);
-                
+
                 // Check if we just completed the route
                 if (S.simDistanceTraveled >= routeMaxDistance && currentRouteDistance < routeMaxDistance) {
-                    console.log(`🏁 [SIM ROUTE COMPLETE] Finished ${route.name} at ${routeMaxDistance.toFixed(0)}m! Continuing with final gradient...`);
+                    console.log(`🏁 [SIM ROUTE COMPLETE] Finished ${route.name} at ${routeMaxDistance.toFixed(0)}m! Auto-advancing in 5 seconds...`);
                     S.routeCompleted = true;
-                    
-                    // TODO: Add auto-complete option here if desired
-                    // For now, let the user manually skip when they want to end the step
-                    // setTimeout(() => { H.handlers.skipStep(); }, 5000); // Auto-skip after 5 seconds
+
+                    // Auto-advance after route completion with 5 second delay
+                    setTimeout(() => {
+                        console.log(`🚀 [AUTO-ADVANCE] Moving to next step after route completion`);
+                        H.handlers.skipStep();
+                    }, 5000); // Auto-skip after 5 seconds
                 }
             }
         }
@@ -569,17 +597,17 @@ import { ftms } from './ftms.js';
         // Enhanced logging with route completion status
         if (!updateSimMode.__lastLog || now - updateSimMode.__lastLog > 3000) {
             const routeStatus = S.routeCompleted ? ' [ROUTE COMPLETE]' : '';
-            const routeProgress = routeMaxDistance < Infinity ? 
+            const routeProgress = routeMaxDistance < Infinity ?
                 ` (${((S.simDistanceTraveled / routeMaxDistance) * 100).toFixed(1)}%)` : '';
             console.log(`[SIM] route=${(S.simDistanceTraveled || 0).toFixed(0)}m${routeProgress} | total=${(S.stepSimDistance || 0).toFixed(0)}m | grade=${gradePct.toFixed(2)}%${routeStatus}`);
             updateSimMode.__lastLog = now;
         }
 
         // This will be throttled by setSimGrade to prevent conflicts
-        setSimGrade(gradePct, { 
-            windMS: 0.0, 
-            crr: 0.003, 
-            cw: 0.45, 
+        setSimGrade(gradePct, {
+            windMS: 0.0,
+            crr: 0.003,
+            cw: 0.45,
             currentSpeed: currentSpeedKph,
             currentDistance: S.simDistanceTraveled || 0
         });
@@ -596,13 +624,13 @@ import { ftms } from './ftms.js';
     // FTMS data handler - called by our correct parsing
     function handleFtmsData(data) {
         const D = H.dom;
-        
+
         // Since we're using the correct parser from trainer_debug.html, 
         // the data should be reliable. Just basic sanity checks.
         const isValidPower = data.powerW !== null && data.powerW !== undefined && data.powerW >= -500 && data.powerW <= 2000;
         const isValidCadence = data.cadenceRpm !== null && data.cadenceRpm !== undefined && data.cadenceRpm >= 0 && data.cadenceRpm <= 250;
         const isValidSpeed = data.speedKph !== null && data.speedKph !== undefined && data.speedKph >= 0 && data.speedKph <= 80;
-        
+
         // Update displays with data from our correct parser
         if (isValidPower) {
             D.powerDisplay.textContent = data.powerW;
@@ -612,7 +640,7 @@ import { ftms } from './ftms.js';
         }
         if (isValidSpeed) {
             D.speedDisplay.textContent = data.speedKph.toFixed(1);
-            
+
             // Update SIM mode if active - but throttle to prevent conflicts
             const currentStep = H.state.workoutPlan[H.state.workout.currentStepIndex];
             if (H.state.workout.isRunning && currentStep?.type === 'sim') {
@@ -624,12 +652,12 @@ import { ftms } from './ftms.js';
                 }
             }
         }
-        
+
         // Display null values as dashes like trainer_debug.html
         if (data.powerW === null) D.powerDisplay.textContent = '—';
         if (data.cadenceRpm === null) D.cadenceDisplay.textContent = '—';
         if (data.speedKph === null) D.speedDisplay.textContent = '—';
-        
+
         // Update gradient and step distance displays
         H.ui.updateWorkoutDisplays();
     }
@@ -639,17 +667,17 @@ import { ftms } from './ftms.js';
         console.info("--- Starting Bluetooth Trainer Connection ---");
         try {
             D.connectionStatus.textContent = 'Status: Connecting...';
-            
-            await H.ftms.connect({ 
+
+            await H.ftms.connect({
                 nameHint: 'KICKR',  // You can adjust this or make it configurable
                 log: (msg) => console.log('[FTMS]', msg)
             });
-            
+
             // Set up event listeners for FTMS data
             H.ftms.on('ibd', H.handlers.handleFtmsData);
-            
+
             // No need for custom parsing - ftms.js is now fixed!
-            
+
             H.state.ftmsConnected = true;
             D.connectionStatus.textContent = `Status: Connected! Please start pedaling to see your metrics.`;
             H.utils.hideError();
@@ -717,7 +745,7 @@ import { ftms } from './ftms.js';
         if (H.timers.simInterval) clearInterval(H.timers.simInterval);
 
         const currentStep = plan[W.currentStepIndex];
-        Dom.workoutProgressText.textContent = `Step ${W.currentStepIndex + 1}: ${currentStep.type.toUpperCase()}`;
+        Dom.workoutProgressText.textContent = `Step ${W.currentStepIndex + 1}/${plan.length}: ${currentStep.type.toUpperCase()}`;
         W.stepStartTime = Date.now();
 
         console.log(`--- STEP ${W.currentStepIndex + 1}/${plan.length}: ${currentStep.type.toUpperCase()} ---`);
@@ -734,24 +762,24 @@ import { ftms } from './ftms.js';
             W.simDistanceTraveled = 0; // Reset route position
             W.lastSimUpdateTs = 0;
             W.routeCompleted = false; // Reset route completion for this step
-            
+
             // Reset gradient state for smooth transitions
             W.currentGrade = 0;
             W.targetGrade = 0;
             W.lastGradeUpdate = Date.now();
             W.lastGradeDistance = 0;
             W.gradeHistory = [];
-            
+
             // Display route info in target
             const route = H.state.garminRoute;
             if (route) {
-                Dom.targetDisplay.textContent = `Route: ${(route.totalDistance/1000).toFixed(2)}km`;
+                Dom.targetDisplay.textContent = `Route: ${(route.totalDistance / 1000).toFixed(2)}km`;
                 console.log(`SIM: Following route gradient "${currentStep.segmentName}" (${route.totalDistance.toFixed(0)}m total)`);
             } else {
                 Dom.targetDisplay.textContent = `Grade: Route`;
                 console.log(`SIM: Following route gradient (${currentStep.segmentName})`);
             }
-            
+
             (async () => {
                 try { await H.erg.setErgModePower(0); } catch { }
                 await new Promise(r => setTimeout(r, 250));
@@ -785,10 +813,10 @@ import { ftms } from './ftms.js';
         const currentStep = plan[W.currentStepIndex];
         const stepEndTime = Date.now();
         const stepDurationSec = (stepEndTime - W.stepStartTime) / 1000;
-        const stepDistanceMeters = currentStep.type === 'sim' ? 
-            (W.stepSimDistance || 0) : 
+        const stepDistanceMeters = currentStep.type === 'sim' ?
+            (W.stepSimDistance || 0) :
             calculateErgStepDistance();
-        
+
         // Validate distance calculation - prevent negative distances
         const validatedDistance = Math.max(0, stepDistanceMeters);
         if (validatedDistance !== stepDistanceMeters) {
@@ -813,15 +841,15 @@ import { ftms } from './ftms.js';
         };
 
         W.stepSummary.push(summary);
-        
+
         // Enhanced logging for SIM vs ERG steps
         if (summary.type === 'sim' && summary.routeDistance !== null) {
-            const routeInfo = summary.routeCompleted ? 
-                `${(summary.routeDistance/1000).toFixed(2)}km COMPLETE` : 
-                `${(summary.routeDistance/1000).toFixed(2)}km route`;
-            console.log(`STEP ${summary.stepNumber} COMPLETE: ${summary.type.toUpperCase()} | Duration: ${(summary.actualDuration/60).toFixed(1)}min | Total: ${(summary.distance/1000).toFixed(2)}km | Route: ${routeInfo} | Avg Speed: ${summary.averageSpeed.toFixed(1)}kph`);
+            const routeInfo = summary.routeCompleted ?
+                `${(summary.routeDistance / 1000).toFixed(2)}km COMPLETE` :
+                `${(summary.routeDistance / 1000).toFixed(2)}km route`;
+            console.log(`STEP ${summary.stepNumber} COMPLETE: ${summary.type.toUpperCase()} | Duration: ${(summary.actualDuration / 60).toFixed(1)}min | Total: ${(summary.distance / 1000).toFixed(2)}km | Route: ${routeInfo} | Avg Speed: ${summary.averageSpeed.toFixed(1)}kph`);
         } else {
-            console.log(`STEP ${summary.stepNumber} COMPLETE: ${summary.type.toUpperCase()} | Duration: ${(summary.actualDuration/60).toFixed(1)}min | Distance: ${(summary.distance/1000).toFixed(2)}km | Avg Speed: ${summary.averageSpeed.toFixed(1)}kph`);
+            console.log(`STEP ${summary.stepNumber} COMPLETE: ${summary.type.toUpperCase()} | Duration: ${(summary.actualDuration / 60).toFixed(1)}min | Distance: ${(summary.distance / 1000).toFixed(2)}km | Avg Speed: ${summary.averageSpeed.toFixed(1)}kph`);
         }
     }
 
@@ -845,7 +873,7 @@ import { ftms } from './ftms.js';
         Dom.workoutProgressText.textContent = "Workout complete!";
         Dom.targetDisplay.textContent = '';
         Dom.progressBar.style.width = '100%';
-        
+
         // Reset displays
         Dom.gradientDisplay.textContent = '—';
         Dom.stepDistanceDisplay.textContent = '—';
@@ -868,31 +896,31 @@ import { ftms } from './ftms.js';
 
         console.log('');
         console.log('=== WORKOUT SUMMARY (Garmin Compatible) ===');
-        console.log(`Total Time: ${(totalWorkoutTime/60).toFixed(1)} minutes`);
-        console.log(`Total Distance: ${(totalDistance/1000).toFixed(2)} km`);
+        console.log(`Total Time: ${(totalWorkoutTime / 60).toFixed(1)} minutes`);
+        console.log(`Total Distance: ${(totalDistance / 1000).toFixed(2)} km`);
         console.log(`Average Speed: ${avgSpeed.toFixed(1)} kph`);
         console.log(`Steps Completed: ${W.stepSummary.length}`);
         console.log('');
-        
+
         console.log('Step-by-Step Breakdown:');
         W.stepSummary.forEach((step, index) => {
             const ergInfo = step.type === 'erg' ? ` @ ${step.target}` : '';
             const segInfo = step.segmentName ? ` (${step.segmentName})` : '';
             console.log(`${index + 1}. ${step.type.toUpperCase()}${ergInfo}${segInfo}`);
-            
+
             if (step.type === 'sim' && step.routeDistance !== null) {
-                const routeInfo = step.routeCompleted ? 
-                    ` | Route: ${(step.routeDistance/1000).toFixed(2)}km COMPLETE` : 
-                    ` | Route: ${(step.routeDistance/1000).toFixed(2)}km (incomplete)`;
-                console.log(`   Time: ${(step.actualDuration/60).toFixed(1)}min | Total: ${(step.distance/1000).toFixed(2)}km${routeInfo} | Avg Speed: ${step.averageSpeed.toFixed(1)}kph`);
+                const routeInfo = step.routeCompleted ?
+                    ` | Route: ${(step.routeDistance / 1000).toFixed(2)}km COMPLETE` :
+                    ` | Route: ${(step.routeDistance / 1000).toFixed(2)}km (incomplete)`;
+                console.log(`   Time: ${(step.actualDuration / 60).toFixed(1)}min | Total: ${(step.distance / 1000).toFixed(2)}km${routeInfo} | Avg Speed: ${step.averageSpeed.toFixed(1)}kph`);
             } else {
-                console.log(`   Time: ${(step.actualDuration/60).toFixed(1)}min | Distance: ${(step.distance/1000).toFixed(2)}km | Avg Speed: ${step.averageSpeed.toFixed(1)}kph`);
+                console.log(`   Time: ${(step.actualDuration / 60).toFixed(1)}min | Distance: ${(step.distance / 1000).toFixed(2)}km | Avg Speed: ${step.averageSpeed.toFixed(1)}kph`);
             }
         });
-        
+
         console.log('');
         console.log('=== END WORKOUT SUMMARY ===');
-        
+
         // Store Garmin-like summary object in our state for potential export
         W.summary = {
             totalTime: totalWorkoutTime,
@@ -901,7 +929,7 @@ import { ftms } from './ftms.js';
             steps: W.stepSummary,
             timestamp: new Date().toISOString()
         };
-        
+
         // Also expose on window for easy console access
         window.lastWorkoutSummary = W.summary;
         console.log('Workout summary saved to H.state.workout.summary (also available as window.lastWorkoutSummary)');

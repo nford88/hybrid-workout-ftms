@@ -1,0 +1,2373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zwift FTMS Virtual Shifting Hack - Protocol Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gear-active { background-color: #3b82f6; color: white; }
+        .gear-inactive { background-color: #e5e7eb; color: #374151; }
+        .gear-inactive:hover { background-color: #d1d5db; }
+        .command-log { font-family: 'Courier New', monospace; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Zwift FTMS Virtual Shifting Hack</h1>
+            <p class="text-gray-600 mb-4">Interactive protocol explorer for Zwift's virtual gearing mechanism using FTMS Set Target Wheel Circumference (0x13)</p>
+            
+            <!-- Protocol Info -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="bg-blue-50 p-3 rounded">
+                    <div class="font-semibold text-blue-800">Protocol Version</div>
+                    <div class="text-blue-600">1.0</div>
+                </div>
+                <div class="bg-green-50 p-3 rounded">
+                    <div class="font-semibold text-green-800">FTMS Op Code</div>
+                    <div class="text-green-600">0x13 (Set Target Wheel Circumference)</div>
+                </div>
+                <div class="bg-purple-50 p-3 rounded">
+                    <div class="font-semibold text-purple-800">Base Circumference</div>
+                    <div class="text-purple-600">2096mm (700c x 25mm)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Virtual Gear Selector -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Virtual Gear Selector</h2>
+                
+                <!-- Current Gear Display -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div class="text-sm text-gray-600">Current Gear Index</div>
+                            <div class="text-2xl font-bold text-blue-600" id="current-index">0</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Gear Ratio</div>
+                            <div class="text-2xl font-bold text-green-600" id="current-ratio">2.50</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <div class="text-sm text-gray-600">FTMS Value (0x13)</div>
+                        <div class="text-xl font-mono text-purple-600" id="current-ftms">21 (0x15)</div>
+                    </div>
+                </div>
+
+                <!-- Gear Grid -->
+                <div class="grid grid-cols-5 gap-2 mb-4" id="gear-grid">
+                    <!-- Gear buttons will be populated by JavaScript -->
+                </div>
+
+                <!-- Quick Controls -->
+                <div class="flex justify-center space-x-2">
+                    <button id="shift-down" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+                        Shift Down ↓
+                    </button>
+                    <button id="reset-gear" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                        Reset (0)
+                    </button>
+                    <button id="shift-up" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+                        Shift Up ↑
+                    </button>
+                </div>
+            </div>
+
+            <!-- FTMS Command Generator -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">FTMS Command Generator</h2>
+                
+                <!-- Current Command -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div class="text-sm text-gray-600 mb-2">Generated Command Payload</div>
+                    <div class="command-log text-lg bg-black text-green-400 p-3 rounded" id="command-payload">
+                        [0x13, 0x15, 0x00]
+                    </div>
+                    <div class="text-sm text-gray-500 mt-2">
+                        Op Code: 0x13 | Value: <span id="payload-value">21</span> | Padding: 0x00
+                    </div>
+                </div>
+
+                <!-- Bluetooth Controls -->
+                <div class="space-y-3">
+                    <button id="connect-trainer" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                        🔗 Connect FTMS Trainer
+                    </button>
+                    <button id="scan-all-chars" class="w-full px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors" disabled>
+                        🔍 Scan ALL Characteristics
+                    </button>
+                    <button id="test-zwift-shifting" class="w-full px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors" disabled>
+                        🧪 Test SwiftControl Patterns
+                    </button>
+                    <button id="test-ftms-shifting" class="w-full px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors" disabled>
+                        🔧 Test FTMS Virtual Shifting
+                    </button>
+                    <button id="test-wahoo-patterns" class="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors" disabled>
+                        🎪 Test Wahoo Patterns
+                    </button>
+                    <button id="read-features" class="w-full px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition-colors" disabled>
+                        📋 Read FTMS Features
+                    </button>
+                    <button id="set-sim-mode" class="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors" disabled>
+                        🏔️ Set SIM Mode (0% Grade)
+                    </button>
+                    <button id="test-qdomyos-method" class="w-full px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors" disabled>
+                        🎯 Test QDomyos Method (Direct Resistance)
+                    </button>
+                    <button id="calibrate-device" class="w-full px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors" disabled>
+                        🔧 Calibrate Device-Specific Resistance
+                    </button>
+                    <button id="debug-ftms-data" class="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors" disabled>
+                        🐛 Debug FTMS Data Reading
+                    </button>
+                    <button id="notification-calibrate" class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors" disabled>
+                        🔔 Notification-Based Calibration (Fixed)
+                    </button>
+                    <button id="adaptive-calibrate" class="w-full px-4 py-2 bg-lime-500 text-white rounded hover:bg-lime-600 transition-colors" disabled>
+                        🎯 Adaptive Baseline Calibration (Recommended)
+                    </button>
+                    <button id="send-command" class="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors" disabled>
+                        📡 Send Gear Command
+                    </button>
+                    <div class="text-sm text-gray-600" id="connection-status">
+                        Not connected to trainer
+                    </div>
+                </div>
+
+                <!-- Formula Display -->
+                <div class="mt-4 p-3 bg-yellow-50 rounded-lg">
+                    <div class="text-sm font-semibold text-yellow-800 mb-1">Calculation Formula</div>
+                    <div class="text-xs text-yellow-700 command-log">
+                        W_target = W_base × (R_virtual / R_fixed)<br>
+                        FTMS_Value = Round(W_target / 100)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Log -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Command Log</h2>
+            <div class="bg-black text-green-400 p-4 rounded-lg h-64 overflow-y-auto command-log" id="command-log">
+                <div class="text-gray-500">// Zwift Virtual Shifting Protocol Explorer v1.0</div>
+                <div class="text-gray-500">// Ready to demonstrate FTMS 0x13 circumference manipulation...</div>
+            </div>
+            <button id="clear-log" class="mt-2 px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 transition-colors">
+                Clear Log
+            </button>
+        </div>
+
+        <!-- Research Notes Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">🔬 SwiftControl Protocol Analysis</h2>
+            <div class="space-y-4 text-sm">
+                <div class="bg-blue-50 p-4 rounded">
+                    <h3 class="font-semibold text-blue-800 mb-2">✅ VERIFIED: Our Implementation Matches SwiftControl!</h3>
+                    <p class="text-blue-700 mb-2">Analysis of jonasbark/swiftcontrol confirms we're on the right track:</p>
+                    <ul class="list-disc list-inside text-blue-600 space-y-1">
+                        <li>✅ <code>RideOn</code> prefix: [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e] - IDENTICAL</li>
+                        <li>✅ Protocol Buffer structure with <code>frontGearIdx</code> and <code>rearGearIdx</code></li>
+                        <li>✅ Data Object IDs: FRONT_GEAR_INDEX (529), REAR_GEAR_INDEX (532), VIRTUAL_SHIFTING_MODE (547)</li>
+                        <li>✅ <code>simulatedRealGearRatio</code> and <code>simulatedVirtualGearRatio</code> fields</li>
+                        <li>✅ Zwift Control Point characteristic: 00000003-19CA-4651-86E5-FA29DCDD09D1</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded">
+                    <h3 class="font-semibold text-green-800 mb-2">🎯 SwiftControl's SET_GEAR_TEST_DATA Pattern</h3>
+                    <div class="text-green-700 mb-2">Protocol Buffer message structure:</div>
+                    <div class="bg-black text-green-400 p-2 rounded font-mono text-xs mb-2">
+class SetGearTestData extends $pb.GeneratedMessage {<br>
+&nbsp;&nbsp;factory SetGearTestData({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$core.int? frontGearIdx,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$core.int? rearGearIdx,<br>
+&nbsp;&nbsp;})<br>
+}
+                    </div>
+                    <ul class="list-disc list-inside text-green-600 space-y-1">
+                        <li>Opcode: <code>SET_GEAR_TEST_DATA</code> (65284 / 0xFF04)</li>
+                        <li>Field 1: frontGearIdx (1=small/hard, 11=big/easy)</li>
+                        <li>Field 2: rearGearIdx (1=small/hard, 11=big/easy)</li>
+                        <li>Protocol Buffer encoding: [0x08, gearIdx, 0x10, gearIdx]</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-yellow-50 p-4 rounded">
+                    <h3 class="font-semibold text-yellow-800 mb-2">⚙️ Gear Simulation Approach</h3>
+                    <p class="text-yellow-700 mb-2">SwiftControl uses two complementary methods:</p>
+                    <ul class="list-disc list-inside text-yellow-600 space-y-1">
+                        <li><strong>Method 1:</strong> Direct gear indices (frontGearIdx/rearGearIdx)</li>
+                        <li><strong>Method 2:</strong> Simulated ratios (simulatedRealGearRatio/simulatedVirtualGearRatio)</li>
+                        <li><strong>Data Objects:</strong> ID-based approach using Data Object IDs 529, 532, 547</li>
+                        <li><strong>Haptic Feedback:</strong> Vibration patterns for gear shift confirmations</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-purple-50 p-4 rounded">
+                    <h3 class="font-semibold text-purple-800 mb-2">🧪 Test Results Summary</h3>
+                    <p class="text-purple-700 mb-2">Wahoo Kickr Core V2 behavior with SwiftControl patterns:</p>
+                    <ul class="list-disc list-inside text-purple-600 space-y-1">
+                        <li>✅ Successfully connects to Zwift custom service (00000001-19CA-...)</li>
+                        <li>✅ Accepts all RideOn-prefixed commands without errors</li>
+                        <li>✅ Responds with "52 69 64 65 4F 6E 02 02" acknowledgments</li>
+                        <li>✅ Continuous Zwift Riding Data notifications flowing</li>
+                        <li>❌ No physical resistance changes felt during testing</li>
+                        <li>🔍 Protocol communication working - missing operational requirements</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-red-50 p-4 rounded">
+                    <h3 class="font-semibold text-red-800 mb-2">🎯 BREAKTHROUGH: QDomyos-Zwift Analysis</h3>
+                    <ul class="list-disc list-inside text-red-600 space-y-1">
+                        <li>✅ Found working virtual shifting in cagnulein/qdomyos-zwift repository</li>
+                        <li>✅ QDomyos acts as bridge: Zwift Play → QDomyos → Direct FTMS resistance</li>
+                        <li>❌ Our approach was wrong: sending controller commands to trainer service</li>
+                        <li>🎯 Correct approach: Parse gear commands → Calculate resistance → Send FTMS resistance</li>
+                        <li>🔧 Need to implement: Direct resistance calculation from gear ratios</li>
+                        <li>⚡ Next: Add QDomyos-style gear→resistance mapping to our implementation</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-emerald-50 p-4 rounded">
+                    <h3 class="font-semibold text-emerald-800 mb-2">🔧 Device-Specific Calibration</h3>
+                    <p class="text-emerald-700 mb-2">Traditional approach: Fixed resistance based on gear ratios</p>
+                    <ul class="list-disc list-inside text-emerald-600 space-y-1">
+                        <li><strong>📊 Process:</strong> Easy gear at 100 RPM + Hard gear at 60 RPM (15s each)</li>
+                        <li><strong>⚙️ Gear Changes:</strong> Manual shifting with pause between phases</li>
+                        <li><strong>🧮 Formula:</strong> Linear interpolation between measured power points</li>
+                        <li><strong>⚠️ Issue:</strong> May not match natural free-ride feel</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-lime-50 p-4 rounded">
+                    <h3 class="font-semibold text-lime-800 mb-2">🎯 Adaptive Baseline Calibration (RECOMMENDED)</h3>
+                    <p class="text-lime-700 mb-2">NEW: Finds your natural power then matches resistance to it</p>
+                    <ul class="list-disc list-inside text-lime-600 space-y-1">
+                        <li><strong>📊 Phase 1:</strong> Record natural power at 120 RPM in easiest gear (no resistance)</li>
+                        <li><strong>🔧 Phase 2:</strong> Test different resistance levels to match your natural power</li>
+                        <li><strong>⚙️ Phase 3:</strong> Optional mapping of middle/hard gears with target power increases</li>
+                        <li><strong>🎯 Result:</strong> Virtual gears feel exactly like your real bike gears</li>
+                        <li><strong>� Benefit:</strong> No arbitrary resistance - matches your actual riding feel</li>
+                        <li><strong>🔄 Smart:</strong> Adapts to YOUR power curve and gear preferences</li>
+                    </ul>
+                    <div class="mt-2 p-2 bg-lime-100 rounded text-xs text-lime-800">
+                        <strong>How it works:</strong> Record 120W natural power in 34F×30R → Find 60W resistance matches that feel → 
+                        Map harder gears to higher resistance that gives proportionally more power (e.g., 180W for middle gear).
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Real vs Virtual Gear Comparison</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Virtual Gears -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">Virtual Gears (Zwift Hack)</h3>
+                    <div class="space-y-1 text-sm max-h-64 overflow-y-auto" id="virtual-gear-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+                <!-- Real Gears -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">Real Gears (Shimano 105 11-30T)</h3>
+                    <div class="space-y-1 text-sm max-h-64 overflow-y-auto">
+                        <div class="flex justify-between"><span>34/30</span><span class="font-mono">1.13</span></div>
+                        <div class="flex justify-between"><span>34/27</span><span class="font-mono">1.26</span></div>
+                        <div class="flex justify-between"><span>34/24</span><span class="font-mono">1.42</span></div>
+                        <div class="flex justify-between"><span>34/21</span><span class="font-mono">1.62</span></div>
+                        <div class="flex justify-between"><span>34/19</span><span class="font-mono">1.79</span></div>
+                        <div class="flex justify-between"><span>34/17</span><span class="font-mono">2.00</span></div>
+                        <div class="flex justify-between"><span>34/15</span><span class="font-mono">2.27</span></div>
+                        <div class="flex justify-between"><span>34/14</span><span class="font-mono">2.43</span></div>
+                        <div class="flex justify-between bg-yellow-100"><span>34/13</span><span class="font-mono">2.62</span></div>
+                        <div class="flex justify-between"><span>34/12</span><span class="font-mono">2.83</span></div>
+                        <div class="flex justify-between"><span>34/11</span><span class="font-mono">3.09</span></div>
+                        <div class="flex justify-between"><span>50/30</span><span class="font-mono">1.67</span></div>
+                        <div class="flex justify-between"><span>50/27</span><span class="font-mono">1.85</span></div>
+                        <div class="flex justify-between"><span>50/24</span><span class="font-mono">2.08</span></div>
+                        <div class="flex justify-between"><span>50/21</span><span class="font-mono">2.38</span></div>
+                        <div class="flex justify-between bg-blue-100"><span>50/19</span><span class="font-mono">2.63</span></div>
+                        <div class="flex justify-between"><span>50/17</span><span class="font-mono">2.94</span></div>
+                        <div class="flex justify-between"><span>50/15</span><span class="font-mono">3.33</span></div>
+                        <div class="flex justify-between"><span>50/14</span><span class="font-mono">3.57</span></div>
+                        <div class="flex justify-between"><span>50/13</span><span class="font-mono">3.85</span></div>
+                        <div class="flex justify-between"><span>50/12</span><span class="font-mono">4.17</span></div>
+                        <div class="flex justify-between"><span>50/11</span><span class="font-mono">4.55</span></div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2">
+                        Highlighted: Virtual baseline (2.50) matches 34/13 (2.62) approximately
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">How The Virtual Shifting Hack Works</h2>
+            <div class="prose text-gray-700">
+                <p class="mb-3">
+                    This tool exploits Zwift's use of FTMS "Set Target Wheel Circumference" (0x13) to simulate different gear ratios.
+                    By changing the virtual wheel circumference, we trick the trainer into thinking we're using different gears.
+                </p>
+                <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-semibold text-blue-800 mb-2">The Math</h3>
+                    <ul class="text-sm text-blue-700 space-y-1">
+                        <li>• Base circumference: 2096mm (700c × 25mm tire)</li>
+                        <li>• Target ratio: 1.0 to 4.0 (simulating 1:1 to 4:1 gear ratios)</li>
+                        <li>• FTMS expects circumference in 10mm units (divide by 100)</li>
+                        <li>• Formula: circumference = base × (target_ratio / baseline_ratio)</li>
+                    </ul>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-yellow-800 mb-2">Protocol Flow</h3>
+                    <ol class="text-sm text-yellow-700 space-y-1">
+                        <li>1. Connect to FTMS trainer via Web Bluetooth</li>
+                        <li>2. Set SIM mode (resistance controlled by grade/wheel circumference)</li>
+                        <li>3. Send 0x13 command with calculated circumference value</li>
+                        <li>4. Trainer adjusts resistance based on new "wheel size"</li>
+                        <li>5. Virtual gearing achieved without actual derailleur!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import the FTMS module -->
+    <script src="../js/ftms.js"></script>
+    <script>
+        // Check if FTMS module loaded properly
+        if (typeof ftms === 'undefined') {
+            console.error('❌ FTMS module failed to load');
+            console.log('💡 This might be due to file:// protocol restrictions');
+            console.log('🔧 Try serving from a local web server instead');
+        } else {
+            console.log('✅ FTMS module loaded successfully');
+        }
+
+        // Global variables
+        let ftmsClient = null;
+        let ftmsConnected = false;
+        let connectedTrainer = null;
+        let simModeActive = false;
+        let currentGearIndex = 0;
+
+        // DOM elements
+        const gearGridEl = document.getElementById('gear-grid');
+        const virtualGearListEl = document.getElementById('virtual-gear-list');
+        const commandLogEl = document.getElementById('command-log');
+        const connectionStatusEl = document.getElementById('connection-status');
+
+        // Virtual gear ratios (baseline 2.50 = normal 700c wheel)
+        const virtualGears = [
+            { index: -10, ratio: 1.00, ftms_value: 8 },   // Super easy
+            { index: -9,  ratio: 1.10, ftms_value: 9 },
+            { index: -8,  ratio: 1.20, ftms_value: 10 },
+            { index: -7,  ratio: 1.30, ftms_value: 11 },
+            { index: -6,  ratio: 1.40, ftms_value: 12 },
+            { index: -5,  ratio: 1.50, ftms_value: 13 },  // Easy
+            { index: -4,  ratio: 1.60, ftms_value: 13 },
+            { index: -3,  ratio: 1.70, ftms_value: 14 },
+            { index: -2,  ratio: 1.80, ftms_value: 15 },
+            { index: -1,  ratio: 1.90, ftms_value: 16 },
+            { index: 0,   ratio: 2.00, ftms_value: 17 },  // Easy baseline
+            { index: 1,   ratio: 2.10, ftms_value: 18 },
+            { index: 2,   ratio: 2.20, ftms_value: 18 },
+            { index: 3,   ratio: 2.30, ftms_value: 19 },
+            { index: 4,   ratio: 2.40, ftms_value: 20 },
+            { index: 5,   ratio: 2.50, ftms_value: 21 },  // Normal baseline (700c x 25mm)
+            { index: 6,   ratio: 2.60, ftms_value: 22 },
+            { index: 7,   ratio: 2.70, ftms_value: 23 },
+            { index: 8,   ratio: 2.80, ftms_value: 23 },
+            { index: 9,   ratio: 2.90, ftms_value: 24 },
+            { index: 10,  ratio: 3.00, ftms_value: 25 },  // Hard
+            { index: 11,  ratio: 3.20, ftms_value: 27 },
+            { index: 12,  ratio: 3.40, ftms_value: 28 },
+            { index: 13,  ratio: 3.60, ftms_value: 30 },
+            { index: 14,  ratio: 3.80, ftms_value: 32 },
+            { index: 15,  ratio: 4.00, ftms_value: 33 },  // Super hard
+        ];
+
+        // Helper functions
+        function findGear(index) {
+            return virtualGears.find(g => g.index === index) || virtualGears[15]; // Default to baseline
+        }
+
+        function logCommand(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            commandLogEl.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            commandLogEl.scrollTop = commandLogEl.scrollHeight;
+        }
+
+        function updateStatus(message) {
+            logCommand(message);
+        }
+
+        // Wait for user key press (for calibration pauses)
+        function waitForKeyPress() {
+            return new Promise(resolve => {
+                const handler = (e) => {
+                    document.removeEventListener('keydown', handler);
+                    updateStatus('✅ Key pressed - continuing...');
+                    resolve();
+                };
+                document.addEventListener('keydown', handler);
+                updateStatus('⌨️ Press any key to continue...');
+            });
+        }
+
+        function updateGearDisplay(gear) {
+            document.getElementById('current-index').textContent = gear.index;
+            document.getElementById('current-ratio').textContent = gear.ratio.toFixed(2);
+            document.getElementById('current-ftms').textContent = `${gear.ftms_value} (0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')})`;
+            
+            // Update command payload
+            document.getElementById('command-payload').textContent = `[0x13, 0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')}, 0x00]`;
+            document.getElementById('payload-value').textContent = gear.ftms_value;
+        }
+
+        function setGear(index) {
+            currentGearIndex = index;
+            const gear = findGear(index);
+            updateGearDisplay(gear);
+            
+            // Update grid
+            const buttons = gearGridEl.querySelectorAll('button');
+            buttons.forEach(btn => {
+                const btnIndex = parseInt(btn.dataset.index);
+                if (btnIndex === index) {
+                    btn.className = 'gear-active w-full py-2 text-sm rounded';
+                } else {
+                    btn.className = 'gear-inactive w-full py-2 text-sm rounded';
+                }
+            });
+            
+            logCommand(`🎯 Selected gear ${index} (ratio ${gear.ratio}, FTMS 0x${gear.ftms_value.toString(16).toUpperCase()})`);
+        }
+
+        function shiftUp() {
+            if (currentGearIndex < 15) {
+                setGear(currentGearIndex + 1);
+            }
+        }
+
+        function shiftDown() {
+            if (currentGearIndex > -10) {
+                setGear(currentGearIndex - 1);
+            }
+        }
+
+        // Initialize gear grid
+        function initializeGearGrid() {
+            virtualGears.forEach(gear => {
+                const button = document.createElement('button');
+                button.textContent = gear.index;
+                button.dataset.index = gear.index;
+                button.className = gear.index === 0 ? 'gear-active w-full py-2 text-sm rounded' : 'gear-inactive w-full py-2 text-sm rounded';
+                button.onclick = () => setGear(gear.index);
+                gearGridEl.appendChild(button);
+            });
+        }
+
+        // Initialize virtual gear list
+        function initializeVirtualGearList() {
+            virtualGears.forEach(gear => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between';
+                div.innerHTML = `
+                    <span>Gear ${gear.index}</span>
+                    <span class="font-mono">${gear.ratio.toFixed(2)}</span>
+                `;
+                if (gear.index === 5) { // Baseline gear
+                    div.className += ' bg-green-100';
+                }
+                virtualGearListEl.appendChild(div);
+            });
+        }
+
+        // Connect to trainer
+        async function connectTrainer() {
+            const connectBtn = document.getElementById('connect-trainer');
+            connectBtn.disabled = true;
+            connectBtn.textContent = '🔄 Connecting...';
+
+            try {
+                logCommand('🔍 Looking for FTMS trainers...');
+                
+                // Check if FTMS module is available
+                if (typeof ftms === 'undefined') {
+                    throw new Error('FTMS module not loaded. Try serving this page from a web server (not file://)');
+                }
+                
+                logCommand('✅ FTMS module detected');
+                logCommand('🔗 Requesting Bluetooth device...');
+                
+                // Try to connect using the ftms module
+                try {
+                    await ftms.connect();
+                    ftmsClient = ftms; // Store reference
+                    ftmsConnected = true;
+                    connectedTrainer = ftms.server?.device || ftms.device; // Set for calibration functions
+                    
+                    logCommand('🎉 Successfully connected to FTMS trainer!');
+                    logCommand(`📱 Device: ${connectedTrainer?.name || 'Unknown'}`);
+                    
+                } catch (error) {
+                    logCommand(`❌ Connection failed: ${error.message}`);
+                    
+                    // Check for common error causes
+                    if (error.message.includes('User cancelled')) {
+                        logCommand('💡 User cancelled device selection');
+                    } else if (error.message.includes('not supported')) {
+                        logCommand('💡 Web Bluetooth not supported in this browser');
+                        logCommand('🔧 Try Chrome, Edge, or newer Safari');
+                    } else if (error.message.includes('HTTPS')) {
+                        logCommand('💡 Web Bluetooth requires HTTPS or localhost');
+                        logCommand('🔧 Try serving from a local web server');
+                    } else {
+                        logCommand('🔧 Check that your trainer is in pairing mode');
+                        logCommand('🔧 Make sure no other apps are connected to it');
+                    }
+                    
+                    // Fallback to demo mode if ftms module fails
+                    logCommand('⚠️ Switching to demo mode');
+                    logCommand('💡 In demo mode, commands are logged but not sent to trainer');
+                    connectionStatusEl.textContent = 'Demo mode - Connection failed';
+                    connectBtn.textContent = '🎭 Demo Mode';
+                    connectBtn.className = 'w-full px-4 py-2 bg-yellow-500 text-white rounded';
+                    document.getElementById('scan-all-chars').disabled = true;
+                    document.getElementById('test-zwift-shifting').disabled = true;
+                    document.getElementById('test-ftms-shifting').disabled = true;
+                    document.getElementById('test-wahoo-patterns').disabled = true;
+                    document.getElementById('read-features').disabled = true;
+                    document.getElementById('set-sim-mode').disabled = false;
+                    document.getElementById('send-command').disabled = false;
+                    return;
+                }
+
+                // Enable buttons
+                connectionStatusEl.textContent = 'Connected to FTMS trainer';
+                document.getElementById('scan-all-chars').disabled = false;
+                document.getElementById('test-zwift-shifting').disabled = false;
+                document.getElementById('test-ftms-shifting').disabled = false;
+                document.getElementById('test-wahoo-patterns').disabled = false;
+                document.getElementById('test-qdomyos-method').disabled = false;
+                document.getElementById('calibrate-device').disabled = false;
+                document.getElementById('debug-ftms-data').disabled = false;
+                document.getElementById('notification-calibrate').disabled = false;
+                document.getElementById('adaptive-calibrate').disabled = false;
+                document.getElementById('read-features').disabled = false;
+                document.getElementById('set-sim-mode').disabled = false;
+                document.getElementById('send-command').disabled = false;
+                connectBtn.textContent = '✅ Connected';
+                logCommand('✅ Successfully connected to FTMS trainer');
+                logCommand('🔍 Scan all characteristics to find Wahoo-specific virtual shifting support');
+                logCommand('⚡ Try Zwift virtual shifting - your trainer has the Zwift custom service!');
+                logCommand('💡 Wahoo trainers may use proprietary characteristics for virtual shifting');
+                
+            } catch (error) {
+                connectBtn.disabled = false;
+                connectBtn.textContent = '🔗 Connect FTMS Trainer';
+                connectionStatusEl.textContent = `Connection failed: ${error.message}`;
+                logCommand(`❌ Connection failed: ${error.message}`);
+            }
+        }
+
+        // Set SIM mode
+        async function setSIMMode() {
+            try {
+                const simBtn = document.getElementById('set-sim-mode');
+                simBtn.disabled = true;
+                simBtn.textContent = '🔄 Setting...';
+
+                logCommand('🏔️ Setting SIM mode with 0% grade...');
+                
+                if (ftmsConnected && ftmsClient) {
+                    // Use the ftms module's setSim method for proper SIM mode
+                    await ftmsClient.setSim({ gradePct: 0 });
+                    logCommand('📡 Sent FTMS SIM mode command with 0% grade');
+                } else {
+                    // Demo mode
+                    logCommand('🎭 DEMO: Would send FTMS SIM mode command with 0% grade');
+                }
+                
+                simModeActive = true;
+                simBtn.textContent = '✅ SIM Mode Active';
+                simBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('✅ SIM mode activated - wheel circumference now affects resistance');
+                logCommand('🎯 You can now send virtual gear commands to change resistance');
+                
+            } catch (error) {
+                const simBtn = document.getElementById('set-sim-mode');
+                simBtn.disabled = false;
+                simBtn.textContent = '🏔️ Set SIM Mode (0% Grade)';
+                logCommand(`❌ Failed to set SIM mode: ${error.message}`);
+            }
+        }
+
+        // Read trainer features
+        async function readTrainerFeatures() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const featBtn = document.getElementById('read-features');
+                featBtn.disabled = true;
+                featBtn.textContent = '🔄 Reading...';
+
+                logCommand('📋 Reading FTMS features from trainer...');
+                
+                const featureResult = await ftmsClient.readFeatures();
+                const features = new Uint8Array(featureResult.raw.buffer);
+                const hex = featureResult.hex;
+                
+                logCommand(`📊 FTMS Feature Data: ${hex}`);
+                
+                if (features.length >= 8) {
+                    // Parse feature bits (this is trainer-specific)
+                    const byte0 = features[0];
+                    const byte1 = features[1];
+                    const byte4 = features[4];
+                    const byte6 = features[6];
+                    
+                    logCommand('🔍 Analyzing trainer capabilities:');
+                    logCommand(`  Cadence: ${(byte0 & 0x02) ? '✅' : '❌'}`);
+                    logCommand(`  Total Distance: ${(byte0 & 0x04) ? '✅' : '❌'}`);
+                    logCommand(`  Inclination: ${(byte0 & 0x08) ? '✅' : '❌'}`);
+                    logCommand(`  Elevation Gain: ${(byte0 & 0x10) ? '✅' : '❌'}`);
+                    logCommand(`  Pace: ${(byte0 & 0x20) ? '✅' : '❌'}`);
+                    logCommand(`  Average Pace: ${(byte0 & 0x40) ? '✅' : '❌'}`);
+                    logCommand(`  Expended Energy: ${(byte0 & 0x80) ? '✅' : '❌'}`);
+                    
+                    logCommand(`  Heart Rate: ${(byte1 & 0x01) ? '✅' : '❌'}`);
+                    logCommand(`  Metabolic Equivalent: ${(byte1 & 0x02) ? '✅' : '❌'}`);
+                    logCommand(`  Elapsed Time: ${(byte1 & 0x04) ? '✅' : '❌'}`);
+                    logCommand(`  Remaining Time: ${(byte1 & 0x08) ? '✅' : '❌'}`);
+                    logCommand(`  Power Measurement: ${(byte1 & 0x10) ? '✅' : '❌'}`);
+                    logCommand(`  Force on Belt: ${(byte1 & 0x20) ? '✅' : '❌'}`);
+                    logCommand(`  Power Output: ${(byte1 & 0x40) ? '✅' : '❌'}`);
+                    
+                    // Check for wheel circumference support (crucial for virtual shifting)
+                    const wheelCircumferenceSupport = (byte6 & 0x04);
+                    logCommand(`  Wheel Circumference Config: ${wheelCircumferenceSupport ? '✅' : '❌'}`);
+                    
+                    // Additional analysis for your trainer's specific feature data
+                    if (hex === '03 40 00 00 0C 60 00 00') {
+                        logCommand('🎯 WAHOO KICKR CORE V2 DETECTED!');
+                        logCommand('📋 Feature Analysis:');
+                        logCommand('  ✅ Cadence supported (bit 1 set)');
+                        logCommand('  ✅ Total distance supported (bit 2 set)');
+                        logCommand('  ❌ Inclination NOT supported in features');
+                        logCommand('  ❌ Wheel circumference NOT in feature flags');
+                        logCommand('  ✅ Power measurement supported');
+                        logCommand('  ✅ ERG mode supported (Power Target)');
+                        logCommand('💡 This explains why FTMS 0x13 commands fail!');
+                        logCommand('🎯 Virtual shifting must use Zwift custom service only');
+                    }
+                    
+                    if (!wheelCircumferenceSupport) {
+                        logCommand('🔧 Virtual shifting may not work via FTMS - try Zwift protocol');
+                    } else {
+                        logCommand('✅ Trainer supports wheel circumference - FTMS virtual shifting should work!');
+                    }
+                } else {
+                    logCommand('⚠️ Feature data too short to parse properly');
+                }
+                
+                featBtn.textContent = '📋 Features Read';
+                featBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                
+            } catch (error) {
+                const featBtn = document.getElementById('read-features');
+                featBtn.disabled = false;
+                featBtn.textContent = '🔍 Read Trainer Features';
+                logCommand(`❌ Failed to read features: ${error.message}`);
+            }
+        }
+
+        // Comprehensive characteristic scanner
+        async function scanAllCharacteristics() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const scanBtn = document.getElementById('scan-all-chars');
+                scanBtn.disabled = true;
+                scanBtn.textContent = '🔄 Scanning...';
+
+                logCommand('🔍 Starting comprehensive characteristic scan...');
+                logCommand('📡 Scanning ALL services and characteristics on this trainer');
+                
+                const server = ftmsClient.server;
+                const services = await server.getPrimaryServices();
+                
+                logCommand(`📋 Found ${services.length} services on trainer:`);
+                
+                for (const service of services) {
+                    const serviceUuid = service.uuid;
+                    const serviceName = getServiceName(serviceUuid);
+                    logCommand(`📦 Service: ${serviceUuid} (${serviceName})`);
+                    
+                    try {
+                        const characteristics = await service.getCharacteristics();
+                        logCommand(`  └─ ${characteristics.length} characteristics:`);
+                        
+                        for (const char of characteristics) {
+                            const charUuid = char.uuid;
+                            const charName = getCharacteristicName(charUuid);
+                            const properties = [];
+                            
+                            if (char.properties.read) properties.push('READ');
+                            if (char.properties.write) properties.push('WRITE');
+                            if (char.properties.writeWithoutResponse) properties.push('WRITE_NO_RESP');
+                            if (char.properties.notify) properties.push('NOTIFY');
+                            if (char.properties.indicate) properties.push('INDICATE');
+                            
+                            logCommand(`    ├─ ${charUuid} (${charName})`);
+                            logCommand(`    │  Properties: ${properties.join(', ')}`);
+                            
+                            // Try to read readable characteristics
+                            if (char.properties.read) {
+                                try {
+                                    const value = await char.readValue();
+                                    const hex = [...new Uint8Array(value.buffer)].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                                    logCommand(`    │  Value: ${hex}`);
+                                    
+                                    // Special handling for potential virtual shifting characteristics
+                                    if (charName.includes('Unknown') && serviceUuid.includes('a026')) {
+                                        logCommand(`    │  🎯 WAHOO PROPRIETARY - Potential virtual shifting!`);
+                                    }
+                                } catch (e) {
+                                    logCommand(`    │  Value: [Read failed: ${e.message}]`);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        logCommand(`  └─ Failed to get characteristics: ${e.message}`);
+                    }
+                    logCommand('');
+                }
+                
+                scanBtn.textContent = '📋 Scan Complete';
+                scanBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('✅ Characteristic scan complete!');
+                logCommand('🔍 Look for Wahoo-specific UUIDs (a026xxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');
+                
+            } catch (error) {
+                const scanBtn = document.getElementById('scan-all-chars');
+                scanBtn.disabled = false;
+                scanBtn.textContent = '🔍 Scan ALL Characteristics';
+                logCommand(`❌ Failed to scan characteristics: ${error.message}`);
+            }
+        }
+
+        // Helper function to identify known services
+        function getServiceName(uuid) {
+            const services = {
+                '00001826-0000-1000-8000-00805f9b34fb': 'FTMS (Fitness Machine)',
+                '0000180f-0000-1000-8000-00805f9b34fb': 'Battery Service',
+                '0000180a-0000-1000-8000-00805f9b34fb': 'Device Information',
+                '00001800-0000-1000-8000-00805f9b34fb': 'Generic Access',
+                '00001801-0000-1000-8000-00805f9b34fb': 'Generic Attribute',
+                '0000181c-0000-1000-8000-00805f9b34fb': 'User Data',
+                // Zwift custom service (found on your trainer!)
+                '00000001-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT CUSTOM SERVICE (Virtual Shifting!)',
+                // Wahoo services
+                'a026e005-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Trainer Service',
+                'a026e002-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Virtual Shifting (?)',
+                'a026e003-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Custom Service 3',
+                'a026e004-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Custom Service 4'
+            };
+            return services[uuid] || 'Unknown Service';
+        }
+
+        // Helper function to identify known characteristics  
+        function getCharacteristicName(uuid) {
+            const characteristics = {
+                '00002acc-0000-1000-8000-00805f9b34fb': 'FTMS Feature',
+                '00002ad2-0000-1000-8000-00805f9b34fb': 'Indoor Bike Data',
+                '00002ad9-0000-1000-8000-00805f9b34fb': 'Fitness Machine Control Point',
+                '00002ada-0000-1000-8000-00805f9b34fb': 'Fitness Machine Status',
+                '00002ad3-0000-1000-8000-00805f9b34fb': 'Training Status',
+                '00002ad6-0000-1000-8000-00805f9b34fb': 'Supported Power Range',
+                '00002ad8-0000-1000-8000-00805f9b34fb': 'Supported Resistance Level Range',
+                '00002a19-0000-1000-8000-00805f9b34fb': 'Battery Level',
+                '00002a29-0000-1000-8000-00805f9b34fb': 'Manufacturer Name',
+                '00002a24-0000-1000-8000-00805f9b34fb': 'Model Number',
+                '00002a25-0000-1000-8000-00805f9b34fb': 'Serial Number',
+                '00002a27-0000-1000-8000-00805f9b34fb': 'Hardware Revision',
+                '00002a26-0000-1000-8000-00805f9b34fb': 'Firmware Revision',
+                '00002a28-0000-1000-8000-00805f9b34fb': 'Software Revision',
+                // Zwift custom characteristics (found on your trainer!)
+                '00000002-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT RIDING DATA (Gear feedback)',
+                '00000003-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT CONTROL POINT (Virtual shifting commands!)',
+                '00000004-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT SYNC TX (Command acknowledgments)',
+                // Wahoo proprietary characteristics
+                'a026e002-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Virtual Shifting Control',
+                'a026e00c-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Gear Position',
+                'a026e00d-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Gear Ratio',
+                'a026e037-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Custom Data'
+            };
+            return characteristics[uuid] || 'Unknown Characteristic';
+        }
+
+        // Send gear command
+        async function sendGearCommand() {
+            const gear = findGear(currentGearIndex);
+            if (!gear) return;
+
+            if (!simModeActive) {
+                logCommand('⚠️ WARNING: SIM mode not active - wheel circumference may not affect resistance');
+                logCommand('💡 Click "Set SIM Mode" first for gear changes to work properly');
+            }
+
+            try {
+                if (ftmsConnected && ftmsClient) {
+                    // Real command using proper FTMS Set Target Wheel Circumference (0x13)
+                    logCommand(`📤 Sending FTMS 0x13 command for gear ${gear.index}...`);
+                    
+                    // Use the ftms client's _writeCpAndWaitAck method for proper handling
+                    const payload = new Uint8Array([0x13, gear.ftms_value, 0x00]);
+                    
+                    try {
+                        // Use the private method if available, otherwise fallback to direct write
+                        if (typeof ftmsClient._writeCpAndWaitAck === 'function') {
+                            await ftmsClient._writeCpAndWaitAck(0x13, payload);
+                        } else {
+                            // Fallback to direct characteristic write
+                            await ftmsClient.chars.cp.writeValueWithResponse(payload);
+                        }
+                        
+                        logCommand(`📡 Sent FTMS Set Wheel Circumference: [0x13, 0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')}, 0x00]`);
+                        logCommand(`🎯 Virtual circumference: ${(gear.ftms_value * 100)}mm (ratio ${gear.ratio})`);
+                        logCommand(`🔬 Expected effect: ${gear.ratio > 2.5 ? 'HARDER' : gear.ratio < 2.5 ? 'EASIER' : 'BASELINE'} resistance`);
+                        
+                        // Log the calculation for debugging
+                        const baseCirc = 2096; // mm
+                        const calculatedCirc = baseCirc * (gear.ratio / 2.50);
+                        logCommand(`🧮 Calculation: ${baseCirc}mm × (${gear.ratio}/2.50) = ${calculatedCirc.toFixed(0)}mm vs sent: ${gear.ftms_value * 100}mm`);
+                    } catch (cmdError) {
+                        logCommand(`❌ Command failed: ${cmdError.message}`);
+                        logCommand(`🔧 Note: Not all trainers support wheel circumference changes`);
+                    }
+                    const baseCirc = 2096; // mm
+                    const calculatedCirc = baseCirc * (gear.ratio / 2.50);
+                    logCommand(`🧮 Calculation: ${baseCirc}mm × (${gear.ratio}/2.50) = ${calculatedCirc.toFixed(0)}mm vs sent: ${gear.ftms_value * 100}mm`);
+                    
+                } else {
+                    // Demo mode
+                    logCommand(`🎭 DEMO: Would send FTMS command: [0x13, 0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')}, 0x00]`);
+                    logCommand(`🎭 DEMO: Circumference set to ${(gear.ftms_value * 100)}mm for ratio ${gear.ratio}`);
+                    logCommand(`🎭 DEMO: This manipulates trainer's speed calculation for virtual gearing`);
+                }
+            } catch (error) {
+                logCommand(`❌ Failed to send command: ${error.message}`);
+            }
+        }
+
+        // Test Zwift Virtual Shifting using the Zwift Control Point
+        async function testZwiftVirtualShifting() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const zwiftBtn = document.getElementById('test-zwift-shifting');
+                zwiftBtn.disabled = true;
+                zwiftBtn.textContent = '🔄 Testing...';
+
+                logCommand('⚡ Testing SWIFTCONTROL-INSPIRED Virtual Shifting...');
+                logCommand('🎯 Based on jonasbark/swiftcontrol Protocol Buffer analysis');
+                logCommand('📋 Testing: SET_GEAR_TEST_DATA + frontGearIdx/rearGearIdx patterns');
+                logCommand('🚴‍♂️ START PEDALING NOW to feel resistance changes!');
+                
+                // Get the Zwift custom service
+                const server = ftmsClient.server;
+                const zwiftService = await server.getPrimaryService('00000001-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftControlPoint = await zwiftService.getCharacteristic('00000003-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftRidingData = await zwiftService.getCharacteristic('00000002-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftSyncTX = await zwiftService.getCharacteristic('00000004-19ca-4651-86e5-fa29dcdd09d1');
+                
+                logCommand('✅ Connected to Zwift virtual shifting characteristics');
+                
+                // Subscribe to notifications for feedback
+                await zwiftRidingData.startNotifications();
+                zwiftRidingData.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`📊 Zwift Riding Data: ${hex}`);
+                });
+                
+                await zwiftSyncTX.startNotifications();
+                zwiftSyncTX.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`🔄 Zwift Sync Response: ${hex}`);
+                });
+                
+                logCommand('🎧 Subscribed to Zwift notifications');
+                
+                // SWIFTCONTROL-INSPIRED COMMAND PATTERNS
+                logCommand('\n🧪 === SWIFTCONTROL PROTOCOL BUFFER PATTERNS ===');
+                
+                // Pattern 1: SET_GEAR_TEST_DATA simulation (Opcode 65284 / 0xFF04)
+                // Based on: com.zwift.protobuf.SetGearTestData
+                const swiftControlPatterns = [
+                    {
+                        name: "🔬 SET_GEAR_TEST_DATA (Hard Gear)",
+                        description: "SwiftControl's frontGearIdx=1, rearGearIdx=1 (small=hard)",
+                        commands: [
+                            [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0xFF, 0x04], // RideOn + SET_GEAR_TEST_DATA opcode
+                            [0x08, 0x01, 0x10, 0x01], // frontGearIdx=1, rearGearIdx=1 (Protocol Buffer format)
+                            [0x12, 0x04, 0x08, 0x23, 0x02, 0x01], // VIRTUAL_SHIFTING_MODE enable
+                        ],
+                        frontGear: 1,
+                        rearGear: 1,
+                        expectedEffect: "HARD (small gears)"
+                    },
+                    {
+                        name: "🔬 SET_GEAR_TEST_DATA (Easy Gear)", 
+                        description: "SwiftControl's frontGearIdx=11, rearGearIdx=11 (big=easy)",
+                        commands: [
+                            [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0xFF, 0x04], // RideOn + SET_GEAR_TEST_DATA opcode  
+                            [0x08, 0x0B, 0x10, 0x0B], // frontGearIdx=11, rearGearIdx=11 (Protocol Buffer format)
+                            [0x12, 0x04, 0x08, 0x23, 0x02, 0x01], // VIRTUAL_SHIFTING_MODE enable
+                        ],
+                        frontGear: 11,
+                        rearGear: 11,
+                        expectedEffect: "EASY (big gears)"
+                    },
+                    
+                    // Pattern 2: Direct Data Object ID commands (from SwiftControl analysis)
+                    {
+                        name: "🎯 FRONT_GEAR_INDEX Data Object (Hard)",
+                        description: "Data Object ID 529 (FRONT_GEAR_INDEX) with small gear",
+                        commands: [
+                            [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x08, 0x07], // RideOn + SET command
+                            [0x12, 0x04, 0x08, 0x11, 0x02, 0x01], // DO 529 (FRONT_GEAR_INDEX) = 1
+                            [0x12, 0x04, 0x08, 0x14, 0x02, 0x01], // DO 532 (REAR_GEAR_INDEX) = 1  
+                        ],
+                        frontGear: 1,
+                        rearGear: 1,
+                        expectedEffect: "HARD (DO approach)"
+                    },
+                    {
+                        name: "🎯 REAR_GEAR_INDEX Data Object (Easy)",
+                        description: "Data Object ID 532 (REAR_GEAR_INDEX) with big gear",
+                        commands: [
+                            [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x08, 0x07], // RideOn + SET command
+                            [0x12, 0x04, 0x08, 0x11, 0x02, 0x0B], // DO 529 (FRONT_GEAR_INDEX) = 11
+                            [0x12, 0x04, 0x08, 0x14, 0x02, 0x0B], // DO 532 (REAR_GEAR_INDEX) = 11
+                        ],
+                        frontGear: 11,
+                        rearGear: 11,
+                        expectedEffect: "EASY (DO approach)"
+                    },
+                    
+                    // Pattern 3: simulatedRealGearRatio + simulatedVirtualGearRatio
+                    {
+                        name: "⚙️ Simulated Gear Ratios (Hard)",
+                        description: "SwiftControl's simulatedRealGearRatio + simulatedVirtualGearRatio",
+                        commands: [
+                            [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x08, 0x07], // RideOn + SET
+                            [0x12, 0x04, 0x08, 0x07, 0x02, 0x64], // simulatedRealGearRatio = 100 (hard)
+                            [0x12, 0x04, 0x08, 0x08, 0x02, 0x32], // simulatedVirtualGearRatio = 50 (hard)
+                        ],
+                        realRatio: 100,
+                        virtualRatio: 50,
+                        expectedEffect: "HARD (ratio simulation)"
+                    },
+                    {
+                        name: "⚙️ Simulated Gear Ratios (Easy)",
+                        description: "SwiftControl's simulatedRealGearRatio + simulatedVirtualGearRatio",
+                        commands: [
+                            [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x08, 0x07], // RideOn + SET
+                            [0x12, 0x04, 0x08, 0x07, 0x02, 0x1E], // simulatedRealGearRatio = 30 (easy)
+                            [0x12, 0x04, 0x08, 0x08, 0x02, 0x64], // simulatedVirtualGearRatio = 100 (easy)
+                        ],
+                        realRatio: 30,
+                        virtualRatio: 100,
+                        expectedEffect: "EASY (ratio simulation)"
+                    }
+                ];
+                
+                for (const pattern of swiftControlPatterns) {
+                    logCommand(`\n🎯 === ${pattern.name} ===`);
+                    logCommand(`📝 ${pattern.description}`);
+                    if (pattern.frontGear) {
+                        logCommand(`🔧 Front gear: ${pattern.frontGear}, Rear gear: ${pattern.rearGear}`);
+                        const gear = findGear(pattern.frontGear);
+                        updateGearDisplay(gear);
+                    } else if (pattern.realRatio) {
+                        logCommand(`� Real ratio: ${pattern.realRatio}, Virtual ratio: ${pattern.virtualRatio}`);
+                    }
+                    logCommand(`📊 Expected: ${pattern.expectedEffect}`);
+                    
+                    // Send all commands in pattern
+                    for (let i = 0; i < pattern.commands.length; i++) {
+                        const command = pattern.commands[i];
+                        const payload = new Uint8Array(command);
+                        const hex = [...payload].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                        
+                        try {
+                            await zwiftControlPoint.writeValueWithoutResponse(payload);
+                            logCommand(`📤 Command ${i + 1}: [${hex}] ✅`);
+                            await new Promise(resolve => setTimeout(resolve, 800));
+                        } catch (error) {
+                            logCommand(`❌ Command ${i + 1} failed: ${error.message}`);
+                        }
+                    }
+                    
+                    // Hold for 3 seconds to feel the change
+                    logCommand(`⏳ HOLDING for 3 seconds - feel the resistance!`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+                
+                // Protocol Buffer structure test (based on SwiftControl's .proto definitions)
+                logCommand('\n🔬 === PROTOCOL BUFFER STRUCTURE TEST ===');
+                logCommand('📋 Testing SwiftControl\'s exact Protocol Buffer field structure');
+                
+                // Test the exact Protocol Buffer encoding that SwiftControl uses
+                const protoBufTests = [
+                    {
+                        name: "TrainerBikeSim Message",
+                        description: "simulatedRealGearRatio=field1, simulatedVirtualGearRatio=field2",
+                        payload: [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x0A, 0x08, 0x08, 0x64, 0x10, 0x32] // PB: field1=100, field2=50
+                    },
+                    {
+                        name: "SetGearTestData Message", 
+                        description: "frontGearIdx=field1, rearGearIdx=field2",
+                        payload: [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0xFF, 0x04, 0x08, 0x01, 0x10, 0x01] // PB: field1=1, field2=1
+                    }
+                ];
+                
+                for (const test of protoBufTests) {
+                    logCommand(`\n🧪 Testing: ${test.name}`);
+                    logCommand(`� ${test.description}`);
+                    const payload = new Uint8Array(test.payload);
+                    const hex = [...payload].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    
+                    try {
+                        await zwiftControlPoint.writeValueWithoutResponse(payload);
+                        logCommand(`📤 Protocol Buffer test: [${hex}] ✅`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    } catch (error) {
+                        logCommand(`❌ Protocol Buffer test failed: ${error.message}`);
+                    }
+                }
+                
+                // Reset to normal
+                logCommand('\n🔄 Resetting to normal gear...');
+                try {
+                    await zwiftControlPoint.writeValueWithoutResponse(new Uint8Array([0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x07, 0x00]));
+                    logCommand('📤 Reset command sent: [52 69 64 65 4F 6E 07 00]');
+                    const resetGear = findGear(8);
+                    updateGearDisplay(resetGear); // Middle gear
+                } catch (e) {
+                    logCommand(`❌ Reset failed: ${e.message}`);
+                }
+                
+                zwiftBtn.textContent = '⚡ SwiftControl Test Complete';
+                zwiftBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('🏁 SwiftControl-inspired virtual shifting test complete!');
+                logCommand('💡 Did you feel resistance changes while pedaling?');
+                logCommand('📊 Check the Zwift responses above for successful patterns');
+                logCommand('🔬 This test used SwiftControl\'s Protocol Buffer approach');
+                logCommand('📋 Key patterns: SET_GEAR_TEST_DATA, frontGearIdx, rearGearIdx, Data Objects');
+                
+            } catch (error) {
+                const zwiftBtn = document.getElementById('test-zwift-shifting');
+                zwiftBtn.disabled = false;
+                zwiftBtn.textContent = '⚡ Test Zwift Virtual Shifting';
+                logCommand(`❌ Failed to test Zwift shifting: ${error.message}`);
+            }
+        }
+
+        // Test FTMS Virtual Shifting using wheel circumference
+        async function testFTMSVirtualShifting() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const ftmsBtn = document.getElementById('test-ftms-shifting');
+                ftmsBtn.disabled = true;
+                ftmsBtn.textContent = '🔄 Testing...';
+
+                logCommand('🔧 Testing FTMS Virtual Shifting (Wheel Circumference)...');
+                
+                const gear = findGear(currentGearIndex);
+                
+                // Subscribe to FTMS Control Point indications for ACK responses
+                if (ftmsClient.chars.cp) {
+                    await ftmsClient.chars.cp.startNotifications();
+                    const indicationHandler = (e) => {
+                        const data = new Uint8Array(e.target.value.buffer);
+                        const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                        logCommand(`📊 FTMS CP Indication: ${hex}`);
+                        
+                        if (data.length >= 3 && data[0] === 0x80) {
+                            const opcode = data[1];
+                            const result = data[2];
+                            logCommand(`🔍 Response to opcode 0x${opcode.toString(16).padStart(2,'0')}: ${result === 0x01 ? '✅ SUCCESS' : `❌ ERROR (0x${result.toString(16).padStart(2,'0')})`}`);
+                        }
+                    };
+                    ftmsClient.chars.cp.addEventListener('characteristicvaluechanged', indicationHandler);
+                    logCommand('🎧 Subscribed to FTMS Control Point indications');
+                }
+                
+                // Test the wheel circumference command that we know should work
+                logCommand(`🧪 Testing FTMS Set Wheel Circumference for gear ${gear.index} (ratio ${gear.ratio})`);
+                
+                try {
+                    // First, request control
+                    const requestControl = new Uint8Array([0x00]);
+                    await ftmsClient.chars.cp.writeValueWithResponse(requestControl);
+                    logCommand('📤 Sent Request Control: [00]');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Then send wheel circumference
+                    const wheelCircCmd = new Uint8Array([0x13, gear.ftms_value, 0x00]);
+                    await ftmsClient.chars.cp.writeValueWithResponse(wheelCircCmd);
+                    logCommand(`📤 Sent Wheel Circumference: [${[...wheelCircCmd].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase()}]`);
+                    logCommand(`🎯 Target circumference: ${gear.ftms_value * 100}mm (${gear.ratio}x harder than baseline)`);
+                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                } catch (error) {
+                    logCommand(`❌ FTMS command failed: ${error.message}`);
+                }
+                
+                ftmsBtn.textContent = '✅ FTMS Test Complete';
+                ftmsBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('🏁 FTMS virtual shifting test complete!');
+                logCommand('💡 Check the FTMS CP Indication responses above');
+                
+            } catch (error) {
+                const ftmsBtn = document.getElementById('test-ftms-shifting');
+                ftmsBtn.disabled = false;
+                ftmsBtn.textContent = '🔧 Test FTMS Virtual Shifting';
+                logCommand(`❌ Failed to test FTMS shifting: ${error.message}`);
+            }
+        }
+
+        // Test specific Wahoo patterns based on reverse engineering
+        async function testWahooPatterns() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const wahooBtn = document.getElementById('test-wahoo-patterns');
+                wahooBtn.disabled = true;
+                wahooBtn.textContent = '🔄 Testing...';
+
+                logCommand('🎪 Testing Wahoo-specific Virtual Shifting Patterns...');
+                
+                // Get the Zwift custom service
+                const server = ftmsClient.server;
+                const zwiftService = await server.getPrimaryService('00000001-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftControlPoint = await zwiftService.getCharacteristic('00000003-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftRidingData = await zwiftService.getCharacteristic('00000002-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftSyncTX = await zwiftService.getCharacteristic('00000004-19ca-4651-86e5-fa29dcdd09d1');
+                
+                // Enhanced notification handlers with more detailed parsing
+                await zwiftRidingData.startNotifications();
+                zwiftRidingData.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`📊 Zwift Riding Data: ${hex} (len=${data.length})`);
+                    
+                    // Try to parse as gear data
+                    if (data.length >= 2) {
+                        logCommand(`   🔍 Possible gear index: ${data[0]}, ratio: ${data[1]}`);
+                    }
+                });
+                
+                await zwiftSyncTX.startNotifications();
+                zwiftSyncTX.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`🔄 Zwift Sync Response: ${hex} (len=${data.length})`);
+                    
+                    // Parse command acknowledgments
+                    if (data.length >= 2) {
+                        logCommand(`   🔍 Command: 0x${data[0].toString(16)}, Status: 0x${data[1].toString(16)}`);
+                    }
+                });
+                
+                const gear = findGear(currentGearIndex);
+                
+                // Wahoo-specific patterns based on known implementations
+                const wahooPatterns = [
+                    // Pattern 1: Wahoo gear selection
+                    [0x01, gear.index + 10],
+                    // Pattern 2: Wahoo virtual shifting enable
+                    [0xA0, 0x01],
+                    // Pattern 3: Known Zwift commands from reverse engineering
+                    [0x8A, gear.index + 10],
+                    // Pattern 4: Multi-byte Wahoo protocol
+                    [0x02, gear.index + 10, gear.ftms_value],
+                    // Pattern 5: Wahoo pairing/handshake
+                    [0xFF, 0xFF, 0x01],
+                    // Pattern 6: Gear mode activation
+                    [0x4E, 0x01],
+                    // Pattern 7: Virtual cassette selection
+                    [0x73, gear.index + 1],
+                    // Pattern 8: Zwift direct gear command
+                    [0x91, gear.index + 10, 0x00],
+                ];
+                
+                logCommand(`🧪 Testing ${wahooPatterns.length} Wahoo-specific patterns for gear ${gear.index}`);
+                
+                for (let i = 0; i < wahooPatterns.length; i++) {
+                    const pattern = wahooPatterns[i];
+                    const payload = new Uint8Array(pattern);
+                    const hex = [...payload].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    
+                    logCommand(`🎪 Wahoo Pattern ${i + 1}: [${hex}]`);
+                    
+                    try {
+                        await zwiftControlPoint.writeValueWithoutResponse(payload);
+                        logCommand(`✅ Pattern ${i + 1} sent successfully`);
+                        
+                        // Wait longer for Wahoo responses
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        
+                    } catch (error) {
+                        logCommand(`❌ Pattern ${i + 1} failed: ${error.message}`);
+                    }
+                }
+                
+                // Also try reading the riding data directly
+                try {
+                    logCommand('📖 Attempting to read current riding data...');
+                    const ridingData = await zwiftRidingData.readValue();
+                    const data = new Uint8Array(ridingData.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`📊 Current Riding Data: ${hex}`);
+                } catch (e) {
+                    logCommand('📖 Riding data is notification-only (cannot read)');
+                }
+                
+                wahooBtn.textContent = '🎪 Wahoo Test Complete';
+                wahooBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('🏁 Wahoo pattern test complete!');
+                logCommand('💡 Check for any responses in Zwift characteristics above');
+                
+            } catch (error) {
+                const wahooBtn = document.getElementById('test-wahoo-patterns');
+                wahooBtn.disabled = false;
+                wahooBtn.textContent = '🎪 Test Wahoo Patterns';
+                logCommand(`❌ Failed to test Wahoo patterns: ${error.message}`);
+            }
+        }
+
+        // QDomyos-style virtual shifting implementation
+        async function testQDomyosMethod() {
+            if (!connectedTrainer) {
+                updateStatus('No trainer connected');
+                return;
+            }
+
+            updateStatus('Testing QDomyos bridge method...');
+            
+            // Gear ratio tables based on QDomyos gears.qml
+            const chainrings = [
+                { teeth: 39, label: 'Small chainring' },
+                { teeth: 53, label: 'Large chainring' }
+            ];
+            
+            const cassette = [
+                { teeth: 11, label: '11T' },
+                { teeth: 12, label: '12T' },
+                { teeth: 13, label: '13T' },
+                { teeth: 14, label: '14T' },
+                { teeth: 16, label: '16T' },
+                { teeth: 18, label: '18T' },
+                { teeth: 20, label: '20T' },
+                { teeth: 22, label: '22T' },
+                { teeth: 25, label: '25T' },
+                { teeth: 28, label: '28T' },
+                { teeth: 32, label: '32T' }
+            ];
+            
+            let currentChainring = 0; // Start with small chainring
+            let currentCog = 5; // Start with middle cog (18T)
+            
+            // Calculate gear ratio and resistance
+            function calculateResistance(chainringIdx, cogIdx) {
+                const ratio = chainrings[chainringIdx].teeth / cassette[cogIdx].teeth;
+                
+                // Check if we have calibration data for this device
+                if (window.deviceCalibration) {
+                    const cal = window.deviceCalibration;
+                    const minRatio = cal.minGearData.gearRatio;
+                    const maxRatio = cal.maxGearData.gearRatio;
+                    const minPower = cal.minGearData.power;
+                    const maxPower = cal.maxGearData.power;
+                    
+                    // Linear interpolation based on calibrated data
+                    const ratioPosition = (ratio - minRatio) / (maxRatio - minRatio);
+                    const expectedPower = minPower + (ratioPosition * (maxPower - minPower));
+                    const resistance = Math.round(expectedPower * cal.calibrationFactor);
+                    
+                    return {
+                        ratio: ratio.toFixed(2),
+                        resistance: Math.max(25, Math.min(resistance, 1000)),
+                        gear: `${chainrings[chainringIdx].teeth}T x ${cassette[cogIdx].teeth}T (Calibrated)`
+                    };
+                } else {
+                    // Fallback to default calculation
+                    const wheelCircumference = 2.105; // meters, typical road bike
+                    const baseResistance = 100; // Base resistance in watts
+                    const resistance = Math.round(baseResistance * ratio * 0.8);
+                    
+                    return {
+                        ratio: ratio.toFixed(2),
+                        resistance: Math.max(25, Math.min(resistance, 1000)),
+                        gear: `${chainrings[chainringIdx].teeth}T x ${cassette[cogIdx].teeth}T`
+                    };
+                }
+            }
+            
+            // Simulate gear shifting with FTMS resistance control
+            async function shiftGear(direction) {
+                let shifted = false;
+                
+                if (direction === 'up') {
+                    // Shift to harder gear (higher ratio)
+                    if (currentCog > 0) {
+                        currentCog--;
+                        shifted = true;
+                    } else if (currentChainring < chainrings.length - 1) {
+                        currentChainring++;
+                        currentCog = cassette.length - 1; // Jump to easiest cog on big ring
+                        shifted = true;
+                    }
+                } else if (direction === 'down') {
+                    // Shift to easier gear (lower ratio)
+                    if (currentCog < cassette.length - 1) {
+                        currentCog++;
+                        shifted = true;
+                    } else if (currentChainring > 0) {
+                        currentChainring--;
+                        currentCog = 0; // Jump to hardest cog on small ring
+                        shifted = true;
+                    }
+                }
+                
+                if (shifted) {
+                    const gearInfo = calculateResistance(currentChainring, currentCog);
+                    updateStatus(`Shifted ${direction}: ${gearInfo.gear} (ratio: ${gearInfo.ratio}, resistance: ${gearInfo.resistance}W)`);
+                    
+                    // Send FTMS resistance command (this is the correct approach!)
+                    await setTrainerResistance(gearInfo.resistance);
+                } else {
+                    updateStatus(`Cannot shift ${direction} - already at limit`);
+                }
+            }
+            
+            // FTMS resistance control command
+            async function setTrainerResistance(watts) {
+                try {
+                    const ftmsControlService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                    const controlPointChar = (await ftmsControlService).getCharacteristic('00002ad9-0000-1000-8000-00805f9b34fb');
+                    
+                    // FTMS Set Target Resistance Level command (0x05)
+                    // Format: [OpCode(0x05), Level(2 bytes, 0.1W resolution)]
+                    const resistanceLevel = Math.round(watts * 10); // Convert to 0.1W units
+                    const command = new Uint8Array([
+                        0x05, // Set Target Resistance Level
+                        resistanceLevel & 0xFF,
+                        (resistanceLevel >> 8) & 0xFF
+                    ]);
+                    
+                    await (await controlPointChar).writeValue(command);
+                    updateStatus(`✅ FTMS resistance set to ${watts}W`);
+                } catch (error) {
+                    updateStatus(`❌ Failed to set resistance: ${error.message}`);
+                }
+            }
+            
+            // Test sequence
+            updateStatus('Starting QDomyos virtual shifting test...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Show initial gear
+            const initialGear = calculateResistance(currentChainring, currentCog);
+            updateStatus(`Initial gear: ${initialGear.gear} (ratio: ${initialGear.ratio}, resistance: ${initialGear.resistance}W)`);
+            await setTrainerResistance(initialGear.resistance);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Test shifting up
+            updateStatus('Testing shift up...');
+            await shiftGear('up');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Test shifting up again
+            updateStatus('Testing another shift up...');
+            await shiftGear('up');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Test shifting down
+            updateStatus('Testing shift down...');
+            await shiftGear('down');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Return to initial gear
+            updateStatus('Returning to initial gear...');
+            currentChainring = 0;
+            currentCog = 5;
+            const finalGear = calculateResistance(currentChainring, currentCog);
+            await setTrainerResistance(finalGear.resistance);
+            
+            updateStatus('✅ QDomyos virtual shifting test complete! This is the correct approach - direct FTMS resistance control.');
+        }
+
+        // Device-specific calibration for personalized resistance mapping
+        async function calibrateDevice() {
+            if (!connectedTrainer) {
+                updateStatus('No trainer connected');
+                return;
+            }
+
+            updateStatus('Starting device-specific calibration...');
+            
+            // Calibration data storage
+            let calibrationData = {
+                deviceId: null,
+                userWeight: 70, // kg, can be input by user
+                minGearData: { resistance: null, cadence: null, power: null },
+                maxGearData: { resistance: null, cadence: null, power: null },
+                calibrationFactor: 1.0,
+                timestamp: new Date().toISOString()
+            };
+
+            // Get device ID for calibration storage
+            try {
+                const server = connectedTrainer.gatt;
+                const deviceInfo = await server.getPrimaryService('0000180a-0000-1000-8000-00805f9b34fb');
+                const serialChar = await deviceInfo.getCharacteristic('00002a25-0000-1000-8000-00805f9b34fb');
+                const serialData = await serialChar.readValue();
+                calibrationData.deviceId = new TextDecoder().decode(serialData);
+                updateStatus(`📱 Device ID: ${calibrationData.deviceId}`);
+            } catch (e) {
+                calibrationData.deviceId = 'unknown-' + Date.now();
+                updateStatus('⚠️ Could not read device serial, using generated ID');
+            }
+
+            // Calibration sequence
+            updateStatus('🔧 CALIBRATION PHASE 1: Setup - Easiest Gear');
+            updateStatus('⚙️ Please shift your bike to the EASIEST gear (biggest cassette cog, smallest chainring)');
+            updateStatus('🎯 Target: Large cog in back (like 28T-32T) + Small chainring in front (like 34T-39T)');
+            updateStatus('⏸️ Take your time to shift properly - press any key when ready...');
+            
+            // Wait for user confirmation
+            await waitForKeyPress();
+            
+            updateStatus('🚴‍♂️ PHASE 1: Start pedaling at 100 RPM in your EASIEST gear');
+            updateStatus('📊 Target cadence: 100 RPM (fast spinning, low resistance)');
+            updateStatus('⏱️ Maintaining for 15 seconds...');
+            
+            // Set easiest gear resistance
+            const easyGear = { chainring: 39, cog: 32, ratio: 39/32 };
+            const easyResistance = Math.round(30 * easyGear.ratio * 0.6); // Lower base for calibration
+            await setTrainerResistance(easyResistance);
+            
+            // Collect data for easy gear
+            let easyGearSamples = [];
+            const easyStartTime = Date.now();
+            
+            while (Date.now() - easyStartTime < 15000) {
+                try {
+                    // Read current trainer data
+                    const ftmsService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                    const indoorBikeChar = (await ftmsService).getCharacteristic('00002ad2-0000-1000-8000-00805f9b34fb');
+                    const data = await (await indoorBikeChar).readValue();
+                    const bikeData = new Uint8Array(data.buffer);
+                    
+                    // Parse FTMS Indoor Bike Data (simplified)
+                    if (bikeData.length >= 8) {
+                        const cadence = bikeData[4] + (bikeData[5] << 8); // RPM * 2
+                        const power = bikeData[6] + (bikeData[7] << 8); // Watts
+                        
+                        if (cadence > 180 && cadence < 220 && power > 20) { // 90-110 RPM, reasonable power
+                            easyGearSamples.push({
+                                cadence: cadence / 2,
+                                power: power,
+                                resistance: easyResistance,
+                                timestamp: Date.now()
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // Continue calibration even if data read fails
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const remaining = Math.ceil((15000 - (Date.now() - easyStartTime)) / 1000);
+                if (remaining > 0) {
+                    const currentCadence = easyGearSamples.length > 0 ? 
+                        easyGearSamples[easyGearSamples.length - 1].cadence.toFixed(0) : 'measuring';
+                    updateStatus(`⏱️ Easy gear: ${remaining}s remaining | Current cadence: ${currentCadence} RPM (target: 100)`);
+                }
+            }
+            
+            // Process easy gear data
+            if (easyGearSamples.length > 5) {
+                const avgCadence = easyGearSamples.reduce((sum, s) => sum + s.cadence, 0) / easyGearSamples.length;
+                const avgPower = easyGearSamples.reduce((sum, s) => sum + s.power, 0) / easyGearSamples.length;
+                calibrationData.minGearData = {
+                    resistance: easyResistance,
+                    cadence: Math.round(avgCadence),
+                    power: Math.round(avgPower),
+                    gearRatio: easyGear.ratio
+                };
+                updateStatus(`✅ Easy gear data: ${avgCadence.toFixed(0)} RPM, ${avgPower.toFixed(0)}W`);
+            } else {
+                updateStatus('⚠️ Insufficient easy gear data - using defaults');
+                calibrationData.minGearData = { resistance: easyResistance, cadence: 100, power: 120, gearRatio: easyGear.ratio };
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // PHASE 2: Gear change instructions
+            updateStatus('🔧 CALIBRATION PHASE 2: Setup - Hardest Gear');
+            updateStatus('⚙️ Please shift your bike to the HARDEST gear (smallest cassette cog, biggest chainring)');
+            updateStatus('🎯 Target: Small cog in back (like 11T-13T) + Big chainring in front (like 50T-53T)');
+            updateStatus('⚠️ This will be much harder to pedal - shift carefully!');
+            updateStatus('⏸️ Take your time to shift properly - press any key when ready...');
+            
+            // Wait for user confirmation for gear change
+            await waitForKeyPress();
+            
+            // PHASE 2: Hardest gear
+            updateStatus('🚴‍♂️ PHASE 2: Start pedaling at 60 RPM in your HARDEST gear');
+            updateStatus('📊 Target cadence: 60 RPM (slower spinning, high resistance - this is tough!)');
+            updateStatus('💪 This should feel very difficult - focus on smooth, controlled pedaling');
+            updateStatus('⏱️ Maintaining for 15 seconds...');
+            
+            const hardGear = { chainring: 53, cog: 11, ratio: 53/11 };
+            const hardResistance = Math.round(50 * hardGear.ratio * 1.2); // Higher multiplier for hard gear
+            await setTrainerResistance(hardResistance);
+            
+            // Collect data for hard gear
+            let hardGearSamples = [];
+            const hardStartTime = Date.now();
+            
+            while (Date.now() - hardStartTime < 15000) {
+                try {
+                    const ftmsService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                    const indoorBikeChar = (await ftmsService).getCharacteristic('00002ad2-0000-1000-8000-00805f9b34fb');
+                    const data = await (await indoorBikeChar).readValue();
+                    const bikeData = new Uint8Array(data.buffer);
+                    
+                    if (bikeData.length >= 8) {
+                        const cadence = bikeData[4] + (bikeData[5] << 8);
+                        const power = bikeData[6] + (bikeData[7] << 8);
+                        
+                        if (cadence > 100 && cadence < 140 && power > 50) { // 50-70 RPM, reasonable power
+                            hardGearSamples.push({
+                                cadence: cadence / 2,
+                                power: power,
+                                resistance: hardResistance,
+                                timestamp: Date.now()
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // Continue calibration
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const remaining = Math.ceil((15000 - (Date.now() - hardStartTime)) / 1000);
+                if (remaining > 0) {
+                    const currentCadence = hardGearSamples.length > 0 ? 
+                        hardGearSamples[hardGearSamples.length - 1].cadence.toFixed(0) : 'measuring';
+                    updateStatus(`⏱️ Hard gear: ${remaining}s remaining | Current cadence: ${currentCadence} RPM (target: 60)`);
+                }
+            }
+            
+            // Process hard gear data
+            if (hardGearSamples.length > 5) {
+                const avgCadence = hardGearSamples.reduce((sum, s) => sum + s.cadence, 0) / hardGearSamples.length;
+                const avgPower = hardGearSamples.reduce((sum, s) => sum + s.power, 0) / hardGearSamples.length;
+                calibrationData.maxGearData = {
+                    resistance: hardResistance,
+                    cadence: Math.round(avgCadence),
+                    power: Math.round(avgPower),
+                    gearRatio: hardGear.ratio
+                };
+                updateStatus(`✅ Hard gear data: ${avgCadence.toFixed(0)} RPM, ${avgPower.toFixed(0)}W`);
+            } else {
+                updateStatus('⚠️ Insufficient hard gear data - using defaults');
+                calibrationData.maxGearData = { resistance: hardResistance, cadence: 60, power: 250, gearRatio: hardGear.ratio };
+            }
+
+            // Calculate calibration factor
+            const powerRange = calibrationData.maxGearData.power - calibrationData.minGearData.power;
+            const gearRatioRange = calibrationData.maxGearData.gearRatio - calibrationData.minGearData.gearRatio;
+            const expectedPowerRange = 150; // Expected range for average cyclist
+            
+            calibrationData.calibrationFactor = powerRange / expectedPowerRange;
+            
+            updateStatus('🧮 CALIBRATION COMPLETE - Calculating personalized formula...');
+            updateStatus(`📊 Power range: ${powerRange.toFixed(0)}W across gear ratios ${gearRatioRange.toFixed(2)}`);
+            updateStatus(`🎯 Calibration factor: ${calibrationData.calibrationFactor.toFixed(2)}`);
+            
+            // Store calibration data in localStorage
+            localStorage.setItem(`zwift-virtual-shifting-calibration-${calibrationData.deviceId}`, JSON.stringify(calibrationData));
+            
+            // Update the calculateResistance function with personalized data
+            window.deviceCalibration = calibrationData;
+            
+            updateStatus('✅ Device calibration complete! Resistance mapping now personalized for your trainer and fitness level.');
+            updateStatus('💾 Calibration data saved - will be used for future sessions.');
+            
+            // Test the calibrated system
+            updateStatus('🧪 Testing calibrated resistance mapping...');
+            await testCalibratedResistance();
+        }
+
+        // Test the calibrated resistance system
+        async function testCalibratedResistance() {
+            if (!window.deviceCalibration) {
+                updateStatus('❌ No calibration data available');
+                return;
+            }
+            
+            const cal = window.deviceCalibration;
+            
+            // Enhanced resistance calculation using calibration data
+            function calculateCalibratedResistance(chainringIdx, cogIdx) {
+                const chainrings = [{ teeth: 39 }, { teeth: 53 }];
+                const cassette = [
+                    { teeth: 11 }, { teeth: 12 }, { teeth: 13 }, { teeth: 14 }, { teeth: 16 },
+                    { teeth: 18 }, { teeth: 20 }, { teeth: 22 }, { teeth: 25 }, { teeth: 28 }, { teeth: 32 }
+                ];
+                
+                const ratio = chainrings[chainringIdx].teeth / cassette[cogIdx].teeth;
+                
+                // Use calibration data to create personalized mapping
+                const minRatio = cal.minGearData.gearRatio;
+                const maxRatio = cal.maxGearData.gearRatio;
+                const minPower = cal.minGearData.power;
+                const maxPower = cal.maxGearData.power;
+                
+                // Linear interpolation based on calibrated data
+                const ratioPosition = (ratio - minRatio) / (maxRatio - minRatio);
+                const expectedPower = minPower + (ratioPosition * (maxPower - minPower));
+                
+                // Convert power to resistance using trainer-specific factor
+                const resistance = Math.round(expectedPower * cal.calibrationFactor);
+                
+                return {
+                    ratio: ratio.toFixed(2),
+                    resistance: Math.max(25, Math.min(resistance, 1000)),
+                    gear: `${chainrings[chainringIdx].teeth}T x ${cassette[cogIdx].teeth}T`,
+                    expectedPower: Math.round(expectedPower),
+                    calibrated: true
+                };
+            }
+            
+            // Test sequence with calibrated values
+            const testGears = [
+                { chainring: 0, cog: 9, name: "Easy (39T x 28T)" },
+                { chainring: 0, cog: 5, name: "Medium (39T x 18T)" },
+                { chainring: 1, cog: 2, name: "Hard (53T x 13T)" }
+            ];
+            
+            for (const gear of testGears) {
+                const result = calculateCalibratedResistance(gear.chainring, gear.cog);
+                updateStatus(`🧪 ${gear.name}: ${result.resistance}W (${result.expectedPower}W expected, ratio ${result.ratio})`);
+                
+                await setTrainerResistance(result.resistance);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+            
+            updateStatus('✅ Calibrated resistance testing complete!');
+            updateStatus('🎯 Your trainer now uses personalized resistance mapping based on your calibration data.');
+        }
+
+        // Adaptive baseline calibration - finds natural free-ride power first
+        async function adaptiveCalibrate() {
+            if (!connectedTrainer) {
+                updateStatus('No trainer connected');
+                return;
+            }
+
+            updateStatus('🎯 Starting Adaptive Baseline Calibration...');
+            updateStatus('💡 This method finds your natural "free ride" power then adjusts resistance to match');
+            
+            // Calibration data storage
+            let adaptiveCalibration = {
+                deviceId: null,
+                baselineGear: null,
+                naturalPower: null,
+                naturalCadence: null,
+                resistanceMapping: {},
+                timestamp: new Date().toISOString()
+            };
+
+            // Get device ID
+            try {
+                const server = connectedTrainer.gatt;
+                const deviceInfo = await server.getPrimaryService('0000180a-0000-1000-8000-00805f9b34fb');
+                const serialChar = await deviceInfo.getCharacteristic('00002a25-0000-1000-8000-00805f9b34fb');
+                const serialData = await serialChar.readValue();
+                adaptiveCalibration.deviceId = new TextDecoder().decode(serialData);
+                updateStatus(`📱 Device ID: ${adaptiveCalibration.deviceId}`);
+            } catch (e) {
+                adaptiveCalibration.deviceId = 'adaptive-' + Date.now();
+                updateStatus('⚠️ Could not read device serial, using generated ID');
+            }
+
+            // PHASE 1: Find natural baseline
+            updateStatus('🔧 PHASE 1: Baseline Discovery (Automated)');
+            updateStatus('⚙️ Please shift to your EASIEST gear (e.g., 34F x 30R like you mentioned)');
+            updateStatus('📝 Note your gear combination and press any key when ready...');
+            await waitForKeyPress();
+
+            updateStatus('🚴‍♂️ Start pedaling at 100 RPM in SIM mode (no resistance set)');
+            updateStatus('📊 10-second baseline ride, recording last 3 seconds for accuracy');
+            updateStatus('⏱️ Recording baseline data...');
+
+            // Record baseline for 10 seconds, use last 3 seconds
+            let baselineSamples = [];
+            const baselineStartTime = Date.now();
+
+            while (Date.now() - baselineStartTime < 10000) {
+                try {
+                    const ftmsService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                    const indoorBikeChar = (await ftmsService).getCharacteristic('00002ad2-0000-1000-8000-00805f9b34fb');
+                    const data = await (await indoorBikeChar).readValue();
+                    const bikeData = new Uint8Array(data.buffer);
+                    
+                    if (bikeData.length >= 8) {
+                        const cadence = (bikeData[4] + (bikeData[5] << 8)) / 2; // Convert to actual RPM
+                        const power = bikeData[6] + (bikeData[7] << 8);
+                        const timeElapsed = Date.now() - baselineStartTime;
+                        
+                        // Only record last 3 seconds (7000-10000ms)
+                        if (timeElapsed > 7000 && cadence > 90 && cadence < 110 && power > 10) {
+                            baselineSamples.push({
+                                cadence: cadence,
+                                power: power,
+                                timestamp: Date.now(),
+                                timeElapsed: timeElapsed
+                            });
+                        }
+                        
+                        const remaining = Math.ceil((10000 - timeElapsed) / 1000);
+                        if (timeElapsed > 7000) {
+                            updateStatus(`� Recording: ${cadence.toFixed(0)} RPM, ${power}W (last 3s window)`);
+                        } else {
+                            updateStatus(`⏱️ Stabilizing: ${remaining}s remaining, ${cadence.toFixed(0)} RPM, ${power}W (target: 100 RPM)`);
+                        }
+                    }
+                } catch (e) {
+                    updateStatus(`❌ Debug: Error reading FTMS data: ${e.message}`);
+                    updateStatus(`🔍 Debug: connectedTrainer type: ${typeof connectedTrainer}`);
+                    updateStatus(`🔍 Debug: ftmsClient available: ${ftmsClient ? 'Yes' : 'No'}`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            // Process baseline data
+            if (baselineSamples.length > 3) {
+                const avgCadence = baselineSamples.reduce((sum, s) => sum + s.cadence, 0) / baselineSamples.length;
+                const avgPower = baselineSamples.reduce((sum, s) => sum + s.power, 0) / baselineSamples.length;
+                
+                adaptiveCalibration.naturalCadence = Math.round(avgCadence);
+                adaptiveCalibration.naturalPower = Math.round(avgPower);
+                adaptiveCalibration.baselineGear = "34F x 30R"; // User can modify this
+                
+                updateStatus(`✅ Baseline established from ${baselineSamples.length} samples:`);
+                updateStatus(`📊 Average: ${avgCadence.toFixed(1)} RPM, ${avgPower.toFixed(1)}W in easiest gear`);
+                updateStatus(`🎯 Target: Find resistance that produces ${avgPower.toFixed(0)}W ± 5W`);
+            } else {
+                updateStatus('❌ Insufficient baseline data - check cadence and power readings');
+                updateStatus(`📊 Only got ${baselineSamples.length} valid samples in last 3 seconds`);
+                return;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // PHASE 2: Automated resistance finding
+            updateStatus('🔧 PHASE 2: Automated Resistance Matching');
+            updateStatus('🤖 Auto-incrementing resistance to find your baseline power match...');
+            
+            const targetPower = adaptiveCalibration.naturalPower;
+            let currentResistance = 10; // Start at 10W
+            let foundMatch = false;
+            let bestMatch = { resistance: 10, powerDiff: 999, actualPower: 0, samples: 0 };
+            
+            while (!foundMatch && currentResistance <= 200) {
+                updateStatus(`🧪 Testing ${currentResistance}W resistance...`);
+                await setTrainerResistance(currentResistance);
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Let resistance settle
+                
+                // 5-second test, record last 3 seconds
+                let testSamples = [];
+                const testStartTime = Date.now();
+                
+                while (Date.now() - testStartTime < 5000) {
+                    try {
+                        const ftmsService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                        const indoorBikeChar = (await ftmsService).getCharacteristic('00002ad2-0000-1000-8000-00805f9b34fb');
+                        const data = await (await indoorBikeChar).readValue();
+                        const bikeData = new Uint8Array(data.buffer);
+                        
+                        if (bikeData.length >= 8) {
+                            const cadence = (bikeData[4] + (bikeData[5] << 8)) / 2;
+                            const power = bikeData[6] + (bikeData[7] << 8);
+                            const timeElapsed = Date.now() - testStartTime;
+                            
+                            // Only record last 3 seconds (2000-5000ms)
+                            if (timeElapsed > 2000 && cadence > 100 && power > 10) {
+                                testSamples.push({ 
+                                    cadence, 
+                                    power, 
+                                    timeElapsed: timeElapsed 
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        // Continue
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                if (testSamples.length > 2) {
+                    const avgPower = testSamples.reduce((sum, s) => sum + s.power, 0) / testSamples.length;
+                    const avgCadence = testSamples.reduce((sum, s) => sum + s.cadence, 0) / testSamples.length;
+                    const powerDiff = Math.abs(avgPower - targetPower);
+                    
+                    updateStatus(`📊 ${currentResistance}W → ${avgPower.toFixed(1)}W @ ${avgCadence.toFixed(0)}RPM (${testSamples.length} samples)`);
+                    updateStatus(`🎯 Power difference: ${powerDiff.toFixed(1)}W (target: ${targetPower}W ± 5W)`);
+                    
+                    // Update best match
+                    if (powerDiff < bestMatch.powerDiff) {
+                        bestMatch = { 
+                            resistance: currentResistance, 
+                            powerDiff, 
+                            actualPower: avgPower,
+                            actualCadence: avgCadence,
+                            samples: testSamples.length
+                        };
+                    }
+                    
+                    // Check if we found a match within 5W
+                    if (powerDiff <= 5) {
+                        foundMatch = true;
+                        updateStatus(`✅ MATCH FOUND! ${currentResistance}W resistance produces ${avgPower.toFixed(1)}W`);
+                        updateStatus(`🎯 Difference: ${powerDiff.toFixed(1)}W (within 5W tolerance)`);
+                        break;
+                    } else if (avgPower > targetPower + 5) {
+                        // If we're overshooting by more than 5W, we might have gone too far
+                        updateStatus(`⚠️ Power too high (${avgPower.toFixed(1)}W > ${targetPower + 5}W), using best match so far`);
+                        break;
+                    }
+                } else {
+                    updateStatus(`⚠️ Insufficient data at ${currentResistance}W (only ${testSamples.length} samples)`);
+                }
+                
+                currentResistance += 10; // Increment by 10W
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Use best match found
+            const finalMatch = foundMatch ? 
+                { resistance: currentResistance - 10, powerDiff: bestMatch.powerDiff, actualPower: bestMatch.actualPower } : 
+                bestMatch;
+                
+            updateStatus(`🎯 FINAL RESULT: ${finalMatch.resistance}W resistance → ${finalMatch.actualPower.toFixed(1)}W output`);
+            updateStatus(`📊 Best match difference: ${finalMatch.powerDiff.toFixed(1)}W from target ${targetPower}W`);
+            updateStatus(`✅ Baseline gear calibrated with ${bestMatch.samples} data points`);
+            
+            adaptiveCalibration.resistanceMapping[adaptiveCalibration.baselineGear] = finalMatch.resistance;
+
+            // PHASE 3: Test other gear ratios
+            updateStatus('🔧 PHASE 3: Multi-Gear Mapping (Optional)');
+            updateStatus('⚙️ Want to test a harder gear ratio? Shift to middle gear and press Y, or any other key to skip');
+            
+            const keyPressed = await waitForSpecificKey();
+            if (keyPressed.toLowerCase() === 'y') {
+                updateStatus('⚙️ Shift to a MIDDLE gear (e.g., 34F x 20R) and press any key...');
+                await waitForKeyPress();
+                
+                // Find resistance for middle gear that gives higher power
+                const targetPowerIncrease = Math.round(adaptiveCalibration.naturalPower * 1.5); // 50% more power
+                updateStatus(`🎯 Finding resistance for middle gear to achieve ~${targetPowerIncrease}W...`);
+                updateStatus(`📊 Using same automated approach: 10W increments until within 5W`);
+                
+                let middleResistance = 10;
+                let middleFoundMatch = false;
+                let middleBestMatch = { resistance: 10, powerDiff: 999, actualPower: 0 };
+                
+                while (!middleFoundMatch && middleResistance <= 250) {
+                    updateStatus(`🧪 Testing ${middleResistance}W resistance in middle gear...`);
+                    await setTrainerResistance(middleResistance);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // 5-second test, last 3 seconds recorded
+                    let samples = [];
+                    const testStart = Date.now();
+                    
+                    while (Date.now() - testStart < 5000) {
+                        try {
+                            const ftmsService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                            const indoorBikeChar = (await ftmsService).getCharacteristic('00002ad2-0000-1000-8000-00805f9b34fb');
+                            const data = await (await indoorBikeChar).readValue();
+                            const bikeData = new Uint8Array(data.buffer);
+                            
+                            if (bikeData.length >= 8) {
+                                const power = bikeData[6] + (bikeData[7] << 8);
+                                const cadence = (bikeData[4] + (bikeData[5] << 8)) / 2;
+                                const elapsed = Date.now() - testStart;
+                                
+                                // Record last 3 seconds
+                                if (elapsed > 2000 && power > 10) {
+                                    samples.push({ power, cadence, elapsed });
+                                }
+                            }
+                        } catch (e) {}
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                    
+                    if (samples.length > 2) {
+                        const avgPower = samples.reduce((sum, s) => sum + s.power, 0) / samples.length;
+                        const avgCadence = samples.reduce((sum, s) => sum + s.cadence, 0) / samples.length;
+                        const powerDiff = Math.abs(avgPower - targetPowerIncrease);
+                        
+                        updateStatus(`📊 ${middleResistance}W → ${avgPower.toFixed(1)}W @ ${avgCadence.toFixed(0)}RPM (${samples.length} samples)`);
+                        updateStatus(`🎯 Power difference: ${powerDiff.toFixed(1)}W (target: ${targetPowerIncrease}W ± 5W)`);
+                        
+                        // Update best match
+                        if (powerDiff < middleBestMatch.powerDiff) {
+                            middleBestMatch = { 
+                                resistance: middleResistance, 
+                                powerDiff, 
+                                actualPower: avgPower,
+                                samples: samples.length
+                            };
+                        }
+                        
+                        // Check for match within 5W
+                        if (powerDiff <= 5) {
+                            middleFoundMatch = true;
+                            updateStatus(`✅ MIDDLE GEAR MATCH! ${middleResistance}W resistance produces ${avgPower.toFixed(1)}W`);
+                            break;
+                        } else if (avgPower > targetPowerIncrease + 10) {
+                            updateStatus(`⚠️ Power too high, using best match so far`);
+                            break;
+                        }
+                    } else {
+                        updateStatus(`⚠️ Insufficient data at ${middleResistance}W (${samples.length} samples)`);
+                    }
+                    
+                    middleResistance += 10;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+                const finalMiddleMatch = middleFoundMatch ? 
+                    { resistance: middleResistance - 10, actualPower: middleBestMatch.actualPower } : 
+                    middleBestMatch;
+                
+                adaptiveCalibration.resistanceMapping["34F x 20R"] = finalMiddleMatch.resistance;
+                updateStatus(`✅ Middle gear: ${finalMiddleMatch.resistance}W resistance → ${finalMiddleMatch.actualPower.toFixed(1)}W`);
+                updateStatus(`📊 Power increase: +${(finalMiddleMatch.actualPower - adaptiveCalibration.naturalPower).toFixed(1)}W from baseline`);
+            }
+
+            // Save adaptive calibration
+            localStorage.setItem(`adaptive-calibration-${adaptiveCalibration.deviceId}`, JSON.stringify(adaptiveCalibration));
+            window.adaptiveCalibration = adaptiveCalibration;
+            
+            updateStatus('');
+            updateStatus('🎉 ===== ADAPTIVE CALIBRATION COMPLETE =====');
+            updateStatus(`📊 Natural baseline: ${adaptiveCalibration.naturalPower}W @ ${adaptiveCalibration.naturalCadence} RPM`);
+            updateStatus(`🎯 Resistance mappings discovered:`);
+            
+            for (const [gear, resistance] of Object.entries(adaptiveCalibration.resistanceMapping)) {
+                updateStatus(`   ${gear}: ${resistance}W resistance`);
+            }
+            
+            updateStatus(`💾 Calibration data saved to device: ${adaptiveCalibration.deviceId}`);
+            updateStatus('🔄 Data will auto-load for future sessions');
+            updateStatus('🎯 Virtual shifting now matches your actual bike feel!');
+            updateStatus('');
+            
+            // Test the adaptive system
+            await testAdaptiveShifting();
+        }
+
+        // Debug FTMS data reading
+        async function debugFTMSData() {
+            if (!connectedTrainer && !ftmsClient) {
+                updateStatus('❌ No trainer connected');
+                return;
+            }
+
+            updateStatus('🐛 Starting FTMS Data Debug...');
+            updateStatus('🚴‍♂️ Please start pedaling at any cadence');
+            
+            for (let i = 0; i < 10; i++) {
+                try {
+                    updateStatus(`\n🔍 Debug Test ${i + 1}/10:`);
+                    
+                    // Method 1: Try FTMS client data
+                    if (ftmsClient) {
+                        updateStatus(`📊 FTMS Client data object: ${JSON.stringify(ftmsClient.data || 'No data property')}`);
+                        if (ftmsClient.data) {
+                            updateStatus(`   Cadence: ${ftmsClient.data.cadence || 'N/A'} RPM`);
+                            updateStatus(`   Power: ${ftmsClient.data.power || 'N/A'} W`);
+                            updateStatus(`   Speed: ${ftmsClient.data.speed || 'N/A'} km/h`);
+                        }
+                    }
+                    
+                    // Method 2: Try manual characteristic reading
+                    if (connectedTrainer) {
+                        try {
+                            const ftmsService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                            const indoorBikeChar = (await ftmsService).getCharacteristic('00002ad2-0000-1000-8000-00805f9b34fb');
+                            const data = await (await indoorBikeChar).readValue();
+                            const bikeData = new Uint8Array(data.buffer);
+                            
+                            updateStatus(`🔍 Raw characteristic data (${bikeData.length} bytes):`);
+                            updateStatus(`   Hex: [${Array.from(bikeData).map(b => b.toString(16).padStart(2, '0')).join(' ')}]`);
+                            updateStatus(`   Dec: [${Array.from(bikeData).join(', ')}]`);
+                            
+                            if (bikeData.length >= 8) {
+                                const flags = bikeData[0] + (bikeData[1] << 8);
+                                const cadence = (bikeData[4] + (bikeData[5] << 8)) / 2;
+                                const power = bikeData[6] + (bikeData[7] << 8);
+                                
+                                updateStatus(`   Flags: 0x${flags.toString(16).padStart(4, '0')}`);
+                                updateStatus(`   Parsed Cadence: ${cadence.toFixed(1)} RPM`);
+                                updateStatus(`   Parsed Power: ${power} W`);
+                            }
+                        } catch (charError) {
+                            updateStatus(`❌ Characteristic read error: ${charError.message}`);
+                        }
+                    }
+                    
+                    // Method 3: Try using FTMS client methods
+                    if (ftmsClient && ftmsClient.chars && ftmsClient.chars.indoorBikeData) {
+                        try {
+                            const data = await ftmsClient.chars.indoorBikeData.readValue();
+                            const bikeData = new Uint8Array(data.buffer);
+                            updateStatus(`🔍 FTMS client method (${bikeData.length} bytes): [${Array.from(bikeData).map(b => b.toString(16).padStart(2, '0')).join(' ')}]`);
+                        } catch (ftmsError) {
+                            updateStatus(`❌ FTMS client read error: ${ftmsError.message}`);
+                        }
+                    }
+                    
+                } catch (error) {
+                    updateStatus(`❌ Debug test ${i + 1} failed: ${error.message}`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            updateStatus('🐛 Debug complete - check logs above for data patterns');
+        }
+
+        // Notification-based calibration that actually works
+        async function notificationCalibrate() {
+            if (!ftmsClient) {
+                updateStatus('❌ No FTMS client available');
+                return;
+            }
+
+            updateStatus('🔔 Starting Notification-Based Calibration...');
+            updateStatus('💡 This uses FTMS notifications instead of direct reads');
+            
+            // Set up live data tracking
+            let liveData = { cadence: 0, power: 0, speed: 0, lastUpdate: 0, sampleCount: 0 };
+            let notificationActive = false;
+            
+            try {
+                // Subscribe to FTMS Indoor Bike Data notifications
+                if (ftmsClient.chars && ftmsClient.chars.ibd) {
+                    await ftmsClient.chars.ibd.startNotifications();
+                    
+                    ftmsClient.chars.ibd.addEventListener('characteristicvaluechanged', (event) => {
+                        const data = new Uint8Array(event.target.value.buffer);
+                        liveData.sampleCount++;
+                        
+                        if (data.length >= 8) {
+                            liveData.cadence = (data[4] + (data[5] << 8)) / 2;
+                            liveData.power = data[6] + (data[7] << 8);
+                            liveData.speed = (data[2] + (data[3] << 8)) / 100; // km/h
+                            liveData.lastUpdate = Date.now();
+                        }
+                    });
+                    
+                    notificationActive = true;
+                    updateStatus('✅ FTMS notifications active');
+                } else {
+                    updateStatus('❌ FTMS Indoor Bike Data characteristic not available');
+                    updateStatus('🔍 Available characteristics: ' + Object.keys(ftmsClient.chars || {}).join(', '));
+                    return;
+                }
+            } catch (e) {
+                updateStatus(`❌ Failed to set up notifications: ${e.message}`);
+                return;
+            }
+
+            // Wait for data to start flowing
+            updateStatus('⏳ Waiting for trainer data...');
+            updateStatus('🚴‍♂️ Please start pedaling to activate data flow');
+            
+            let waitStart = Date.now();
+            while (liveData.lastUpdate === 0 && Date.now() - waitStart < 30000) {
+                updateStatus(`⏳ No data yet... (${liveData.sampleCount} samples received)`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            if (liveData.lastUpdate === 0) {
+                updateStatus('❌ No data received after 30 seconds');
+                return;
+            }
+            
+            updateStatus(`✅ Data flowing! Got ${liveData.sampleCount} samples`);
+            updateStatus('⚙️ Please shift to your EASIEST gear and press any key...');
+            await waitForKeyPress();
+
+            // Phase 1: Baseline recording
+            updateStatus('🚴‍♂️ Pedal at 100 RPM for 10 seconds in easiest gear');
+            updateStatus('📊 Recording last 3 seconds for baseline...');
+            
+            let baselineSamples = [];
+            const baselineStart = Date.now();
+            
+            while (Date.now() - baselineStart < 10000) {
+                const timeElapsed = Date.now() - baselineStart;
+                const remaining = Math.ceil((10000 - timeElapsed) / 1000);
+                
+                // Record last 3 seconds
+                if (timeElapsed > 7000 && liveData.cadence > 90 && liveData.cadence < 110 && liveData.power > 10) {
+                    baselineSamples.push({
+                        cadence: liveData.cadence,
+                        power: liveData.power,
+                        timestamp: Date.now()
+                    });
+                    updateStatus(`✅ Sample #${baselineSamples.length}: ${liveData.cadence.toFixed(1)} RPM, ${liveData.power}W`);
+                } else if (timeElapsed > 7000) {
+                    updateStatus(`📊 Live: ${liveData.cadence.toFixed(1)} RPM, ${liveData.power}W (need 90-110 RPM, >10W)`);
+                } else {
+                    updateStatus(`⏱️ Stabilizing: ${remaining}s, ${liveData.cadence.toFixed(1)} RPM, ${liveData.power}W`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            if (baselineSamples.length < 3) {
+                updateStatus(`❌ Insufficient baseline data: ${baselineSamples.length} samples (need ≥3)`);
+                updateStatus('💡 Make sure you\'re pedaling steadily at 100 RPM');
+                return;
+            }
+            
+            // Calculate baseline
+            const avgCadence = baselineSamples.reduce((sum, s) => sum + s.cadence, 0) / baselineSamples.length;
+            const avgPower = baselineSamples.reduce((sum, s) => sum + s.power, 0) / baselineSamples.length;
+            
+            updateStatus(`✅ Baseline: ${avgCadence.toFixed(1)} RPM, ${avgPower.toFixed(1)}W (${baselineSamples.length} samples)`);
+            updateStatus(`🎯 Target: Find resistance that produces ${avgPower.toFixed(0)}W ± 5W`);
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Phase 2: Auto resistance matching
+            updateStatus('🤖 Starting automated resistance matching...');
+            
+            let currentResistance = 10;
+            let bestMatch = { resistance: 10, powerDiff: 999, actualPower: 0 };
+            
+            while (currentResistance <= 200) {
+                updateStatus(`🧪 Testing ${currentResistance}W resistance...`);
+                await setTrainerResistance(currentResistance);
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Settle time
+                
+                // Collect 5 seconds of data, use last 3 seconds
+                let testSamples = [];
+                const testStart = Date.now();
+                
+                while (Date.now() - testStart < 5000) {
+                    const elapsed = Date.now() - testStart;
+                    
+                    if (elapsed > 2000 && liveData.power > 10) { // Last 3 seconds
+                        testSamples.push(liveData.power);
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                if (testSamples.length > 2) {
+                    const avgTestPower = testSamples.reduce((sum, p) => sum + p, 0) / testSamples.length;
+                    const powerDiff = Math.abs(avgTestPower - avgPower);
+                    
+                    updateStatus(`📊 ${currentResistance}W → ${avgTestPower.toFixed(1)}W (diff: ${powerDiff.toFixed(1)}W, ${testSamples.length} samples)`);
+                    
+                    if (powerDiff < bestMatch.powerDiff) {
+                        bestMatch = { resistance: currentResistance, powerDiff, actualPower: avgTestPower };
+                    }
+                    
+                    if (powerDiff <= 5) {
+                        updateStatus(`✅ PERFECT MATCH! ${currentResistance}W resistance = ${avgTestPower.toFixed(1)}W`);
+                        break;
+                    }
+                } else {
+                    updateStatus(`⚠️ Insufficient test data: ${testSamples.length} samples`);
+                }
+                
+                currentResistance += 10;
+            }
+            
+            updateStatus('');
+            updateStatus('🎉 === NOTIFICATION CALIBRATION COMPLETE ===');
+            updateStatus(`📊 Natural power: ${avgPower.toFixed(1)}W @ ${avgCadence.toFixed(1)} RPM`);
+            updateStatus(`🎯 Best match: ${bestMatch.resistance}W resistance → ${bestMatch.actualPower.toFixed(1)}W`);
+            updateStatus(`📈 Accuracy: ±${bestMatch.powerDiff.toFixed(1)}W from target`);
+            updateStatus('✅ This approach works with FTMS notifications!');
+        }
+
+        // Wait for specific key press
+        function waitForSpecificKey() {
+            return new Promise(resolve => {
+                const handler = (e) => {
+                    document.removeEventListener('keydown', handler);
+                    updateStatus(`✅ Key '${e.key}' pressed`);
+                    resolve(e.key);
+                };
+                document.addEventListener('keydown', handler);
+            });
+        }
+
+        // Test adaptive shifting system
+        async function testAdaptiveShifting() {
+            if (!window.adaptiveCalibration) {
+                updateStatus('❌ No adaptive calibration data available');
+                return;
+            }
+            
+            const cal = window.adaptiveCalibration;
+            updateStatus('🧪 Testing adaptive virtual shifting...');
+            
+            for (const [gear, resistance] of Object.entries(cal.resistanceMapping)) {
+                updateStatus(`🔄 Virtual shift to: ${gear}`);
+                await setTrainerResistance(resistance);
+                updateStatus(`🎯 Set ${resistance}W resistance (should feel like ${gear})`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+            
+            updateStatus('✅ Adaptive shifting test complete!');
+            updateStatus('🎯 This approach matches your actual gear feel much better!');
+        }
+
+        // FTMS resistance control command (shared function)
+        async function setTrainerResistance(watts) {
+            try {
+                const ftmsControlService = connectedTrainer.gatt.getPrimaryService('00001826-0000-1000-8000-00805f9b34fb');
+                const controlPointChar = (await ftmsControlService).getCharacteristic('00002ad9-0000-1000-8000-00805f9b34fb');
+                
+                // FTMS Set Target Resistance Level command (0x05)
+                const resistanceLevel = Math.round(watts * 10); // Convert to 0.1W units
+                const command = new Uint8Array([
+                    0x05, // Set Target Resistance Level
+                    resistanceLevel & 0xFF,
+                    (resistanceLevel >> 8) & 0xFF
+                ]);
+                
+                await (await controlPointChar).writeValue(command);
+                updateStatus(`✅ FTMS resistance set to ${watts}W`);
+            } catch (error) {
+                updateStatus(`❌ Failed to set resistance: ${error.message}`);
+            }
+        }
+
+        // Helper function for waiting for key press
+        function waitForKeyPress() {
+            return new Promise(resolve => {
+                const handler = (e) => {
+                    document.removeEventListener('keydown', handler);
+                    resolve();
+                };
+                document.addEventListener('keydown', handler);
+            });
+        }
+
+        // Event listeners
+        document.getElementById('shift-up').onclick = shiftUp;
+        document.getElementById('shift-down').onclick = shiftDown;
+        document.getElementById('reset-gear').onclick = () => setGear(0);
+        document.getElementById('connect-trainer').onclick = connectTrainer;
+        document.getElementById('scan-all-chars').onclick = scanAllCharacteristics;
+        document.getElementById('read-features').onclick = readTrainerFeatures;
+        document.getElementById('test-zwift-shifting').onclick = testZwiftVirtualShifting;
+        document.getElementById('test-ftms-shifting').onclick = testFTMSVirtualShifting;
+        document.getElementById('test-qdomyos-method').onclick = testQDomyosMethod;
+        document.getElementById('debug-ftms-data').onclick = debugFTMSData;
+        document.getElementById('calibrate-device').onclick = calibrateDevice;
+        document.getElementById('adaptive-calibrate').onclick = adaptiveCalibrate;
+        document.getElementById('notification-calibrate').onclick = notificationCalibrate;
+        document.getElementById('set-sim-mode').onclick = setSIMMode;
+        document.getElementById('send-command').onclick = sendGearCommand;
+        document.getElementById('clear-log').onclick = () => {
+            commandLogEl.innerHTML = '<div class="text-gray-500">// Command log cleared</div>';
+        };
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === '+') {
+                e.preventDefault();
+                shiftUp();
+            } else if (e.key === 'ArrowDown' || e.key === '-') {
+                e.preventDefault();
+                shiftDown();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                setGear(0);
+            }
+        });
+
+        // Initialize
+        initializeGearGrid();
+        initializeVirtualGearList();
+        
+        // Load existing calibration data if available
+        const deviceCalibrations = Object.keys(localStorage).filter(key => key.startsWith('zwift-virtual-shifting-calibration-'));
+        if (deviceCalibrations.length > 0) {
+            const latestCalibration = deviceCalibrations.sort().pop();
+            try {
+                window.deviceCalibration = JSON.parse(localStorage.getItem(latestCalibration));
+                logCommand(`📂 Loaded calibration data for device: ${window.deviceCalibration.deviceId}`);
+                logCommand(`📊 Calibration factor: ${window.deviceCalibration.calibrationFactor.toFixed(2)}`);
+            } catch (e) {
+                logCommand('⚠️ Failed to load calibration data');
+            }
+        }
+        
+        logCommand('🚀 Zwift Virtual Shifting Protocol Explorer initialized');
+        logCommand('🎮 Use arrow keys or click buttons to shift gears');
+        logCommand('📖 Protocol documentation: circumference manipulation via FTMS 0x13');
+        logCommand('⚠️ Important: Set SIM mode first for wheel circumference to affect resistance');
+        logCommand('🔬 This tool tests Zwift\'s virtual gearing hack using wheel circumference abuse');
+        logCommand('🔧 NEW: Device-specific calibration available - personalize resistance mapping for your trainer!');
+    </script>
+</body>
+</html>

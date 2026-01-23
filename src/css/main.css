@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Custom component classes for the FTMS app */
+@layer components {
+  /* Metric card - used for power, speed, cadence, etc. */
+  .metric-card {
+    @apply bg-white rounded-xl shadow-md p-4 sm:p-6 text-center;
+  }
+  
+  .metric-card h3 {
+    @apply text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2;
+  }
+  
+  .metric-value {
+    @apply text-2xl sm:text-3xl font-bold;
+  }
+  
+  .metric-unit {
+    @apply text-xs sm:text-sm text-gray-500;
+  }
+
+  /* Section card - used for main content sections */
+  .section-card {
+    @apply bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6 sm:mb-8;
+  }
+  
+  .section-title {
+    @apply text-xl sm:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4;
+  }
+
+  /* Button base styles (shared) */
+  .btn-connect {
+    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-purple-600 hover:bg-purple-700;
+  }
+  
+  .btn-start {
+    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-orange-600 hover:bg-orange-700;
+  }
+  
+  .btn-skip {
+    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-gray-600 hover:bg-gray-700;
+  }
+  
+  .btn-debug {
+    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-yellow-600 hover:bg-yellow-700;
+  }
+  
+  .btn-import {
+    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-blue-600 hover:bg-blue-700;
+  }
+  
+  .btn-add {
+    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-green-600 hover:bg-green-700;
+  }
+  
+  .btn-danger {
+    @apply px-3 sm:px-4 py-1 rounded-sm text-white text-xs sm:text-sm bg-red-600 hover:bg-red-700 transition-colors;
+  }
+
+  /* Form inputs */
+  .form-input {
+    @apply w-full p-2 sm:p-3 border border-gray-300 rounded-lg text-sm sm:text-base;
+  }
+  
+  .form-select {
+    @apply w-full p-2 sm:p-3 border border-gray-300 rounded-lg text-sm sm:text-base;
+  }
+  
+  .form-textarea {
+    @apply w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 rounded-lg resize-none font-mono text-xs sm:text-sm;
+  }
+
+  /* Labels */
+  .form-label {
+    @apply block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -357,5 +357,12 @@ class FTMSClient extends Emitter {
 }
 
 // Export a ready-to-use singleton, plus the class if you want multiple instances
-export const ftms = new FTMSClient();
-export { FTMSClient };
+// Support both ES6 modules and global scope for browser compatibility
+if (typeof module !== 'undefined' && module.exports) {
+  // Node.js style export
+  module.exports = { ftms: new FTMSClient(), FTMSClient };
+} else if (typeof window !== 'undefined') {
+  // Browser global export
+  window.ftms = new FTMSClient();
+  window.FTMSClient = FTMSClient;
+}

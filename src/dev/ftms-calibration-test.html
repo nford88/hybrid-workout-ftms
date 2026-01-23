@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=de        <!-- Sample Data Debug -->
+        <div class="mb-6" id="sample-debug-section" style="display: none;">
+            <h2 class="text-lg font-semibold mb-3">🔍 Sample Data Debug</h2>
+            <div class="p-4 bg-yellow-50 rounded max-h-64 overflow-y-auto" id="sample-debug">
+                <!-- Sample data will be shown here -->
+            </div>
+        </div>
+
+        <!-- Raw Data Analysis -->
+        <div class="mb-6" id="raw-data-section" style="display: none;">
+            <h2 class="text-lg font-semibold mb-3">🔬 Raw FTMS Data Analysis</h2>
+            <div class="p-4 bg-purple-50 rounded">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-sm text-gray-500">Cadence ÷ 2 (Current)</div>
+                        <div id="cadence-div2" class="text-lg font-bold text-red-600">-- RPM</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Cadence × 1 (Fixed?)</div>
+                        <div id="cadence-raw" class="text-lg font-bold text-green-600">-- RPM</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-sm">
+                    <strong>Raw Hex Data:</strong> <span id="raw-hex" class="font-mono">--</span>
+                </div>
+            </div>
+        </div>-scale=1.0">
+    <title>FTMS Calibration Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-3xl font-bold text-center mb-6">🚴‍♂️ FTMS Calibration Test</h1>
+        
+        <!-- Connection Section -->
+        <div class="mb-6">
+            <button id="connect-btn" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                🔗 Connect to FTMS Trainer
+            </button>
+            <div id="connection-status" class="mt-2 text-sm text-gray-600">
+                Not connected
+            </div>
+        </div>
+
+        <!-- FTMS Data Display -->
+        <div class="mb-6 p-4 bg-gray-50 rounded">
+            <h2 class="text-lg font-semibold mb-3">📊 Live FTMS Data</h2>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-sm text-gray-500">Speed</div>
+                    <div id="speed" class="text-xl font-bold">-- km/h</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Cadence</div>
+                    <div id="cadence" class="text-xl font-bold">-- RPM</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Power</div>
+                    <div id="power" class="text-xl font-bold">-- W</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resistance Test -->
+        <div class="mb-6">
+            <button id="baseline-btn" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-2" disabled>
+                📊 Measure Baseline (No Resistance)
+            </button>
+            <button id="resistance-test-btn" class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors" disabled>
+                ⚡ Run Resistance Test (Lowest Gear)
+            </button>
+            <div id="test-status" class="mt-2 text-sm text-gray-600">
+                Connect trainer to enable testing
+            </div>
+        </div>
+
+        <!-- Baseline Results -->
+        <div class="mb-6" id="baseline-section" style="display: none;">
+            <h2 class="text-lg font-semibold mb-3">📏 Baseline Measurement</h2>
+            <div class="p-4 bg-blue-50 rounded">
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-sm text-gray-500">Natural Power</div>
+                        <div id="baseline-power" class="text-xl font-bold text-blue-600">-- W</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Natural Cadence</div>
+                        <div id="baseline-cadence" class="text-xl font-bold text-blue-600">-- RPM</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Natural Speed</div>
+                        <div id="baseline-speed" class="text-xl font-bold text-blue-600">-- km/h</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="mb-6" id="results-section" style="display: none;">
+            <h2 class="text-lg font-semibold mb-3">📈 Test Results</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 px-4 py-2">Resistance Set</th>
+                            <th class="border border-gray-300 px-4 py-2">Actual Power</th>
+                            <th class="border border-gray-300 px-4 py-2">Cadence</th>
+                            <th class="border border-gray-300 px-4 py-2">Speed</th>
+                            <th class="border border-gray-300 px-4 py-2">vs Target</th>
+                            <th class="border border-gray-300 px-4 py-2">vs Baseline</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-table">
+                        <!-- Results will be added here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Log Output -->
+        <div class="mb-4">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-lg font-semibold">📝 Test Log</h2>
+                <button id="clear-log-btn" class="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600">
+                    Clear Log
+                </button>
+            </div>
+            <div class="p-4 bg-black text-green-400 rounded font-mono text-sm h-96 overflow-y-auto" id="log">
+                FTMS Calibration Test Ready...<br>
+            </div>
+        </div>
+
+        <!-- Raw Data Analysis -->
+        <div class="mb-6" id="raw-data-section" style="display: none;">
+            <h2 class="text-lg font-semibold mb-3">� Raw FTMS Data Analysis</h2>
+            <div class="p-4 bg-purple-50 rounded">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-sm text-gray-500">Cadence ÷ 2 (Current)</div>
+                        <div id="cadence-div2" class="text-lg font-bold text-red-600">-- RPM</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Cadence × 1 (Fixed?)</div>
+                        <div id="cadence-raw" class="text-lg font-bold text-green-600">-- RPM</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-sm">
+                    <strong>Raw Hex Data:</strong> <span id="raw-hex" class="font-mono">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import FTMS Module -->
+    <script src="../js/ftms.js"></script>
+    <script>
+        // Simple logging function
+        function log(message) {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logEl.innerHTML += `[${timestamp}] ${message}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // Global variables
+        let ftmsClient = null;
+        let isConnected = false;
+        let currentData = { speedKph: null, cadenceRpm: null, powerW: null };
+        let baselinePower = null;
+        let baselineCadence = null;
+        let baselineSpeed = null;
+
+        // Update connection status
+        function updateConnectionStatus(status) {
+            document.getElementById('connection-status').textContent = status;
+        }
+
+        // Update FTMS data display
+        function updateFTMSData(data) {
+            // Store current data for test sampling
+            currentData = { ...data };
+            
+            // Show raw data analysis if available
+            if (data.raw) {
+                document.getElementById('raw-data-section').style.display = 'block';
+                document.getElementById('raw-hex').textContent = data.raw;
+                
+                // Parse the raw data manually to test different cadence calculations
+                try {
+                    const bytes = data.raw.split(' ').map(b => parseInt(b, 16));
+                    const dv = new DataView(new Uint8Array(bytes).buffer);
+                    
+                    let off = 2; // Skip flags
+                    if (dv.byteLength >= off + 2) off += 2; // Skip speed
+                    if (dv.byteLength >= off + 2) {
+                        const rawCadence = dv.getUint16(off, true);
+                        document.getElementById('cadence-div2').textContent = (rawCadence / 2).toFixed(1) + ' RPM';
+                        document.getElementById('cadence-raw').textContent = rawCadence.toFixed(1) + ' RPM';
+                    }
+                } catch (e) {
+                    console.log('Error parsing raw data:', e);
+                }
+            }
+            
+            // Debug: Log raw FTMS data occasionally
+            if (Math.random() < 0.05) { // 5% of updates
+                console.log('Raw FTMS data:', data);
+            }
+            
+            if (data.speedKph !== null) {
+                document.getElementById('speed').textContent = data.speedKph.toFixed(1) + ' km/h';
+            }
+            if (data.cadenceRpm !== null) {
+                document.getElementById('cadence').textContent = data.cadenceRpm.toFixed(0) + ' RPM';
+            }
+            if (data.powerW !== null) {
+                document.getElementById('power').textContent = data.powerW.toFixed(0) + ' W';
+            }
+        }
+
+        // Sample data over a period and return valid samples only
+        async function sampleData(durationMs, sampleIntervalMs = 200, debugSamples = false) {
+            const samples = [];
+            const sampleStart = Date.now();
+            let sampleCount = 0;
+            
+            if (debugSamples) {
+                const debugSection = document.getElementById('sample-debug-section');
+                const debugDiv = document.getElementById('sample-debug');
+                
+                if (debugSection && debugDiv) {
+                    debugSection.style.display = 'block';
+                    debugDiv.innerHTML = '<strong>Live Sample Data:</strong><br>';
+                }
+            }
+            
+            while (Date.now() - sampleStart < durationMs) {
+                sampleCount++;
+                const rawData = { ...currentData };
+                
+                if (debugSamples) {
+                    const debugDiv = document.getElementById('sample-debug');
+                    if (debugDiv) {
+                        const elapsed = ((Date.now() - sampleStart) / 1000).toFixed(1);
+                        const debugLine = `[${elapsed}s] Power: ${rawData.powerW || 'null'}, Cadence: ${rawData.cadenceRpm || 'null'}, Speed: ${rawData.speedKph || 'null'}`;
+                        debugDiv.innerHTML += debugLine + '<br>';
+                        debugDiv.scrollTop = debugDiv.scrollHeight;
+                    }
+                }
+                
+                // Only include samples with valid power AND cadence data
+                if (rawData.powerW !== null && rawData.cadenceRpm !== null && 
+                    rawData.powerW > 0 && rawData.cadenceRpm > 0) {
+                    samples.push({
+                        power: rawData.powerW,
+                        cadence: rawData.cadenceRpm,
+                        speed: rawData.speedKph || 0,
+                        timestamp: Date.now(),
+                        sampleNumber: sampleCount
+                    });
+                }
+                await new Promise(resolve => setTimeout(resolve, sampleIntervalMs));
+            }
+            
+            if (debugSamples) {
+                log(`🔍 DEBUG: Total samples attempted: ${sampleCount}, Valid samples: ${samples.length}`);
+                if (samples.length > 0) {
+                    log(`🔍 DEBUG: Cadence range: ${Math.min(...samples.map(s => s.cadence)).toFixed(1)} - ${Math.max(...samples.map(s => s.cadence)).toFixed(1)} RPM`);
+                    log(`🔍 DEBUG: Power range: ${Math.min(...samples.map(s => s.power)).toFixed(1)} - ${Math.max(...samples.map(s => s.power)).toFixed(1)} W`);
+                    
+                    // Show first and last few samples
+                    const firstSamples = samples.slice(0, 3);
+                    const lastSamples = samples.slice(-3);
+                    log(`🔍 DEBUG: First samples: ${firstSamples.map(s => `${s.power.toFixed(1)}W@${s.cadence.toFixed(1)}RPM`).join(', ')}`);
+                    log(`🔍 DEBUG: Last samples: ${lastSamples.map(s => `${s.power.toFixed(1)}W@${s.cadence.toFixed(1)}RPM`).join(', ')}`);
+                }
+            }
+            
+            return samples;
+        }
+
+        // Calculate averages from samples
+        function calculateAverages(samples) {
+            if (samples.length === 0) return { power: null, cadence: null, speed: null };
+            
+            return {
+                power: samples.reduce((sum, s) => sum + s.power, 0) / samples.length,
+                cadence: samples.reduce((sum, s) => sum + s.cadence, 0) / samples.length,
+                speed: samples.reduce((sum, s) => sum + s.speed, 0) / samples.length
+            };
+        }
+
+        // Measure baseline (no resistance)
+        async function measureBaseline() {
+            if (!isConnected || !ftmsClient) {
+                log('❌ Not connected to trainer');
+                return;
+            }
+
+            const baselineBtn = document.getElementById('baseline-btn');
+            baselineBtn.disabled = true;
+            baselineBtn.textContent = '📊 Measuring...';
+
+            try {
+                log('📏 Starting Baseline Measurement');
+                log('⚙️ Make sure you are in your LOWEST gear');
+                log('🚴‍♂️ Pedal at steady ~100 RPM with NO resistance');
+                
+                // Set ERG to very low resistance (or try to disable it)
+                try {
+                    await ftmsClient.setErgWatts(1); // Minimal resistance
+                    log('✅ Set minimal resistance for baseline');
+                } catch (e) {
+                    log('⚠️ Could not set minimal resistance, continue anyway');
+                }
+                
+                // Wait for stabilization
+                log('⏳ Stabilizing for 3 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Sample baseline data
+                log('📊 Sampling baseline data for 5 seconds...');
+                const samples = await sampleData(5000, 200, true); // Enable debug for baseline
+                
+                if (samples.length >= 5) {
+                    const averages = calculateAverages(samples);
+                    
+                    baselinePower = averages.power;
+                    baselineCadence = averages.cadence;
+                    baselineSpeed = averages.speed;
+                    
+                    // Update baseline display
+                    const powerEl = document.getElementById('baseline-power');
+                    const cadenceEl = document.getElementById('baseline-cadence');
+                    const speedEl = document.getElementById('baseline-speed');
+                    const sectionEl = document.getElementById('baseline-section');
+                    
+                    if (powerEl) powerEl.textContent = baselinePower.toFixed(1) + 'W';
+                    if (cadenceEl) cadenceEl.textContent = baselineCadence.toFixed(0) + ' RPM';
+                    if (speedEl) speedEl.textContent = baselineSpeed.toFixed(1) + ' km/h';
+                    if (sectionEl) sectionEl.style.display = 'block';
+                    
+                    log(`✅ Baseline: ${baselinePower.toFixed(1)}W @ ${baselineCadence.toFixed(0)} RPM (${samples.length} samples)`);
+                    log('🎯 Now you can run the resistance test');
+                    
+                } else {
+                    log(`❌ Insufficient baseline data: ${samples.length} samples (need ≥5)`);
+                    log('💡 Make sure you are pedaling steadily');
+                }
+                
+            } catch (error) {
+                log('❌ Baseline measurement failed: ' + error.message);
+            } finally {
+                baselineBtn.disabled = false;
+                baselineBtn.textContent = '📊 Measure Baseline (No Resistance)';
+            }
+        }
+
+        // Add result row to table
+        function addResultRow(resistanceSet, actualPower, cadence, speed) {
+            const table = document.getElementById('results-table');
+            const row = document.createElement('tr');
+            
+            const targetDiff = actualPower !== null ? (actualPower - resistanceSet).toFixed(0) : 'N/A';
+            const targetDiffClass = actualPower !== null ? 
+                (Math.abs(actualPower - resistanceSet) <= 5 ? 'text-green-600' : 'text-red-600') : '';
+            
+            const baselineDiff = (actualPower !== null && baselinePower !== null) ? 
+                (actualPower - baselinePower).toFixed(0) : 'N/A';
+            const baselineDiffClass = baselineDiff !== 'N/A' ? 
+                (baselineDiff >= 0 ? 'text-orange-600' : 'text-blue-600') : '';
+            
+            row.innerHTML = `
+                <td class="border border-gray-300 px-4 py-2 text-center font-semibold">${resistanceSet}W</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${actualPower !== null ? actualPower.toFixed(1) + 'W' : 'N/A'}</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${cadence !== null ? cadence.toFixed(0) + ' RPM' : 'N/A'}</td>
+                <td class="border border-gray-300 px-4 py-2 text-center">${speed !== null ? speed.toFixed(1) + ' km/h' : 'N/A'}</td>
+                <td class="border border-gray-300 px-4 py-2 text-center ${targetDiffClass}">${targetDiff !== 'N/A' ? (targetDiff >= 0 ? '+' + targetDiff : targetDiff) + 'W' : 'N/A'}</td>
+                <td class="border border-gray-300 px-4 py-2 text-center ${baselineDiffClass}">${baselineDiff !== 'N/A' ? (baselineDiff >= 0 ? '+' + baselineDiff : baselineDiff) + 'W' : 'N/A'}</td>
+            `;
+            
+            table.appendChild(row);
+        }
+
+        // Clear results table
+        function clearResults() {
+            const table = document.getElementById('results-table');
+            table.innerHTML = '';
+            document.getElementById('results-section').style.display = 'none';
+        }
+
+        // Connect to trainer
+        async function connectTrainer() {
+            const connectBtn = document.getElementById('connect-btn');
+            connectBtn.disabled = true;
+            connectBtn.textContent = '🔄 Connecting...';
+
+            try {
+                if (typeof ftms === 'undefined') {
+                    throw new Error('FTMS module not loaded');
+                }
+
+                log('🔍 Requesting FTMS trainer connection...');
+                
+                // Use the ftms module's connect method
+                await ftms.connect();
+                ftmsClient = ftms;
+                isConnected = true;
+
+                log('✅ Connected to FTMS trainer: ' + (ftms.device?.name || 'Unknown'));
+                updateConnectionStatus('Connected to ' + (ftms.device?.name || 'FTMS Trainer'));
+
+                // Set up data listener using ftms module's built-in events
+                ftms.on('ibd', (data) => {
+                    updateFTMSData(data);
+                });
+
+                // Add raw data logging for debugging
+                ftms.on('log', (logMessage) => {
+                    if (logMessage.includes('NOTIFY FTMS IBD:')) {
+                        console.log('FTMS Raw Data:', logMessage);
+                    }
+                });
+
+                // Enable buttons
+                document.getElementById('resistance-test-btn').disabled = false;
+                document.getElementById('baseline-btn').disabled = false;
+                document.getElementById('test-status').textContent = 'Ready - Start with baseline measurement!';
+
+                connectBtn.textContent = '✅ Connected';
+                connectBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+
+            } catch (error) {
+                log('❌ Connection failed: ' + error.message);
+                updateConnectionStatus('Connection failed');
+                connectBtn.disabled = false;
+                connectBtn.textContent = '🔗 Connect to FTMS Trainer';
+            }
+        }
+
+        // Run resistance test
+        async function runResistanceTest() {
+            if (!isConnected || !ftmsClient) {
+                log('❌ Not connected to trainer');
+                return;
+            }
+
+            const testBtn = document.getElementById('resistance-test-btn');
+            testBtn.disabled = true;
+            testBtn.textContent = '🧪 Testing...';
+
+            // Clear previous results
+            clearResults();
+
+            try {
+                log('🎯 Starting Resistance Test');
+                log('⚙️ Make sure you are in your LOWEST gear (easiest)');
+                log('🚴‍♂️ Start pedaling at steady 100 RPM');
+                
+                // Show results section
+                document.getElementById('results-section').style.display = 'block';
+                
+                // Wait 2 seconds for user to start pedaling
+                log('⏳ Starting in 2 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Test resistance levels from 10W to 100W in 10W increments
+                for (let resistance = 10; resistance <= 100; resistance += 10) {
+                    log(`📊 Testing ${resistance}W resistance...`);
+                    
+                    // Use ftms module's setErgWatts method
+                    await ftmsClient.setErgWatts(resistance);
+                    
+                    // Wait 3 seconds for power to stabilize
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    // Sample data for 5 seconds with improved filtering
+                    log(`📈 Sampling data for ${resistance}W (5 seconds)...`);
+                    const samples = await sampleData(5000);
+                    
+                    if (samples.length >= 8) {
+                        // Calculate averages from all 5 seconds of data
+                        const averages = calculateAverages(samples);
+                        
+                        // Add to results table
+                        addResultRow(resistance, averages.power, averages.cadence, averages.speed);
+                        
+                        const baselineNote = baselinePower ? ` (${(averages.power - baselinePower >= 0 ? '+' : '')}${(averages.power - baselinePower).toFixed(0)}W vs baseline)` : '';
+                        log(`✅ ${resistance}W → ${averages.power.toFixed(1)}W @ ${averages.cadence.toFixed(0)} RPM [${samples.length} samples over 5s]${baselineNote}`);
+                    } else {
+                        // No sufficient data received
+                        addResultRow(resistance, null, null, null);
+                        log(`⚠️ ${resistance}W → Insufficient data (${samples.length} samples, need ≥8 for 5s)`);
+                    }
+                }
+
+                log('🎉 Resistance test complete!');
+                log('📈 Check the table above for detailed results');
+                
+            } catch (error) {
+                log('❌ Test failed: ' + error.message);
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '⚡ Run Resistance Test (Lowest Gear)';
+            }
+        }
+
+        // Keyboard shortcut for resistance test
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                if (isConnected && !document.getElementById('resistance-test-btn').disabled) {
+                    runResistanceTest();
+                }
+            }
+        });
+
+        // Event listeners
+        document.getElementById('connect-btn').onclick = connectTrainer;
+        document.getElementById('baseline-btn').onclick = measureBaseline;
+        document.getElementById('resistance-test-btn').onclick = runResistanceTest;
+        document.getElementById('clear-log-btn').onclick = () => {
+            document.getElementById('log').innerHTML = 'Log cleared...<br>';
+            document.getElementById('sample-debug-section').style.display = 'none';
+        };
+
+        log('🚀 FTMS Calibration Test initialized');
+        log('💡 Press "R" key to run resistance test once connected');
+    </script>
+</body>
+</html>

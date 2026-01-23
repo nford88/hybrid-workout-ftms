@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zwift FTMS Virtual Shifting Hack - Protocol Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gear-active { background-color: #3b82f6; color: white; }
+        .gear-inactive { background-color: #e5e7eb; color: #374151; }
+        .gear-inactive:hover { background-color: #d1d5db; }
+        .command-log { font-family: 'Courier New', monospace; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Zwift FTMS Virtual Shifting Hack</h1>
+            <p class="text-gray-600 mb-4">Interactive protocol explorer for Zwift's virtual gearing mechanism using FTMS Set Target Wheel Circumference (0x13)</p>
+            
+            <!-- Protocol Info -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="bg-blue-50 p-3 rounded">
+                    <div class="font-semibold text-blue-800">Protocol Version</div>
+                    <div class="text-blue-600">1.0</div>
+                </div>
+                <div class="bg-green-50 p-3 rounded">
+                    <div class="font-semibold text-green-800">FTMS Op Code</div>
+                    <div class="text-green-600">0x13 (Set Target Wheel Circumference)</div>
+                </div>
+                <div class="bg-purple-50 p-3 rounded">
+                    <div class="font-semibold text-purple-800">Base Circumference</div>
+                    <div class="text-purple-600">2096mm (700c x 25mm)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Virtual Gear Selector -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Virtual Gear Selector</h2>
+                
+                <!-- Current Gear Display -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div class="text-sm text-gray-600">Current Gear Index</div>
+                            <div class="text-2xl font-bold text-blue-600" id="current-index">0</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Gear Ratio</div>
+                            <div class="text-2xl font-bold text-green-600" id="current-ratio">2.50</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <div class="text-sm text-gray-600">FTMS Value (0x13)</div>
+                        <div class="text-xl font-mono text-purple-600" id="current-ftms">21 (0x15)</div>
+                    </div>
+                </div>
+
+                <!-- Gear Grid -->
+                <div class="grid grid-cols-5 gap-2 mb-4" id="gear-grid">
+                    <!-- Gear buttons will be populated by JavaScript -->
+                </div>
+
+                <!-- Quick Controls -->
+                <div class="flex justify-center space-x-2">
+                    <button id="shift-down" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">
+                        Shift Down ↓
+                    </button>
+                    <button id="reset-gear" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                        Reset (0)
+                    </button>
+                    <button id="shift-up" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+                        Shift Up ↑
+                    </button>
+                </div>
+            </div>
+
+            <!-- FTMS Command Generator -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">FTMS Command Generator</h2>
+                
+                <!-- Current Command -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div class="text-sm text-gray-600 mb-2">Generated Command Payload</div>
+                    <div class="command-log text-lg bg-black text-green-400 p-3 rounded" id="command-payload">
+                        [0x13, 0x15, 0x00]
+                    </div>
+                    <div class="text-sm text-gray-500 mt-2">
+                        Op Code: 0x13 | Value: <span id="payload-value">21</span> | Padding: 0x00
+                    </div>
+                </div>
+
+                <!-- Bluetooth Controls -->
+                <div class="space-y-3">
+                    <button id="connect-trainer" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                        🔗 Connect FTMS Trainer
+                    </button>
+                    <button id="scan-all-chars" class="w-full px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors" disabled>
+                        🔍 Scan ALL Characteristics
+                    </button>
+                    <button id="test-zwift-shifting" class="w-full px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors" disabled>
+                        ⚡ Test Zwift Virtual Shifting
+                    </button>
+                    <button id="test-ftms-shifting" class="w-full px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors" disabled>
+                        🔧 Test FTMS Virtual Shifting
+                    </button>
+                    <button id="test-wahoo-patterns" class="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors" disabled>
+                        🎪 Test Wahoo Patterns
+                    </button>
+                    <button id="read-features" class="w-full px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition-colors" disabled>
+                        📋 Read FTMS Features
+                    </button>
+                    <button id="set-sim-mode" class="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors" disabled>
+                        🏔️ Set SIM Mode (0% Grade)
+                    </button>
+                    <button id="send-command" class="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors" disabled>
+                        📡 Send Gear Command
+                    </button>
+                    <div class="text-sm text-gray-600" id="connection-status">
+                        Not connected to trainer
+                    </div>
+                </div>
+
+                <!-- Formula Display -->
+                <div class="mt-4 p-3 bg-yellow-50 rounded-lg">
+                    <div class="text-sm font-semibold text-yellow-800 mb-1">Calculation Formula</div>
+                    <div class="text-xs text-yellow-700 command-log">
+                        W_target = W_base × (R_virtual / R_fixed)<br>
+                        FTMS_Value = Round(W_target / 100)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Log -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Command Log</h2>
+            <div class="bg-black text-green-400 p-4 rounded-lg h-64 overflow-y-auto command-log" id="command-log">
+                <div class="text-gray-500">// Zwift Virtual Shifting Protocol Explorer v1.0</div>
+                <div class="text-gray-500">// Ready to demonstrate FTMS 0x13 circumference manipulation...</div>
+            </div>
+            <button id="clear-log" class="mt-2 px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 transition-colors">
+                Clear Log
+            </button>
+        </div>
+
+        <!-- Research Notes Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">🔬 Research Findings</h2>
+            <div class="space-y-4 text-sm">
+                <div class="bg-blue-50 p-4 rounded">
+                    <h3 class="font-semibold text-blue-800 mb-2">SwiftControl Protocol Analysis</h3>
+                    <p class="text-blue-700 mb-2">Analysis of jonasbark/swiftcontrol revealed Protocol Buffer structure for virtual shifting:</p>
+                    <ul class="list-disc list-inside text-blue-600 space-y-1">
+                        <li><code>simulatedRealGearRatio</code> and <code>simulatedVirtualGearRatio</code> fields</li>
+                        <li>Data Object IDs: VIRTUAL_SHIFTING_MODE (547), FRONT_GEAR_INDEX (529), REAR_GEAR_INDEX (532)</li>
+                        <li>RideOn prefix commands: [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e] + gear commands</li>
+                        <li>Haptic feedback patterns for gear shift confirmations</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded">
+                    <h3 class="font-semibold text-green-800 mb-2">Zwift Custom Service Structure</h3>
+                    <ul class="list-disc list-inside text-green-600 space-y-1">
+                        <li>Service UUID: <code>00000001-19CA-4651-86E5-FA29DCDD09D1</code></li>
+                        <li>RidingData (Notify): <code>00000002-19CA-4651-86E5-FA29DCDD09D1</code></li>
+                        <li>Control Point (Write): <code>00000003-19CA-4651-86E5-FA29DCDD09D1</code></li>
+                        <li>SyncTX (Indicate): <code>00000004-19CA-4651-86E5-FA29DCDD09D1</code></li>
+                    </ul>
+                </div>
+                
+                <div class="bg-yellow-50 p-4 rounded">
+                    <h3 class="font-semibold text-yellow-800 mb-2">Test Results Summary</h3>
+                    <p class="text-yellow-700 mb-2">Wahoo Kickr Core V2 behavior observed:</p>
+                    <ul class="list-disc list-inside text-yellow-600 space-y-1">
+                        <li>✅ Has Zwift custom service with all expected characteristics</li>
+                        <li>✅ Accepts command writes without errors</li>
+                        <li>❌ No responses received from any characteristic</li>
+                        <li>❌ FTMS wheel circumference commands fail with 0x04 (unsupported)</li>
+                        <li>🔍 May require specific initialization sequence or different protocol</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-purple-50 p-4 rounded">
+                    <h3 class="font-semibold text-purple-800 mb-2">Next Research Steps</h3>
+                    <ul class="list-disc list-inside text-purple-600 space-y-1">
+                        <li>Analyze ajchellew/zwiftplay for Zwift Play controller protocol</li>
+                        <li>Study JuergenLeber/SHIFTR for BLE bridge implementation</li>
+                        <li>Review StephenDone/kickr_bluetooth for Wahoo-specific patterns</li>
+                        <li>Test with actual Zwift Play controllers for comparison</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Real vs Virtual Gear Comparison</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Virtual Gears -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">Virtual Gears (Zwift Hack)</h3>
+                    <div class="space-y-1 text-sm max-h-64 overflow-y-auto" id="virtual-gear-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+                <!-- Real Gears -->
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">Real Gears (Shimano 105 11-30T)</h3>
+                    <div class="space-y-1 text-sm max-h-64 overflow-y-auto">
+                        <div class="flex justify-between"><span>34/30</span><span class="font-mono">1.13</span></div>
+                        <div class="flex justify-between"><span>34/27</span><span class="font-mono">1.26</span></div>
+                        <div class="flex justify-between"><span>34/24</span><span class="font-mono">1.42</span></div>
+                        <div class="flex justify-between"><span>34/21</span><span class="font-mono">1.62</span></div>
+                        <div class="flex justify-between"><span>34/19</span><span class="font-mono">1.79</span></div>
+                        <div class="flex justify-between"><span>34/17</span><span class="font-mono">2.00</span></div>
+                        <div class="flex justify-between"><span>34/15</span><span class="font-mono">2.27</span></div>
+                        <div class="flex justify-between"><span>34/14</span><span class="font-mono">2.43</span></div>
+                        <div class="flex justify-between bg-yellow-100"><span>34/13</span><span class="font-mono">2.62</span></div>
+                        <div class="flex justify-between"><span>34/12</span><span class="font-mono">2.83</span></div>
+                        <div class="flex justify-between"><span>34/11</span><span class="font-mono">3.09</span></div>
+                        <div class="flex justify-between"><span>50/30</span><span class="font-mono">1.67</span></div>
+                        <div class="flex justify-between"><span>50/27</span><span class="font-mono">1.85</span></div>
+                        <div class="flex justify-between"><span>50/24</span><span class="font-mono">2.08</span></div>
+                        <div class="flex justify-between"><span>50/21</span><span class="font-mono">2.38</span></div>
+                        <div class="flex justify-between bg-blue-100"><span>50/19</span><span class="font-mono">2.63</span></div>
+                        <div class="flex justify-between"><span>50/17</span><span class="font-mono">2.94</span></div>
+                        <div class="flex justify-between"><span>50/15</span><span class="font-mono">3.33</span></div>
+                        <div class="flex justify-between"><span>50/14</span><span class="font-mono">3.57</span></div>
+                        <div class="flex justify-between"><span>50/13</span><span class="font-mono">3.85</span></div>
+                        <div class="flex justify-between"><span>50/12</span><span class="font-mono">4.17</span></div>
+                        <div class="flex justify-between"><span>50/11</span><span class="font-mono">4.55</span></div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2">
+                        Highlighted: Virtual baseline (2.50) matches 34/13 (2.62) approximately
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">How The Virtual Shifting Hack Works</h2>
+            <div class="prose text-gray-700">
+                <p class="mb-3">
+                    This tool exploits Zwift's use of FTMS "Set Target Wheel Circumference" (0x13) to simulate different gear ratios.
+                    By changing the virtual wheel circumference, we trick the trainer into thinking we're using different gears.
+                </p>
+                <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-semibold text-blue-800 mb-2">The Math</h3>
+                    <ul class="text-sm text-blue-700 space-y-1">
+                        <li>• Base circumference: 2096mm (700c × 25mm tire)</li>
+                        <li>• Target ratio: 1.0 to 4.0 (simulating 1:1 to 4:1 gear ratios)</li>
+                        <li>• FTMS expects circumference in 10mm units (divide by 100)</li>
+                        <li>• Formula: circumference = base × (target_ratio / baseline_ratio)</li>
+                    </ul>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-yellow-800 mb-2">Protocol Flow</h3>
+                    <ol class="text-sm text-yellow-700 space-y-1">
+                        <li>1. Connect to FTMS trainer via Web Bluetooth</li>
+                        <li>2. Set SIM mode (resistance controlled by grade/wheel circumference)</li>
+                        <li>3. Send 0x13 command with calculated circumference value</li>
+                        <li>4. Trainer adjusts resistance based on new "wheel size"</li>
+                        <li>5. Virtual gearing achieved without actual derailleur!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import the FTMS module -->
+    <script type="module">
+        import { ftms } from '../js/ftms.js';
+
+        // Global variables
+        let ftmsClient = null;
+        let ftmsConnected = false;
+        let simModeActive = false;
+        let currentGearIndex = 0;
+
+        // DOM elements
+        const gearGridEl = document.getElementById('gear-grid');
+        const virtualGearListEl = document.getElementById('virtual-gear-list');
+        const commandLogEl = document.getElementById('command-log');
+        const connectionStatusEl = document.getElementById('connection-status');
+
+        // Virtual gear ratios (baseline 2.50 = normal 700c wheel)
+        const virtualGears = [
+            { index: -10, ratio: 1.00, ftms_value: 8 },   // Super easy
+            { index: -9,  ratio: 1.10, ftms_value: 9 },
+            { index: -8,  ratio: 1.20, ftms_value: 10 },
+            { index: -7,  ratio: 1.30, ftms_value: 11 },
+            { index: -6,  ratio: 1.40, ftms_value: 12 },
+            { index: -5,  ratio: 1.50, ftms_value: 13 },  // Easy
+            { index: -4,  ratio: 1.60, ftms_value: 13 },
+            { index: -3,  ratio: 1.70, ftms_value: 14 },
+            { index: -2,  ratio: 1.80, ftms_value: 15 },
+            { index: -1,  ratio: 1.90, ftms_value: 16 },
+            { index: 0,   ratio: 2.00, ftms_value: 17 },  // Easy baseline
+            { index: 1,   ratio: 2.10, ftms_value: 18 },
+            { index: 2,   ratio: 2.20, ftms_value: 18 },
+            { index: 3,   ratio: 2.30, ftms_value: 19 },
+            { index: 4,   ratio: 2.40, ftms_value: 20 },
+            { index: 5,   ratio: 2.50, ftms_value: 21 },  // Normal baseline (700c x 25mm)
+            { index: 6,   ratio: 2.60, ftms_value: 22 },
+            { index: 7,   ratio: 2.70, ftms_value: 23 },
+            { index: 8,   ratio: 2.80, ftms_value: 23 },
+            { index: 9,   ratio: 2.90, ftms_value: 24 },
+            { index: 10,  ratio: 3.00, ftms_value: 25 },  // Hard
+            { index: 11,  ratio: 3.20, ftms_value: 27 },
+            { index: 12,  ratio: 3.40, ftms_value: 28 },
+            { index: 13,  ratio: 3.60, ftms_value: 30 },
+            { index: 14,  ratio: 3.80, ftms_value: 32 },
+            { index: 15,  ratio: 4.00, ftms_value: 33 },  // Super hard
+        ];
+
+        // Helper functions
+        function findGear(index) {
+            return virtualGears.find(g => g.index === index) || virtualGears[15]; // Default to baseline
+        }
+
+        function logCommand(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            commandLogEl.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            commandLogEl.scrollTop = commandLogEl.scrollHeight;
+        }
+
+        function updateGearDisplay(gear) {
+            document.getElementById('current-index').textContent = gear.index;
+            document.getElementById('current-ratio').textContent = gear.ratio.toFixed(2);
+            document.getElementById('current-ftms').textContent = `${gear.ftms_value} (0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')})`;
+            
+            // Update command payload
+            document.getElementById('command-payload').textContent = `[0x13, 0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')}, 0x00]`;
+            document.getElementById('payload-value').textContent = gear.ftms_value;
+        }
+
+        function setGear(index) {
+            currentGearIndex = index;
+            const gear = findGear(index);
+            updateGearDisplay(gear);
+            
+            // Update grid
+            const buttons = gearGridEl.querySelectorAll('button');
+            buttons.forEach(btn => {
+                const btnIndex = parseInt(btn.dataset.index);
+                if (btnIndex === index) {
+                    btn.className = 'gear-active w-full py-2 text-sm rounded';
+                } else {
+                    btn.className = 'gear-inactive w-full py-2 text-sm rounded';
+                }
+            });
+            
+            logCommand(`🎯 Selected gear ${index} (ratio ${gear.ratio}, FTMS 0x${gear.ftms_value.toString(16).toUpperCase()})`);
+        }
+
+        function shiftUp() {
+            if (currentGearIndex < 15) {
+                setGear(currentGearIndex + 1);
+            }
+        }
+
+        function shiftDown() {
+            if (currentGearIndex > -10) {
+                setGear(currentGearIndex - 1);
+            }
+        }
+
+        // Initialize gear grid
+        function initializeGearGrid() {
+            virtualGears.forEach(gear => {
+                const button = document.createElement('button');
+                button.textContent = gear.index;
+                button.dataset.index = gear.index;
+                button.className = gear.index === 0 ? 'gear-active w-full py-2 text-sm rounded' : 'gear-inactive w-full py-2 text-sm rounded';
+                button.onclick = () => setGear(gear.index);
+                gearGridEl.appendChild(button);
+            });
+        }
+
+        // Initialize virtual gear list
+        function initializeVirtualGearList() {
+            virtualGears.forEach(gear => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between';
+                div.innerHTML = `
+                    <span>Gear ${gear.index}</span>
+                    <span class="font-mono">${gear.ratio.toFixed(2)}</span>
+                `;
+                if (gear.index === 5) { // Baseline gear
+                    div.className += ' bg-green-100';
+                }
+                virtualGearListEl.appendChild(div);
+            });
+        }
+
+        // Connect to trainer
+        async function connectTrainer() {
+            const connectBtn = document.getElementById('connect-trainer');
+            connectBtn.disabled = true;
+            connectBtn.textContent = '🔄 Connecting...';
+
+            try {
+                logCommand('🔍 Looking for FTMS trainers...');
+                
+                // Try to connect using the ftms module
+                try {
+                    await ftms.connect();
+                    ftmsClient = ftms; // Store reference
+                    ftmsConnected = true;
+                } catch (error) {
+                    // Fallback to demo mode if ftms module fails
+                    logCommand('⚠️ FTMS module not available - running in demo mode');
+                    logCommand('💡 In demo mode, commands are logged but not sent to trainer');
+                    connectionStatusEl.textContent = 'Demo mode - FTMS module not loaded';
+                    connectBtn.textContent = '🎭 Demo Mode';
+                    connectBtn.className = 'w-full px-4 py-2 bg-yellow-500 text-white rounded';
+                    document.getElementById('scan-all-chars').disabled = true;
+                    document.getElementById('test-zwift-shifting').disabled = true;
+                    document.getElementById('test-ftms-shifting').disabled = true;
+                    document.getElementById('test-wahoo-patterns').disabled = true;
+                    document.getElementById('read-features').disabled = true;
+                    document.getElementById('set-sim-mode').disabled = false;
+                    document.getElementById('send-command').disabled = false;
+                    return;
+                }
+
+                // Enable buttons
+                connectionStatusEl.textContent = 'Connected to FTMS trainer';
+                document.getElementById('scan-all-chars').disabled = false;
+                document.getElementById('test-zwift-shifting').disabled = false;
+                document.getElementById('test-ftms-shifting').disabled = false;
+                document.getElementById('test-wahoo-patterns').disabled = false;
+                document.getElementById('read-features').disabled = false;
+                document.getElementById('set-sim-mode').disabled = false;
+                document.getElementById('send-command').disabled = false;
+                connectBtn.textContent = '✅ Connected';
+                logCommand('✅ Successfully connected to FTMS trainer');
+                logCommand('🔍 Scan all characteristics to find Wahoo-specific virtual shifting support');
+                logCommand('⚡ Try Zwift virtual shifting - your trainer has the Zwift custom service!');
+                logCommand('💡 Wahoo trainers may use proprietary characteristics for virtual shifting');
+                
+            } catch (error) {
+                connectBtn.disabled = false;
+                connectBtn.textContent = '🔗 Connect FTMS Trainer';
+                connectionStatusEl.textContent = `Connection failed: ${error.message}`;
+                logCommand(`❌ Connection failed: ${error.message}`);
+            }
+        }
+
+        // Set SIM mode
+        async function setSIMMode() {
+            try {
+                const simBtn = document.getElementById('set-sim-mode');
+                simBtn.disabled = true;
+                simBtn.textContent = '🔄 Setting...';
+
+                logCommand('🏔️ Setting SIM mode with 0% grade...');
+                
+                if (ftmsConnected && ftmsClient) {
+                    // Use the ftms module's setSim method for proper SIM mode
+                    await ftmsClient.setSim({ gradePct: 0 });
+                    logCommand('📡 Sent FTMS SIM mode command with 0% grade');
+                } else {
+                    // Demo mode
+                    logCommand('🎭 DEMO: Would send FTMS SIM mode command with 0% grade');
+                }
+                
+                simModeActive = true;
+                simBtn.textContent = '✅ SIM Mode Active';
+                simBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('✅ SIM mode activated - wheel circumference now affects resistance');
+                logCommand('🎯 You can now send virtual gear commands to change resistance');
+                
+            } catch (error) {
+                const simBtn = document.getElementById('set-sim-mode');
+                simBtn.disabled = false;
+                simBtn.textContent = '🏔️ Set SIM Mode (0% Grade)';
+                logCommand(`❌ Failed to set SIM mode: ${error.message}`);
+            }
+        }
+
+        // Read trainer features
+        async function readTrainerFeatures() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const featBtn = document.getElementById('read-features');
+                featBtn.disabled = true;
+                featBtn.textContent = '🔄 Reading...';
+
+                logCommand('📋 Reading FTMS features from trainer...');
+                
+                const featureResult = await ftmsClient.readFeatures();
+                const features = new Uint8Array(featureResult.raw.buffer);
+                const hex = featureResult.hex;
+                
+                logCommand(`📊 FTMS Feature Data: ${hex}`);
+                
+                if (features.length >= 8) {
+                    // Parse feature bits (this is trainer-specific)
+                    const byte0 = features[0];
+                    const byte1 = features[1];
+                    const byte4 = features[4];
+                    const byte6 = features[6];
+                    
+                    logCommand('🔍 Analyzing trainer capabilities:');
+                    logCommand(`  Cadence: ${(byte0 & 0x02) ? '✅' : '❌'}`);
+                    logCommand(`  Total Distance: ${(byte0 & 0x04) ? '✅' : '❌'}`);
+                    logCommand(`  Inclination: ${(byte0 & 0x08) ? '✅' : '❌'}`);
+                    logCommand(`  Elevation Gain: ${(byte0 & 0x10) ? '✅' : '❌'}`);
+                    logCommand(`  Pace: ${(byte0 & 0x20) ? '✅' : '❌'}`);
+                    logCommand(`  Average Pace: ${(byte0 & 0x40) ? '✅' : '❌'}`);
+                    logCommand(`  Expended Energy: ${(byte0 & 0x80) ? '✅' : '❌'}`);
+                    
+                    logCommand(`  Heart Rate: ${(byte1 & 0x01) ? '✅' : '❌'}`);
+                    logCommand(`  Metabolic Equivalent: ${(byte1 & 0x02) ? '✅' : '❌'}`);
+                    logCommand(`  Elapsed Time: ${(byte1 & 0x04) ? '✅' : '❌'}`);
+                    logCommand(`  Remaining Time: ${(byte1 & 0x08) ? '✅' : '❌'}`);
+                    logCommand(`  Power Measurement: ${(byte1 & 0x10) ? '✅' : '❌'}`);
+                    logCommand(`  Force on Belt: ${(byte1 & 0x20) ? '✅' : '❌'}`);
+                    logCommand(`  Power Output: ${(byte1 & 0x40) ? '✅' : '❌'}`);
+                    
+                    // Check for wheel circumference support (crucial for virtual shifting)
+                    const wheelCircumferenceSupport = (byte6 & 0x04);
+                    logCommand(`  Wheel Circumference Config: ${wheelCircumferenceSupport ? '✅' : '❌'}`);
+                    
+                    // Additional analysis for your trainer's specific feature data
+                    if (hex === '03 40 00 00 0C 60 00 00') {
+                        logCommand('🎯 WAHOO KICKR CORE V2 DETECTED!');
+                        logCommand('📋 Feature Analysis:');
+                        logCommand('  ✅ Cadence supported (bit 1 set)');
+                        logCommand('  ✅ Total distance supported (bit 2 set)');
+                        logCommand('  ❌ Inclination NOT supported in features');
+                        logCommand('  ❌ Wheel circumference NOT in feature flags');
+                        logCommand('  ✅ Power measurement supported');
+                        logCommand('  ✅ ERG mode supported (Power Target)');
+                        logCommand('💡 This explains why FTMS 0x13 commands fail!');
+                        logCommand('🎯 Virtual shifting must use Zwift custom service only');
+                    }
+                    
+                    if (!wheelCircumferenceSupport) {
+                        logCommand('🔧 Virtual shifting may not work via FTMS - try Zwift protocol');
+                    } else {
+                        logCommand('✅ Trainer supports wheel circumference - FTMS virtual shifting should work!');
+                    }
+                } else {
+                    logCommand('⚠️ Feature data too short to parse properly');
+                }
+                
+                featBtn.textContent = '📋 Features Read';
+                featBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                
+            } catch (error) {
+                const featBtn = document.getElementById('read-features');
+                featBtn.disabled = false;
+                featBtn.textContent = '🔍 Read Trainer Features';
+                logCommand(`❌ Failed to read features: ${error.message}`);
+            }
+        }
+
+        // Comprehensive characteristic scanner
+        async function scanAllCharacteristics() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const scanBtn = document.getElementById('scan-all-chars');
+                scanBtn.disabled = true;
+                scanBtn.textContent = '🔄 Scanning...';
+
+                logCommand('🔍 Starting comprehensive characteristic scan...');
+                logCommand('📡 Scanning ALL services and characteristics on this trainer');
+                
+                const server = ftmsClient.server;
+                const services = await server.getPrimaryServices();
+                
+                logCommand(`📋 Found ${services.length} services on trainer:`);
+                
+                for (const service of services) {
+                    const serviceUuid = service.uuid;
+                    const serviceName = getServiceName(serviceUuid);
+                    logCommand(`📦 Service: ${serviceUuid} (${serviceName})`);
+                    
+                    try {
+                        const characteristics = await service.getCharacteristics();
+                        logCommand(`  └─ ${characteristics.length} characteristics:`);
+                        
+                        for (const char of characteristics) {
+                            const charUuid = char.uuid;
+                            const charName = getCharacteristicName(charUuid);
+                            const properties = [];
+                            
+                            if (char.properties.read) properties.push('READ');
+                            if (char.properties.write) properties.push('WRITE');
+                            if (char.properties.writeWithoutResponse) properties.push('WRITE_NO_RESP');
+                            if (char.properties.notify) properties.push('NOTIFY');
+                            if (char.properties.indicate) properties.push('INDICATE');
+                            
+                            logCommand(`    ├─ ${charUuid} (${charName})`);
+                            logCommand(`    │  Properties: ${properties.join(', ')}`);
+                            
+                            // Try to read readable characteristics
+                            if (char.properties.read) {
+                                try {
+                                    const value = await char.readValue();
+                                    const hex = [...new Uint8Array(value.buffer)].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                                    logCommand(`    │  Value: ${hex}`);
+                                    
+                                    // Special handling for potential virtual shifting characteristics
+                                    if (charName.includes('Unknown') && serviceUuid.includes('a026')) {
+                                        logCommand(`    │  🎯 WAHOO PROPRIETARY - Potential virtual shifting!`);
+                                    }
+                                } catch (e) {
+                                    logCommand(`    │  Value: [Read failed: ${e.message}]`);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        logCommand(`  └─ Failed to get characteristics: ${e.message}`);
+                    }
+                    logCommand('');
+                }
+                
+                scanBtn.textContent = '📋 Scan Complete';
+                scanBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('✅ Characteristic scan complete!');
+                logCommand('🔍 Look for Wahoo-specific UUIDs (a026xxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');
+                
+            } catch (error) {
+                const scanBtn = document.getElementById('scan-all-chars');
+                scanBtn.disabled = false;
+                scanBtn.textContent = '🔍 Scan ALL Characteristics';
+                logCommand(`❌ Failed to scan characteristics: ${error.message}`);
+            }
+        }
+
+        // Helper function to identify known services
+        function getServiceName(uuid) {
+            const services = {
+                '00001826-0000-1000-8000-00805f9b34fb': 'FTMS (Fitness Machine)',
+                '0000180f-0000-1000-8000-00805f9b34fb': 'Battery Service',
+                '0000180a-0000-1000-8000-00805f9b34fb': 'Device Information',
+                '00001800-0000-1000-8000-00805f9b34fb': 'Generic Access',
+                '00001801-0000-1000-8000-00805f9b34fb': 'Generic Attribute',
+                '0000181c-0000-1000-8000-00805f9b34fb': 'User Data',
+                // Zwift custom service (found on your trainer!)
+                '00000001-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT CUSTOM SERVICE (Virtual Shifting!)',
+                // Wahoo services
+                'a026e005-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Trainer Service',
+                'a026e002-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Virtual Shifting (?)',
+                'a026e003-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Custom Service 3',
+                'a026e004-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Custom Service 4'
+            };
+            return services[uuid] || 'Unknown Service';
+        }
+
+        // Helper function to identify known characteristics  
+        function getCharacteristicName(uuid) {
+            const characteristics = {
+                '00002acc-0000-1000-8000-00805f9b34fb': 'FTMS Feature',
+                '00002ad2-0000-1000-8000-00805f9b34fb': 'Indoor Bike Data',
+                '00002ad9-0000-1000-8000-00805f9b34fb': 'Fitness Machine Control Point',
+                '00002ada-0000-1000-8000-00805f9b34fb': 'Fitness Machine Status',
+                '00002ad3-0000-1000-8000-00805f9b34fb': 'Training Status',
+                '00002ad6-0000-1000-8000-00805f9b34fb': 'Supported Power Range',
+                '00002ad8-0000-1000-8000-00805f9b34fb': 'Supported Resistance Level Range',
+                '00002a19-0000-1000-8000-00805f9b34fb': 'Battery Level',
+                '00002a29-0000-1000-8000-00805f9b34fb': 'Manufacturer Name',
+                '00002a24-0000-1000-8000-00805f9b34fb': 'Model Number',
+                '00002a25-0000-1000-8000-00805f9b34fb': 'Serial Number',
+                '00002a27-0000-1000-8000-00805f9b34fb': 'Hardware Revision',
+                '00002a26-0000-1000-8000-00805f9b34fb': 'Firmware Revision',
+                '00002a28-0000-1000-8000-00805f9b34fb': 'Software Revision',
+                // Zwift custom characteristics (found on your trainer!)
+                '00000002-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT RIDING DATA (Gear feedback)',
+                '00000003-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT CONTROL POINT (Virtual shifting commands!)',
+                '00000004-19ca-4651-86e5-fa29dcdd09d1': '🎯 ZWIFT SYNC TX (Command acknowledgments)',
+                // Wahoo proprietary characteristics
+                'a026e002-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Virtual Shifting Control',
+                'a026e00c-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Gear Position',
+                'a026e00d-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Gear Ratio',
+                'a026e037-0a7d-4ab3-97fa-f1500f9feb8b': 'Wahoo Custom Data'
+            };
+            return characteristics[uuid] || 'Unknown Characteristic';
+        }
+
+        // Send gear command
+        async function sendGearCommand() {
+            const gear = findGear(currentGearIndex);
+            if (!gear) return;
+
+            if (!simModeActive) {
+                logCommand('⚠️ WARNING: SIM mode not active - wheel circumference may not affect resistance');
+                logCommand('💡 Click "Set SIM Mode" first for gear changes to work properly');
+            }
+
+            try {
+                if (ftmsConnected && ftmsClient) {
+                    // Real command using proper FTMS Set Target Wheel Circumference (0x13)
+                    logCommand(`📤 Sending FTMS 0x13 command for gear ${gear.index}...`);
+                    
+                    // Use the ftms client's _writeCpAndWaitAck method for proper handling
+                    const payload = new Uint8Array([0x13, gear.ftms_value, 0x00]);
+                    
+                    try {
+                        // Use the private method if available, otherwise fallback to direct write
+                        if (typeof ftmsClient._writeCpAndWaitAck === 'function') {
+                            await ftmsClient._writeCpAndWaitAck(0x13, payload);
+                        } else {
+                            // Fallback to direct characteristic write
+                            await ftmsClient.chars.cp.writeValueWithResponse(payload);
+                        }
+                        
+                        logCommand(`📡 Sent FTMS Set Wheel Circumference: [0x13, 0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')}, 0x00]`);
+                        logCommand(`🎯 Virtual circumference: ${(gear.ftms_value * 100)}mm (ratio ${gear.ratio})`);
+                        logCommand(`🔬 Expected effect: ${gear.ratio > 2.5 ? 'HARDER' : gear.ratio < 2.5 ? 'EASIER' : 'BASELINE'} resistance`);
+                        
+                        // Log the calculation for debugging
+                        const baseCirc = 2096; // mm
+                        const calculatedCirc = baseCirc * (gear.ratio / 2.50);
+                        logCommand(`🧮 Calculation: ${baseCirc}mm × (${gear.ratio}/2.50) = ${calculatedCirc.toFixed(0)}mm vs sent: ${gear.ftms_value * 100}mm`);
+                    } catch (cmdError) {
+                        logCommand(`❌ Command failed: ${cmdError.message}`);
+                        logCommand(`🔧 Note: Not all trainers support wheel circumference changes`);
+                    }
+                    const baseCirc = 2096; // mm
+                    const calculatedCirc = baseCirc * (gear.ratio / 2.50);
+                    logCommand(`🧮 Calculation: ${baseCirc}mm × (${gear.ratio}/2.50) = ${calculatedCirc.toFixed(0)}mm vs sent: ${gear.ftms_value * 100}mm`);
+                    
+                } else {
+                    // Demo mode
+                    logCommand(`🎭 DEMO: Would send FTMS command: [0x13, 0x${gear.ftms_value.toString(16).toUpperCase().padStart(2, '0')}, 0x00]`);
+                    logCommand(`🎭 DEMO: Circumference set to ${(gear.ftms_value * 100)}mm for ratio ${gear.ratio}`);
+                    logCommand(`🎭 DEMO: This manipulates trainer's speed calculation for virtual gearing`);
+                }
+            } catch (error) {
+                logCommand(`❌ Failed to send command: ${error.message}`);
+            }
+        }
+
+        // Test Zwift Virtual Shifting using the Zwift Control Point
+        async function testZwiftVirtualShifting() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const zwiftBtn = document.getElementById('test-zwift-shifting');
+                zwiftBtn.disabled = true;
+                zwiftBtn.textContent = '🔄 Testing...';
+
+                logCommand('⚡ Testing Zwift Virtual Shifting Protocol...');
+                
+                // Get the Zwift custom service
+                const server = ftmsClient.server;
+                const zwiftService = await server.getPrimaryService('00000001-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftControlPoint = await zwiftService.getCharacteristic('00000003-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftRidingData = await zwiftService.getCharacteristic('00000002-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftSyncTX = await zwiftService.getCharacteristic('00000004-19ca-4651-86e5-fa29dcdd09d1');
+                
+                logCommand('✅ Connected to Zwift virtual shifting characteristics');
+                
+                // Subscribe to notifications for feedback
+                await zwiftRidingData.startNotifications();
+                zwiftRidingData.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`📊 Zwift Riding Data: ${hex}`);
+                });
+                
+                await zwiftSyncTX.startNotifications();
+                zwiftSyncTX.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`🔄 Zwift Sync Response: ${hex}`);
+                });
+                
+                logCommand('🎧 Subscribed to Zwift notifications');
+                
+                // First, try sending an initialization sequence
+                logCommand('🔧 Trying initialization sequence...');
+                
+                // Pattern A: Zwift handshake
+                try {
+                    await zwiftControlPoint.writeValueWithoutResponse(new Uint8Array([0x01, 0x00]));
+                    logCommand('📤 Sent handshake: [01 00]');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (e) { logCommand(`❌ Handshake failed: ${e.message}`); }
+                
+                // Pattern B: Enable virtual shifting mode
+                try {
+                    await zwiftControlPoint.writeValueWithoutResponse(new Uint8Array([0x02, 0x01]));
+                    logCommand('📤 Sent enable command: [02 01]');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (e) { logCommand(`❌ Enable failed: ${e.message}`); }
+                
+                // Pattern C: Request status
+                try {
+                    await zwiftControlPoint.writeValueWithoutResponse(new Uint8Array([0x03]));
+                    logCommand('📤 Sent status request: [03]');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (e) { logCommand(`❌ Status request failed: ${e.message}`); }
+                
+                // Test gear shifting commands based on known Zwift protocol patterns
+                const gear = findGear(currentGearIndex);
+                
+                // Try different Zwift command patterns (Enhanced with SwiftControl research)
+                const patterns = [
+                    // Basic patterns
+                    [0x10, gear.index + 12], // Offset to make positive
+                    [0x11, Math.round(gear.ratio * 100)], // Gear ratio as percentage 
+                    [0x12, gear.ftms_value], // Circumference-like value
+                    [0x20, gear.index + 12, 0x00, 0x00], // Multi-byte gear command
+                    
+                    // Initialization patterns
+                    [0x01, 0x00], // Initialize/handshake command
+                    [0x02, 0x01], // Set gear mode
+                    [0xFF, 0x01, 0x00], // Zwift pairing sequence
+                    [0x40, 0x00], // ERG mode off / gear mode on
+                    [0x50, 0x01], // Virtual gear enable
+                    [0x30, gear.index + 10, 0x00], // Actual gear selection
+                    
+                    // SwiftControl protocol buffer patterns
+                    [0x12, 0x04, 0x08, 0x23, 0x02, 0x01], // VIRTUAL_SHIFTING_MODE enable (DO=547)
+                    [0x12, 0x04, 0x08, 0x11, 0x02, gear.index], // FRONT_GEAR_INDEX (DO=529)
+                    [0x12, 0x04, 0x08, 0x14, 0x02, gear.index], // REAR_GEAR_INDEX (DO=532)
+                    [0x12, 0x06, 0x08, 0x10, 0x02, 0x12, 0x02, 0x08, 0x0A], // Trainer gear config
+                    
+                    // RideOn prefix commands (from swiftcontrol)
+                    [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x01, 0x02], // RideOn Shift Up
+                    [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x02, 0x01], // RideOn Shift Down
+                    [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x07, 0x00], // RideOn Gear Mode
+                    
+                    // Gear ratio protobuf patterns
+                    [0x08, 0x07, 0x12, 0x04, 0x08, Math.round(gear.ratio * 100), 0x00, 0x00], // simulatedRealGearRatio
+                    [0x08, 0x08, 0x12, 0x04, 0x08, Math.round(gear.ratio * 50), 0x00, 0x00], // simulatedVirtualGearRatio
+                    
+                    // Haptic feedback test
+                    [0x12, 0x12, 0x08, 0x0A, 0x06, 0x08, 0x02, 0x10, 0x00, 0x18], // Vibration pattern
+                    
+                    // Simple gear commands
+                    [0x00, 0x01], // Simple up
+                    [0x00, 0x00], // Simple down
+                    [0x01, 0x01, 0x00, 0x00], // Front gear up
+                    [0x02, 0x00, 0x01, 0x00], // Rear gear up
+                    [0x01, 0x00, 0x00, 0x00], // Front gear down
+                    [0x02, 0x00, 0x00, 0x00], // Rear gear down
+                ];
+                
+                for (let i = 0; i < patterns.length; i++) {
+                    const pattern = patterns[i];
+                    const payload = new Uint8Array(pattern);
+                    const hex = [...payload].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    
+                    logCommand(`🧪 Testing pattern ${i + 1}: [${hex}]`);
+                    
+                    try {
+                        await zwiftControlPoint.writeValueWithoutResponse(payload);
+                        logCommand(`✅ Pattern ${i + 1} sent successfully`);
+                        
+                        // Wait for response
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                    } catch (error) {
+                        logCommand(`❌ Pattern ${i + 1} failed: ${error.message}`);
+                    }
+                }
+                
+                zwiftBtn.textContent = '⚡ Zwift Test Complete';
+                zwiftBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('🏁 Zwift virtual shifting test complete!');
+                logCommand('💡 Check the responses above to see which pattern worked');
+                
+            } catch (error) {
+                const zwiftBtn = document.getElementById('test-zwift-shifting');
+                zwiftBtn.disabled = false;
+                zwiftBtn.textContent = '⚡ Test Zwift Virtual Shifting';
+                logCommand(`❌ Failed to test Zwift shifting: ${error.message}`);
+            }
+        }
+
+        // Test FTMS Virtual Shifting using wheel circumference
+        async function testFTMSVirtualShifting() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const ftmsBtn = document.getElementById('test-ftms-shifting');
+                ftmsBtn.disabled = true;
+                ftmsBtn.textContent = '🔄 Testing...';
+
+                logCommand('🔧 Testing FTMS Virtual Shifting (Wheel Circumference)...');
+                
+                const gear = findGear(currentGearIndex);
+                
+                // Subscribe to FTMS Control Point indications for ACK responses
+                if (ftmsClient.chars.cp) {
+                    await ftmsClient.chars.cp.startNotifications();
+                    const indicationHandler = (e) => {
+                        const data = new Uint8Array(e.target.value.buffer);
+                        const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                        logCommand(`📊 FTMS CP Indication: ${hex}`);
+                        
+                        if (data.length >= 3 && data[0] === 0x80) {
+                            const opcode = data[1];
+                            const result = data[2];
+                            logCommand(`🔍 Response to opcode 0x${opcode.toString(16).padStart(2,'0')}: ${result === 0x01 ? '✅ SUCCESS' : `❌ ERROR (0x${result.toString(16).padStart(2,'0')})`}`);
+                        }
+                    };
+                    ftmsClient.chars.cp.addEventListener('characteristicvaluechanged', indicationHandler);
+                    logCommand('🎧 Subscribed to FTMS Control Point indications');
+                }
+                
+                // Test the wheel circumference command that we know should work
+                logCommand(`🧪 Testing FTMS Set Wheel Circumference for gear ${gear.index} (ratio ${gear.ratio})`);
+                
+                try {
+                    // First, request control
+                    const requestControl = new Uint8Array([0x00]);
+                    await ftmsClient.chars.cp.writeValueWithResponse(requestControl);
+                    logCommand('📤 Sent Request Control: [00]');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Then send wheel circumference
+                    const wheelCircCmd = new Uint8Array([0x13, gear.ftms_value, 0x00]);
+                    await ftmsClient.chars.cp.writeValueWithResponse(wheelCircCmd);
+                    logCommand(`📤 Sent Wheel Circumference: [${[...wheelCircCmd].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase()}]`);
+                    logCommand(`🎯 Target circumference: ${gear.ftms_value * 100}mm (${gear.ratio}x harder than baseline)`);
+                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                } catch (error) {
+                    logCommand(`❌ FTMS command failed: ${error.message}`);
+                }
+                
+                ftmsBtn.textContent = '✅ FTMS Test Complete';
+                ftmsBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('🏁 FTMS virtual shifting test complete!');
+                logCommand('💡 Check the FTMS CP Indication responses above');
+                
+            } catch (error) {
+                const ftmsBtn = document.getElementById('test-ftms-shifting');
+                ftmsBtn.disabled = false;
+                ftmsBtn.textContent = '🔧 Test FTMS Virtual Shifting';
+                logCommand(`❌ Failed to test FTMS shifting: ${error.message}`);
+            }
+        }
+
+        // Test specific Wahoo patterns based on reverse engineering
+        async function testWahooPatterns() {
+            if (!ftmsConnected || !ftmsClient) {
+                logCommand('❌ Not connected to trainer');
+                return;
+            }
+
+            try {
+                const wahooBtn = document.getElementById('test-wahoo-patterns');
+                wahooBtn.disabled = true;
+                wahooBtn.textContent = '🔄 Testing...';
+
+                logCommand('🎪 Testing Wahoo-specific Virtual Shifting Patterns...');
+                
+                // Get the Zwift custom service
+                const server = ftmsClient.server;
+                const zwiftService = await server.getPrimaryService('00000001-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftControlPoint = await zwiftService.getCharacteristic('00000003-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftRidingData = await zwiftService.getCharacteristic('00000002-19ca-4651-86e5-fa29dcdd09d1');
+                const zwiftSyncTX = await zwiftService.getCharacteristic('00000004-19ca-4651-86e5-fa29dcdd09d1');
+                
+                // Enhanced notification handlers with more detailed parsing
+                await zwiftRidingData.startNotifications();
+                zwiftRidingData.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`📊 Zwift Riding Data: ${hex} (len=${data.length})`);
+                    
+                    // Try to parse as gear data
+                    if (data.length >= 2) {
+                        logCommand(`   🔍 Possible gear index: ${data[0]}, ratio: ${data[1]}`);
+                    }
+                });
+                
+                await zwiftSyncTX.startNotifications();
+                zwiftSyncTX.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = new Uint8Array(e.target.value.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`🔄 Zwift Sync Response: ${hex} (len=${data.length})`);
+                    
+                    // Parse command acknowledgments
+                    if (data.length >= 2) {
+                        logCommand(`   🔍 Command: 0x${data[0].toString(16)}, Status: 0x${data[1].toString(16)}`);
+                    }
+                });
+                
+                const gear = findGear(currentGearIndex);
+                
+                // Wahoo-specific patterns based on known implementations
+                const wahooPatterns = [
+                    // Pattern 1: Wahoo gear selection
+                    [0x01, gear.index + 10],
+                    // Pattern 2: Wahoo virtual shifting enable
+                    [0xA0, 0x01],
+                    // Pattern 3: Known Zwift commands from reverse engineering
+                    [0x8A, gear.index + 10],
+                    // Pattern 4: Multi-byte Wahoo protocol
+                    [0x02, gear.index + 10, gear.ftms_value],
+                    // Pattern 5: Wahoo pairing/handshake
+                    [0xFF, 0xFF, 0x01],
+                    // Pattern 6: Gear mode activation
+                    [0x4E, 0x01],
+                    // Pattern 7: Virtual cassette selection
+                    [0x73, gear.index + 1],
+                    // Pattern 8: Zwift direct gear command
+                    [0x91, gear.index + 10, 0x00],
+                ];
+                
+                logCommand(`🧪 Testing ${wahooPatterns.length} Wahoo-specific patterns for gear ${gear.index}`);
+                
+                for (let i = 0; i < wahooPatterns.length; i++) {
+                    const pattern = wahooPatterns[i];
+                    const payload = new Uint8Array(pattern);
+                    const hex = [...payload].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    
+                    logCommand(`🎪 Wahoo Pattern ${i + 1}: [${hex}]`);
+                    
+                    try {
+                        await zwiftControlPoint.writeValueWithoutResponse(payload);
+                        logCommand(`✅ Pattern ${i + 1} sent successfully`);
+                        
+                        // Wait longer for Wahoo responses
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        
+                    } catch (error) {
+                        logCommand(`❌ Pattern ${i + 1} failed: ${error.message}`);
+                    }
+                }
+                
+                // Also try reading the riding data directly
+                try {
+                    logCommand('📖 Attempting to read current riding data...');
+                    const ridingData = await zwiftRidingData.readValue();
+                    const data = new Uint8Array(ridingData.buffer);
+                    const hex = [...data].map(b => b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+                    logCommand(`📊 Current Riding Data: ${hex}`);
+                } catch (e) {
+                    logCommand('📖 Riding data is notification-only (cannot read)');
+                }
+                
+                wahooBtn.textContent = '🎪 Wahoo Test Complete';
+                wahooBtn.className = 'w-full px-4 py-2 bg-green-500 text-white rounded';
+                logCommand('🏁 Wahoo pattern test complete!');
+                logCommand('💡 Check for any responses in Zwift characteristics above');
+                
+            } catch (error) {
+                const wahooBtn = document.getElementById('test-wahoo-patterns');
+                wahooBtn.disabled = false;
+                wahooBtn.textContent = '🎪 Test Wahoo Patterns';
+                logCommand(`❌ Failed to test Wahoo patterns: ${error.message}`);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('shift-up').onclick = shiftUp;
+        document.getElementById('shift-down').onclick = shiftDown;
+        document.getElementById('reset-gear').onclick = () => setGear(0);
+        document.getElementById('connect-trainer').onclick = connectTrainer;
+        document.getElementById('scan-all-chars').onclick = scanAllCharacteristics;
+        document.getElementById('read-features').onclick = readTrainerFeatures;
+        document.getElementById('test-zwift-shifting').onclick = testZwiftVirtualShifting;
+        document.getElementById('test-ftms-shifting').onclick = testFTMSVirtualShifting;
+        document.getElementById('test-wahoo-patterns').onclick = testWahooPatterns;
+        document.getElementById('set-sim-mode').onclick = setSIMMode;
+        document.getElementById('send-command').onclick = sendGearCommand;
+        document.getElementById('clear-log').onclick = () => {
+            commandLogEl.innerHTML = '<div class="text-gray-500">// Command log cleared</div>';
+        };
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === '+') {
+                e.preventDefault();
+                shiftUp();
+            } else if (e.key === 'ArrowDown' || e.key === '-') {
+                e.preventDefault();
+                shiftDown();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                setGear(0);
+            }
+        });
+
+        // Initialize
+        initializeGearGrid();
+        initializeVirtualGearList();
+        logCommand('🚀 Zwift Virtual Shifting Protocol Explorer initialized');
+        logCommand('🎮 Use arrow keys or click buttons to shift gears');
+        logCommand('📖 Protocol documentation: circumference manipulation via FTMS 0x13');
+        logCommand('⚠️ Important: Set SIM mode first for wheel circumference to affect resistance');
+        logCommand('🔬 This tool tests Zwift\'s virtual gearing hack using wheel circumference abuse');
+    </script>
+</body>
+</html>
