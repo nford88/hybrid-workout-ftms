@@ -25,7 +25,8 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'src/index.html'),
         debug: resolve(__dirname, 'src/dev/bluetooth-test.html'),
-        shifting: resolve(__dirname, 'src/dev/zwift-virtual-shifting.html')
+        shifting: resolve(__dirname, 'src/dev/zwift-virtual-shifting.html'),
+        shiftingPoc: resolve(__dirname, 'src/dev/virtual-shifting-poc.html')
       },
       output: {
         // Use content hash + build hash for better cache busting

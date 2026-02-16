@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Shifting PoC - FTMS Hybrid Workout</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gear-position-bar {
+            background: linear-gradient(to right, #10b981 0%, #fbbf24 50%, #ef4444 100%);
+        }
+        .command-log {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+        }
+        .telemetry-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .telemetry-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">🚴 Virtual Shifting Proof of Concept</h1>
+            <p class="text-gray-600">Testing application-level virtual gearing via FTMS resistance adjustment</p>
+            <div class="mt-3 flex items-center space-x-4 text-sm">
+                <div class="flex items-center">
+                    <span class="w-3 h-3 rounded-full bg-gray-400 mr-2" id="status-indicator"></span>
+                    <span id="connection-status" class="text-gray-600">Disconnected</span>
+                </div>
+                <div class="text-gray-500" id="mode-indicator">Mode: Idle</div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            <!-- LEFT COLUMN: Connection & Control -->
+            <div class="space-y-4">
+
+                <!-- Connection -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">Connection</h2>
+                    <button id="connect-btn" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                        🔗 Connect FTMS Trainer
+                    </button>
+                    <div id="trainer-info" class="mt-3 text-sm text-gray-600 hidden">
+                        <div><strong>Trainer:</strong> <span id="trainer-name">-</span></div>
+                        <div><strong>Features:</strong> <span id="trainer-features">-</span></div>
+                    </div>
+                </div>
+
+                <!-- Virtual Gear Display -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">Virtual Gear</h2>
+
+                    <!-- Current Gear -->
+                    <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 mb-3">
+                        <div class="text-center">
+                            <div class="text-sm text-gray-600 mb-1">Current Gear</div>
+                            <div class="text-4xl font-bold text-blue-600" id="gear-index">14</div>
+                            <div class="text-sm text-gray-500">/ 22</div>
+                            <div class="text-xl font-semibold text-purple-600 mt-2" id="gear-display">50 / 21</div>
+                            <div class="text-sm text-gray-600">Ratio: <span id="gear-ratio" class="font-mono">2.38</span></div>
+                            <div class="text-sm text-gray-600">Multiplier: <span id="gear-multiplier" class="font-mono font-bold">1.00x</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Shift Buttons -->
+                    <div class="flex justify-center space-x-2 mb-3">
+                        <button id="shift-down-btn" class="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-lg font-semibold">
+                            ⬇️ Shift Down
+                        </button>
+                        <button id="shift-up-btn" class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-lg font-semibold">
+                            Shift Up ⬆️
+                        </button>
+                    </div>
+                    <div class="text-xs text-center text-gray-500 mb-3">Keyboard: [↓] or [ for down, [↑] or ] for up</div>
+
+                    <!-- Gear Position Bar -->
+                    <div class="relative h-6 bg-gray-200 rounded-full overflow-hidden gear-position-bar mb-2">
+                        <div id="gear-position-marker" class="absolute top-0 bottom-0 w-1 bg-white border-2 border-gray-800 transition-all duration-300" style="left: 59.1%;"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-600">
+                        <span>Easy (1)</span>
+                        <span>Baseline (14)</span>
+                        <span>Hard (22)</span>
+                    </div>
+
+                    <!-- Enable Toggle -->
+                    <div class="mt-3 flex items-center justify-center space-x-2">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="virtual-gear-enabled" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            <span class="ml-3 text-sm font-medium text-gray-700">Virtual Gearing Enabled</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Calibration -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">Calibration</h2>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Your FTP (watts)</label>
+                        <input type="number" id="ftp-input" value="250" min="50" max="500" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="save-ftp-btn" class="w-full mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors text-sm">
+                            💾 Save FTP
+                        </button>
+                    </div>
+                    <div class="text-xs text-gray-500 bg-blue-50 p-2 rounded">
+                        <strong>FTP-Based Calibration:</strong> Gear 14 (50/21) at 90 RPM = 75% FTP. Other gears scaled proportionally.
+                    </div>
+                </div>
+            </div>
+
+            <!-- MIDDLE COLUMN: Telemetry & Testing -->
+            <div class="space-y-4">
+
+                <!-- Live Telemetry -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">Live Telemetry</h2>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="telemetry-card bg-blue-50 p-3 rounded-lg text-center">
+                            <div class="text-xs text-gray-600 mb-1">Speed</div>
+                            <div class="text-2xl font-bold text-blue-600" id="telem-speed">0.0</div>
+                            <div class="text-xs text-gray-500">kph</div>
+                        </div>
+                        <div class="telemetry-card bg-green-50 p-3 rounded-lg text-center">
+                            <div class="text-xs text-gray-600 mb-1">Cadence</div>
+                            <div class="text-2xl font-bold text-green-600" id="telem-cadence">0</div>
+                            <div class="text-xs text-gray-500">RPM</div>
+                        </div>
+                        <div class="telemetry-card bg-purple-50 p-3 rounded-lg text-center">
+                            <div class="text-xs text-gray-600 mb-1">Power</div>
+                            <div class="text-2xl font-bold text-purple-600" id="telem-power">0</div>
+                            <div class="text-xs text-gray-500">watts</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SIM Mode Test -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">🏔️ SIM Mode Test</h2>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Base Gradient: <span id="sim-gradient-value" class="font-mono">5.0</span>%
+                        </label>
+                        <input type="range" id="sim-gradient-slider" min="-10" max="20" step="0.5" value="5" class="w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>-10%</span>
+                            <span>0%</span>
+                            <span>+20%</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-yellow-50 p-3 rounded-lg mb-3 text-sm">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-700">Base:</span>
+                            <span class="font-mono font-semibold" id="sim-base-display">5.0%</span>
+                        </div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-700">Gear Multiplier:</span>
+                            <span class="font-mono font-semibold" id="sim-multiplier-display">1.00x</span>
+                        </div>
+                        <div class="flex justify-between border-t border-yellow-200 pt-1">
+                            <span class="text-gray-700 font-bold">Effective:</span>
+                            <span class="font-mono font-bold text-blue-600" id="sim-effective-display">5.0%</span>
+                        </div>
+                    </div>
+
+                    <button id="apply-sim-btn" class="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold">
+                        🎯 Apply to Trainer (SIM)
+                    </button>
+                </div>
+
+                <!-- ERG Mode Test -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">⚡ ERG Mode Test</h2>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Base Power: <span id="erg-power-value" class="font-mono">200</span>W
+                        </label>
+                        <input type="range" id="erg-power-slider" min="50" max="400" step="5" value="200" class="w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>50W</span>
+                            <span>200W</span>
+                            <span>400W</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-purple-50 p-3 rounded-lg mb-3 text-sm">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-700">Base:</span>
+                            <span class="font-mono font-semibold" id="erg-base-display">200W</span>
+                        </div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-700">Gear Multiplier:</span>
+                            <span class="font-mono font-semibold" id="erg-multiplier-display">1.00x</span>
+                        </div>
+                        <div class="flex justify-between border-t border-purple-200 pt-1">
+                            <span class="text-gray-700 font-bold">Effective:</span>
+                            <span class="font-mono font-bold text-purple-600" id="erg-effective-display">200W</span>
+                        </div>
+                    </div>
+
+                    <button id="apply-erg-btn" class="w-full px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-semibold">
+                        ⚡ Apply to Trainer (ERG)
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Command Log & Info -->
+            <div class="space-y-4">
+
+                <!-- Command Log -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-lg font-bold text-gray-800">Command Log</h2>
+                        <button id="clear-log-btn" class="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                            Clear
+                        </button>
+                    </div>
+                    <div id="command-log" class="command-log bg-black text-green-400 p-3 rounded h-96 overflow-y-auto">
+                        <div class="text-gray-500">Waiting for commands...</div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">ℹ️ Info</h2>
+                    <div class="text-sm text-gray-700 space-y-2">
+                        <div class="bg-blue-50 p-2 rounded">
+                            <strong>Drivetrain:</strong> Shimano 105 2x11<br>
+                            <strong>Front:</strong> 50/34T<br>
+                            <strong>Cassette:</strong> 11-28T
+                        </div>
+                        <div class="bg-green-50 p-2 rounded">
+                            <strong>Baseline:</strong> Gear 14 (50/21 = 2.38)<br>
+                            <strong>Range:</strong> 1.21 - 4.55 ratio
+                        </div>
+                        <div class="bg-yellow-50 p-2 rounded text-xs">
+                            <strong>How it works:</strong> Virtual gearing adjusts FTMS resistance (SIM gradient or ERG power) to simulate gear changes without physical shifting.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Reference -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-3">⌨️ Keyboard Shortcuts</h2>
+                    <div class="text-sm space-y-1 text-gray-700">
+                        <div><kbd class="px-2 py-1 bg-gray-200 rounded text-xs font-mono">↑</kbd> or <kbd class="px-2 py-1 bg-gray-200 rounded text-xs font-mono">]</kbd> - Shift Up</div>
+                        <div><kbd class="px-2 py-1 bg-gray-200 rounded text-xs font-mono">↓</kbd> or <kbd class="px-2 py-1 bg-gray-200 rounded text-xs font-mono">[</kbd> - Shift Down</div>
+                        <div><kbd class="px-2 py-1 bg-gray-200 rounded text-xs font-mono">0</kbd> - Reset to baseline (Gear 14)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load FTMS library -->
+    <script src="../js/ftms.js"></script>
+
+    <script>
+        // ====================================================================
+        // VIRTUAL SHIFTING POC - MAIN APPLICATION
+        // ====================================================================
+
+        const app = {
+            ftms: null,
+            state: {
+                connected: false,
+                currentMode: 'idle', // 'idle', 'sim', 'erg'
+                baseGradient: 5.0,   // Last SIM gradient set
+                basePower: 200,      // Last ERG power set
+                autoApply: true,     // Auto-apply on gear change
+                commandInProgress: false,  // FTMS command in progress
+                pendingGearChange: false,  // Gear change waiting to be applied
+                debounceTimer: null,       // Debounce timer for rapid shifts
+                telemetry: {
+                    speed: 0,
+                    cadence: 0,
+                    power: 0
+                }
+            },
+
+            init() {
+                console.log('[PoC] Initializing Virtual Shifting PoC...');
+                this.ftms = window.ftms;
+                this.setupEventListeners();
+                this.loadSavedFTP();
+                this.updateUI();
+                console.log('[PoC] Ready! Connect your trainer to begin.');
+            },
+
+            setupEventListeners() {
+                // Connection
+                document.getElementById('connect-btn').addEventListener('click', () => this.connect());
+
+                // Shifting
+                document.getElementById('shift-up-btn').addEventListener('click', () => this.shiftUp());
+                document.getElementById('shift-down-btn').addEventListener('click', () => this.shiftDown());
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowUp' || e.key === ']') {
+                        e.preventDefault();
+                        this.shiftUp();
+                    } else if (e.key === 'ArrowDown' || e.key === '[') {
+                        e.preventDefault();
+                        this.shiftDown();
+                    } else if (e.key === '0') {
+                        e.preventDefault();
+                        this.resetToBaseline();
+                    }
+                });
+
+                // Virtual gear toggle
+                document.getElementById('virtual-gear-enabled').addEventListener('change', (e) => {
+                    this.ftms.virtualGear.enabled = e.target.checked;
+                    this.log(`Virtual gearing ${e.target.checked ? 'ENABLED' : 'DISABLED'}`);
+                    this.updateUI();
+                });
+
+                // Calibration
+                document.getElementById('save-ftp-btn').addEventListener('click', () => this.saveFTP());
+                document.getElementById('ftp-input').addEventListener('input', (e) => {
+                    this.ftms.virtualGear.calibration.userFTP = parseInt(e.target.value) || 250;
+                });
+
+                // SIM test
+                document.getElementById('sim-gradient-slider').addEventListener('input', (e) => {
+                    document.getElementById('sim-gradient-value').textContent = e.target.value;
+                    this.updateSIMDisplay();
+                });
+                document.getElementById('apply-sim-btn').addEventListener('click', () => this.applySIM());
+
+                // ERG test
+                document.getElementById('erg-power-slider').addEventListener('input', (e) => {
+                    document.getElementById('erg-power-value').textContent = e.target.value;
+                    this.updateERGDisplay();
+                });
+                document.getElementById('apply-erg-btn').addEventListener('click', () => this.applyERG());
+
+                // Log control
+                document.getElementById('clear-log-btn').addEventListener('click', () => this.clearLog());
+
+                // Listen to ftms events
+                this.ftms.virtualGear.on('gearChange', (gear) => this.onGearChange(gear));
+            },
+
+            async connect() {
+                try {
+                    this.log('Connecting to FTMS trainer...');
+                    await this.ftms.connect({
+                        log: (msg) => this.log(msg)
+                    });
+
+                    this.state.connected = true;
+                    this.updateConnectionStatus(true);
+                    this.log('✓ Connected successfully!');
+
+                    // Setup telemetry
+                    this.ftms.on('ibd', (data) => this.onTelemetry(data));
+
+                } catch (err) {
+                    this.log(`✗ Connection failed: ${err.message}`, 'error');
+                    this.updateConnectionStatus(false);
+                }
+            },
+
+            shiftUp() {
+                if (!this.ftms.virtualGear.enabled) {
+                    this.log('⚠️ Virtual gearing is disabled', 'warn');
+                    return;
+                }
+                const success = this.ftms.virtualGear.shiftUp();
+                if (!success) {
+                    this.log('Already at hardest gear (22)', 'warn');
+                }
+            },
+
+            shiftDown() {
+                if (!this.ftms.virtualGear.enabled) {
+                    this.log('⚠️ Virtual gearing is disabled', 'warn');
+                    return;
+                }
+                const success = this.ftms.virtualGear.shiftDown();
+                if (!success) {
+                    this.log('Already at easiest gear (1)', 'warn');
+                }
+            },
+
+            resetToBaseline() {
+                this.ftms.virtualGear.currentGearIndex = 14;
+                this.log('Reset to baseline gear 14 (50/21)');
+                this.updateUI();
+            },
+
+            onGearChange(gear) {
+                this.log(`Gear changed to ${gear.index + 1}: ${gear.display} (ratio ${gear.ratio.toFixed(2)}, multiplier ${gear.multiplier.toFixed(2)}x)`);
+                this.updateUI();
+
+                // Auto-apply with debounce (wait 300ms after last shift)
+                if (this.state.autoApply && this.state.connected) {
+                    // Clear any pending command
+                    if (this.state.debounceTimer) {
+                        clearTimeout(this.state.debounceTimer);
+                    }
+
+                    // Set new timer - only send command after 100ms of no shifting (faster!)
+                    this.state.debounceTimer = setTimeout(() => {
+                        if (!this.state.commandInProgress) {
+                            if (this.state.currentMode === 'sim') {
+                                this.log(`🔄 Auto-applying SIM with new gear...`);
+                                this.applySIM();
+                            } else if (this.state.currentMode === 'erg') {
+                                this.log(`🔄 Auto-applying ERG with new gear...`);
+                                this.applyERG();
+                            }
+                        } else {
+                            this.log(`⏳ Command in progress, will retry...`);
+                            this.state.pendingGearChange = true;
+                        }
+                    }, 100); // 100ms debounce (3x faster!)
+                }
+            },
+
+            onTelemetry(data) {
+                this.state.telemetry.speed = data.speedKph || 0;
+                this.state.telemetry.cadence = data.cadenceRpm || 0;
+                this.state.telemetry.power = data.powerWatts || 0;
+
+                document.getElementById('telem-speed').textContent = this.state.telemetry.speed.toFixed(1);
+                document.getElementById('telem-cadence').textContent = this.state.telemetry.cadence.toFixed(0);
+                document.getElementById('telem-power').textContent = this.state.telemetry.power.toFixed(0);
+            },
+
+            updateUI() {
+                const gear = this.ftms.virtualGear.getCurrentGear();
+                const enabled = this.ftms.virtualGear.enabled;
+
+                // Gear display
+                document.getElementById('gear-index').textContent = gear.index + 1;
+                document.getElementById('gear-display').textContent = gear.display;
+                document.getElementById('gear-ratio').textContent = gear.ratio.toFixed(2);
+                document.getElementById('gear-multiplier').textContent = gear.multiplier.toFixed(2) + 'x';
+
+                // Position marker (0-21 maps to 0-100%)
+                const position = (gear.index / 21) * 100;
+                document.getElementById('gear-position-marker').style.left = position + '%';
+
+                // Color code multiplier
+                const multiplierEl = document.getElementById('gear-multiplier');
+                if (gear.multiplier < 0.85) {
+                    multiplierEl.classList.add('text-green-600');
+                    multiplierEl.classList.remove('text-yellow-600', 'text-red-600');
+                } else if (gear.multiplier > 1.15) {
+                    multiplierEl.classList.add('text-red-600');
+                    multiplierEl.classList.remove('text-green-600', 'text-yellow-600');
+                } else {
+                    multiplierEl.classList.add('text-yellow-600');
+                    multiplierEl.classList.remove('text-green-600', 'text-red-600');
+                }
+
+                // Update test displays
+                this.updateSIMDisplay();
+                this.updateERGDisplay();
+
+                // Disable buttons based on state
+                const shiftingAllowed = enabled && !this.state.commandInProgress;
+                document.getElementById('shift-up-btn').disabled = !shiftingAllowed;
+                document.getElementById('shift-down-btn').disabled = !shiftingAllowed;
+                document.getElementById('apply-sim-btn').disabled = !this.state.connected || this.state.commandInProgress;
+                document.getElementById('apply-erg-btn').disabled = !this.state.connected || this.state.commandInProgress;
+
+                // Visual feedback when command in progress
+                if (this.state.commandInProgress) {
+                    document.getElementById('shift-up-btn').classList.add('opacity-50', 'cursor-not-allowed');
+                    document.getElementById('shift-down-btn').classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    document.getElementById('shift-up-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+                    document.getElementById('shift-down-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            },
+
+            updateSIMDisplay() {
+                const baseGradient = parseFloat(document.getElementById('sim-gradient-slider').value);
+                const multiplier = this.ftms.virtualGear.getMultiplier();
+                const effective = this.ftms.virtualGear.applyToGradient(baseGradient);
+
+                document.getElementById('sim-base-display').textContent = baseGradient.toFixed(1) + '%';
+                document.getElementById('sim-multiplier-display').textContent = multiplier.toFixed(2) + 'x';
+                document.getElementById('sim-effective-display').textContent = effective.toFixed(1) + '%';
+                document.getElementById('sim-gradient-value').textContent = baseGradient.toFixed(1);
+            },
+
+            updateERGDisplay() {
+                const basePower = parseInt(document.getElementById('erg-power-slider').value);
+                const multiplier = this.ftms.virtualGear.getMultiplier();
+                const effective = this.ftms.virtualGear.applyToPower(basePower);
+
+                document.getElementById('erg-base-display').textContent = basePower + 'W';
+                document.getElementById('erg-multiplier-display').textContent = multiplier.toFixed(2) + 'x';
+                document.getElementById('erg-effective-display').textContent = effective + 'W';
+                document.getElementById('erg-power-value').textContent = basePower;
+            },
+
+            async applySIM() {
+                if (!this.state.connected) {
+                    this.log('⚠️ Not connected to trainer', 'warn');
+                    return;
+                }
+
+                // Check if command already in progress
+                if (this.state.commandInProgress) {
+                    this.log('⏳ Command already in progress, queuing...', 'warn');
+                    this.state.pendingGearChange = true;
+                    return;
+                }
+
+                const baseGradient = parseFloat(document.getElementById('sim-gradient-slider').value);
+                const effective = this.ftms.virtualGear.applyToGradient(baseGradient);
+
+                // Store base gradient for auto-apply
+                this.state.baseGradient = baseGradient;
+
+                this.log(`Applying SIM: base=${baseGradient.toFixed(1)}%, effective=${effective.toFixed(1)}%`);
+
+                this.state.commandInProgress = true;
+                this.updateModeIndicator(); // Show "Sending command..."
+
+                try {
+                    await this.ftms.setSim({
+                        gradePct: effective,
+                        crr: 0.004,
+                        cwa: 0.51,
+                        windMps: 0
+                    });
+                    this.state.currentMode = 'sim';
+                    this.updateModeIndicator();
+                    this.log('✓ SIM mode applied successfully');
+                } catch (err) {
+                    this.log(`✗ SIM mode failed: ${err.message}`, 'error');
+                } finally {
+                    this.state.commandInProgress = false;
+                    this.updateModeIndicator(); // Clear "Sending command..."
+                    this.updateUI(); // Re-enable buttons
+
+                    // If there was a pending gear change, apply it now
+                    if (this.state.pendingGearChange) {
+                        this.state.pendingGearChange = false;
+                        this.log('🔄 Applying pending gear change...');
+                        setTimeout(() => this.applySIM(), 100);
+                    }
+                }
+            },
+
+            async applyERG() {
+                if (!this.state.connected) {
+                    this.log('⚠️ Not connected to trainer', 'warn');
+                    return;
+                }
+
+                // Check if command already in progress
+                if (this.state.commandInProgress) {
+                    this.log('⏳ Command already in progress, queuing...', 'warn');
+                    this.state.pendingGearChange = true;
+                    return;
+                }
+
+                const basePower = parseInt(document.getElementById('erg-power-slider').value);
+                const effective = this.ftms.virtualGear.applyToPower(basePower);
+
+                // Store base power for auto-apply
+                this.state.basePower = basePower;
+
+                this.log(`Applying ERG: base=${basePower}W, effective=${effective}W`);
+
+                this.state.commandInProgress = true;
+                this.updateModeIndicator(); // Show "Sending command..."
+
+                try {
+                    await this.ftms.setErgWatts(effective);
+                    this.state.currentMode = 'erg';
+                    this.updateModeIndicator();
+                    this.log('✓ ERG mode applied successfully');
+                } catch (err) {
+                    this.log(`✗ ERG mode failed: ${err.message}`, 'error');
+                } finally {
+                    this.state.commandInProgress = false;
+                    this.updateModeIndicator(); // Clear "Sending command..."
+                    this.updateUI(); // Re-enable buttons
+
+                    // If there was a pending gear change, apply it now
+                    if (this.state.pendingGearChange) {
+                        this.state.pendingGearChange = false;
+                        this.log('🔄 Applying pending gear change...');
+                        setTimeout(() => this.applyERG(), 100);
+                    }
+                }
+            },
+
+            loadSavedFTP() {
+                const saved = localStorage.getItem('ftms_user_ftp');
+                if (saved) {
+                    const ftp = parseInt(saved);
+                    this.ftms.virtualGear.calibration.userFTP = ftp;
+                    document.getElementById('ftp-input').value = ftp;
+                    this.log(`Loaded saved FTP: ${ftp}W`);
+                }
+            },
+
+            saveFTP() {
+                const ftp = parseInt(document.getElementById('ftp-input').value) || 250;
+                localStorage.setItem('ftms_user_ftp', ftp);
+                this.ftms.virtualGear.calibration.userFTP = ftp;
+                this.log(`Saved FTP: ${ftp}W`);
+            },
+
+            updateConnectionStatus(connected) {
+                const indicator = document.getElementById('status-indicator');
+                const status = document.getElementById('connection-status');
+                const info = document.getElementById('trainer-info');
+
+                if (connected) {
+                    indicator.classList.remove('bg-gray-400');
+                    indicator.classList.add('bg-green-500');
+                    status.textContent = 'Connected';
+                    status.classList.remove('text-gray-600');
+                    status.classList.add('text-green-600');
+                    info.classList.remove('hidden');
+
+                    // Get trainer name from ftms
+                    const name = this.ftms.device?.name || 'Unknown';
+                    document.getElementById('trainer-name').textContent = name;
+                    document.getElementById('trainer-features').textContent = 'FTMS Compatible';
+                } else {
+                    indicator.classList.remove('bg-green-500');
+                    indicator.classList.add('bg-gray-400');
+                    status.textContent = 'Disconnected';
+                    status.classList.remove('text-green-600');
+                    status.classList.add('text-gray-600');
+                    info.classList.add('hidden');
+                }
+            },
+
+            updateModeIndicator() {
+                const modeEl = document.getElementById('mode-indicator');
+
+                if (this.state.commandInProgress) {
+                    modeEl.textContent = '⏳ Sending command...';
+                    modeEl.classList.add('text-yellow-600', 'font-bold');
+                    return;
+                }
+
+                modeEl.classList.remove('text-yellow-600', 'font-bold');
+                const modes = {
+                    'idle': 'Mode: Idle',
+                    'sim': 'Mode: SIM (Gradient)',
+                    'erg': 'Mode: ERG (Power)'
+                };
+                modeEl.textContent = modes[this.state.currentMode] || 'Mode: Unknown';
+            },
+
+            log(message, type = 'info') {
+                const logEl = document.getElementById('command-log');
+                const timestamp = new Date().toLocaleTimeString();
+                const colors = {
+                    info: 'text-green-400',
+                    warn: 'text-yellow-400',
+                    error: 'text-red-400'
+                };
+
+                const entry = document.createElement('div');
+                entry.className = colors[type] || colors.info;
+                entry.textContent = `[${timestamp}] ${message}`;
+
+                logEl.appendChild(entry);
+                logEl.scrollTop = logEl.scrollHeight;
+
+                // Also console.log for Chrome debugging
+                console.log(`[PoC ${type.toUpperCase()}]`, message);
+            },
+
+            clearLog() {
+                document.getElementById('command-log').innerHTML = '<div class="text-gray-500">Log cleared.</div>';
+            }
+        };
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>

@@ -356,13 +356,164 @@ class FTMSClient extends Emitter {
   }
 }
 
+// ============================================================================
+// VIRTUAL GEARING MODULE
+// ============================================================================
+// Simulates a Shimano 105 2x11 drivetrain (50/34 front, 11-28 cassette)
+// by adjusting FTMS resistance parameters (SIM gradient or ERG power)
+
+class VirtualGear {
+  constructor() {
+    // Shimano 105 2x11 gear table
+    this.gearTable = [
+      { index: 0,  front: 34, rear: 28, ratio: 1.21 },  // Easiest
+      { index: 1,  front: 34, rear: 25, ratio: 1.36 },
+      { index: 2,  front: 34, rear: 23, ratio: 1.48 },
+      { index: 3,  front: 34, rear: 21, ratio: 1.62 },
+      { index: 4,  front: 34, rear: 19, ratio: 1.79 },
+      { index: 5,  front: 34, rear: 17, ratio: 2.00 },
+      { index: 6,  front: 34, rear: 15, ratio: 2.27 },
+      { index: 7,  front: 34, rear: 14, ratio: 2.43 },
+      { index: 8,  front: 34, rear: 13, ratio: 2.62 },
+      { index: 9,  front: 34, rear: 12, ratio: 2.83 },
+      { index: 10, front: 34, rear: 11, ratio: 3.09 },
+      { index: 11, front: 50, rear: 28, ratio: 1.79 },
+      { index: 12, front: 50, rear: 25, ratio: 2.00 },
+      { index: 13, front: 50, rear: 23, ratio: 2.17 },
+      { index: 14, front: 50, rear: 21, ratio: 2.38 },  // BASELINE
+      { index: 15, front: 50, rear: 19, ratio: 2.63 },
+      { index: 16, front: 50, rear: 17, ratio: 2.94 },
+      { index: 17, front: 50, rear: 15, ratio: 3.33 },
+      { index: 18, front: 50, rear: 14, ratio: 3.57 },
+      { index: 19, front: 50, rear: 13, ratio: 3.85 },
+      { index: 20, front: 50, rear: 12, ratio: 4.17 },
+      { index: 21, front: 50, rear: 11, ratio: 4.55 }   // Hardest
+    ];
+
+    this.currentGearIndex = 14;  // Start at baseline (50/21)
+    this.baselineRatio = 2.38;   // Gear 14 ratio
+    this.enabled = true;          // Virtual gearing enabled by default
+
+    this.calibration = {
+      method: 'ftp-based',       // Calibration method
+      userFTP: 250              // Default FTP in watts
+    };
+
+    this.listeners = {};          // Event listeners
+    this.logFn = null;            // Logger function
+  }
+
+  // Shift to harder gear (higher ratio)
+  shiftUp() {
+    if (this.currentGearIndex < this.gearTable.length - 1) {
+      this.currentGearIndex++;
+      const gear = this.getCurrentGear();
+      this._log(`Shifted UP to gear ${gear.index + 1} (${gear.display})`);
+      this.emit('gearChange', gear);
+      return true;
+    }
+    return false;
+  }
+
+  // Shift to easier gear (lower ratio)
+  shiftDown() {
+    if (this.currentGearIndex > 0) {
+      this.currentGearIndex--;
+      const gear = this.getCurrentGear();
+      this._log(`Shifted DOWN to gear ${gear.index + 1} (${gear.display})`);
+      this.emit('gearChange', gear);
+      return true;
+    }
+    return false;
+  }
+
+  // Get current gear object with calculated properties
+  getCurrentGear() {
+    const gear = this.gearTable[this.currentGearIndex];
+    return {
+      index: gear.index,
+      front: gear.front,
+      rear: gear.rear,
+      ratio: gear.ratio,
+      display: `${gear.front}/${gear.rear}`,
+      multiplier: this.getMultiplier()
+    };
+  }
+
+  // Calculate resistance multiplier relative to baseline
+  getMultiplier() {
+    const currentRatio = this.gearTable[this.currentGearIndex].ratio;
+    return currentRatio / this.baselineRatio;
+  }
+
+  // Apply gear multiplier to SIM mode gradient
+  applyToGradient(baseGradient) {
+    if (!this.enabled) return baseGradient;
+
+    const multiplier = this.getMultiplier();
+    const adjusted = baseGradient * multiplier;
+
+    // Safety limits: -10% to +20%
+    return Math.max(-10, Math.min(20, adjusted));
+  }
+
+  // Apply gear multiplier to ERG mode power
+  applyToPower(basePower) {
+    if (!this.enabled) return basePower;
+
+    const multiplier = this.getMultiplier();
+    const adjusted = basePower * multiplier;
+
+    // Safety limits: 50W to 2000W
+    return Math.max(50, Math.min(2000, Math.round(adjusted)));
+  }
+
+  // Calculate target power based on FTP calibration
+  // Formula: Baseline gear (14) at 90 RPM = 75% FTP
+  calculateTargetPower(cadence = 90) {
+    const baselinePower = this.calibration.userFTP * 0.75;
+    const cadenceRatio = cadence / 90;
+    const gearRatio = this.getMultiplier();
+
+    // Power scales with gear ratio and cadence^1.5
+    return baselinePower * gearRatio * Math.pow(cadenceRatio, 1.5);
+  }
+
+  // Event emitter: register listener
+  on(event, callback) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+  }
+
+  // Event emitter: trigger event
+  emit(event, data) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(cb => cb(data));
+    }
+  }
+
+  // Internal logging
+  _log(msg) {
+    if (this.logFn) {
+      this.logFn(`[VirtualGear] ${msg}`);
+    }
+    console.log(`[VirtualGear] ${msg}`);
+  }
+}
+
 // Export a ready-to-use singleton, plus the class if you want multiple instances
 // Support both ES6 modules and global scope for browser compatibility
 if (typeof module !== 'undefined' && module.exports) {
   // Node.js style export
-  module.exports = { ftms: new FTMSClient(), FTMSClient };
+  const ftmsInstance = new FTMSClient();
+  ftmsInstance.virtualGear = new VirtualGear();
+  module.exports = { ftms: ftmsInstance, FTMSClient, VirtualGear };
 } else if (typeof window !== 'undefined') {
   // Browser global export
   window.ftms = new FTMSClient();
+  window.ftms.virtualGear = new VirtualGear();
   window.FTMSClient = FTMSClient;
+  window.VirtualGear = VirtualGear;
 }
