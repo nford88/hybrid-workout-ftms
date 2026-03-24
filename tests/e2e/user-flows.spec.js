@@ -75,9 +75,10 @@ async function loadAppWithBluetoothSpy(page) {
   await page.waitForFunction(() => !!window.Hybrid?.handlers?.connectTrainer, { timeout: 5000 })
 }
 
-// These tests are always headed with slowMo so the interactions are visible.
-// Run with: npx playwright test tests/e2e/user-flows.spec.js
-test.use({ headless: false, launchOptions: { slowMo: 400 } })
+// Headed with slowMo locally; headless in CI (set HEADED=1 to force headed locally).
+// Run with: HEADED=1 npx playwright test tests/e2e/user-flows.spec.js
+const isHeaded = !!process.env.HEADED
+test.use({ headless: !isHeaded, launchOptions: { slowMo: isHeaded ? 400 : 0 } })
 
 // ─── Test 1: UI Interactions ──────────────────────────────────────────────────
 
