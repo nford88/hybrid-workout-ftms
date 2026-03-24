@@ -3,12 +3,15 @@
 
 import { createMockDOM } from './mocks/dom-mock.js'
 import { createMockFTMS } from './mocks/ftms-mock.js'
+import { haversineDistance } from '../src/utils/geo'
+import { clamp } from '../src/utils/math'
+import { formatTime } from '../src/utils/time'
 
 // Create a minimal environment to run the functions
 export function createTestEnvironment() {
   const mockDOM = createMockDOM()
   const mockFTMS = createMockFTMS()
-  
+
   // Create global Hybrid object structure
   global.Hybrid = {
     dom: mockDOM,
@@ -33,35 +36,26 @@ export function createTestEnvironment() {
         lastGradeUpdate: 0,
         lastGradeDistance: 0,
         gradeHistory: [],
-        routeCompleted: false
-      }
+        routeCompleted: false,
+      },
     },
     timers: { ergTimeout: null, simInterval: null, totalWorkoutTimeInterval: null },
     utils: {
-      clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
-      R: 6371e3,
-      haversineDistance: (lat1, lon1, lat2, lon2) => {
-        const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180;
-        const Δλ = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return global.Hybrid.utils.R * c;
+      clamp,
+      haversineDistance,
+      formatTime,
+      showError: (m) => {
+        mockDOM.errorText.textContent = m
+        mockDOM.errorDiv.classList.remove('hidden')
       },
-      showError: (m) => { mockDOM.errorText.textContent = m; mockDOM.errorDiv.classList.remove('hidden'); },
       hideError: () => mockDOM.errorDiv.classList.add('hidden'),
-      formatTime: (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-      }
     },
     route: {},
     erg: {},
     sim: {},
     handlers: {},
     ui: {},
-    workout: {}
+    workout: {},
   }
 
   // Mock the global ftms object
@@ -94,9 +88,9 @@ export function createTestEnvironment() {
         lastGradeUpdate: 0,
         lastGradeDistance: 0,
         gradeHistory: [],
-        routeCompleted: false
+        routeCompleted: false,
       }
       mockFTMS.clearCallLog()
-    }
+    },
   }
 }

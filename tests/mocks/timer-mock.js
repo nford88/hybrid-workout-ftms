@@ -17,7 +17,7 @@ export class MockTimer {
       callback,
       delay,
       startTime: this.currentTime,
-      triggered: false
+      triggered: false,
     })
     return id
   }
@@ -34,7 +34,7 @@ export class MockTimer {
       callback,
       delay,
       startTime: this.currentTime,
-      lastTrigger: this.currentTime
+      lastTrigger: this.currentTime,
     })
     return id
   }
@@ -50,8 +50,7 @@ export class MockTimer {
 
     // Trigger timeouts that should fire
     for (const [id, timeout] of this.timeouts.entries()) {
-      if (!timeout.triggered && 
-          this.currentTime >= timeout.startTime + timeout.delay) {
+      if (!timeout.triggered && this.currentTime >= timeout.startTime + timeout.delay) {
         timeout.triggered = true
         timeout.callback()
         this.timeouts.delete(id)
@@ -59,7 +58,7 @@ export class MockTimer {
     }
 
     // Trigger intervals that should fire
-    for (const [id, interval] of this.intervals.entries()) {
+    for (const [, interval] of this.intervals.entries()) {
       while (this.currentTime >= interval.lastTrigger + interval.delay) {
         interval.lastTrigger += interval.delay
         interval.callback()
@@ -102,6 +101,6 @@ export function setupTimerMocks(mockTimer) {
   vi.stubGlobal('clearInterval', mockTimer.clearInterval.bind(mockTimer))
   vi.stubGlobal('Date', {
     ...Date,
-    now: () => mockTimer.getCurrentTime()
+    now: () => mockTimer.getCurrentTime(),
   })
 }

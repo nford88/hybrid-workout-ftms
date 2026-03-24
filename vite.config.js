@@ -1,10 +1,13 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
+import react from '@vitejs/plugin-react'
 
 // Get build hash from environment or generate one
 const buildHash = process.env.VITE_BUILD_HASH?.slice(0, 7) || Date.now().toString(36)
 
 export default defineConfig({
+  plugins: [react()],
+
   // Make build hash available to the app
   define: {
     '__BUILD_HASH__': JSON.stringify(buildHash),
@@ -25,8 +28,10 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'src/index.html'),
         debug: resolve(__dirname, 'src/dev/bluetooth-test.html'),
+        powerCurve: resolve(__dirname, 'src/dev/power-curve-calibration.html'),
         shifting: resolve(__dirname, 'src/dev/zwift-virtual-shifting.html'),
         shiftingPoc: resolve(__dirname, 'src/dev/virtual-shifting-poc.html')
+
       },
       output: {
         // Use content hash + build hash for better cache busting

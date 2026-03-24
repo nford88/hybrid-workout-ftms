@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Power Curve Calibration Test</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #2563eb;
+        margin: 0 0 8px 0;
+      }
+      h2 {
+        color: #1e40af;
+        margin: 0 0 16px 0;
+        font-size: 20px;
+      }
+      button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-right: 12px;
+      }
+      button:hover {
+        background: #1e40af;
+      }
+      button:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+      .status {
+        font-size: 14px;
+        color: #64748b;
+        margin-top: 8px;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .metric {
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 6px;
+        text-align: center;
+      }
+      .metric-label {
+        font-size: 12px;
+        color: #64748b;
+      }
+      .metric-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1e293b;
+        margin: 4px 0;
+      }
+      .metric-unit {
+        font-size: 12px;
+        color: #94a3b8;
+      }
+      .instruction {
+        background: #dbeafe;
+        border-left: 4px solid #2563eb;
+        padding: 16px;
+        margin: 16px 0;
+        border-radius: 4px;
+      }
+      .instruction h3 {
+        margin: 0 0 8px 0;
+        color: #1e40af;
+      }
+      .timer {
+        font-size: 48px;
+        font-weight: bold;
+        text-align: center;
+        margin: 20px 0;
+        color: #2563eb;
+      }
+      .progress {
+        background: #e2e8f0;
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 16px 0;
+      }
+      .progress-bar {
+        background: #2563eb;
+        height: 100%;
+        transition: width 0.3s ease;
+      }
+      .data-point {
+        background: #f1f5f9;
+        padding: 8px 12px;
+        margin: 4px 0;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+      }
+      .complete {
+        background: #dcfce7;
+        border-left: 4px solid #16a34a;
+        padding: 16px;
+        border-radius: 4px;
+      }
+      .prompt-box {
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 16px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        max-height: 400px;
+        overflow-y: auto;
+        margin-top: 12px;
+      }
+      .copy-btn {
+        background: #16a34a;
+        margin-top: 8px;
+      }
+      .copy-btn:hover {
+        background: #15803d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>🚴 Power Curve Calibration Test</h1>
+      <p class="status">
+        Generate personalized virtual gearing curves based on your actual riding data
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Setup Instructions</h2>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px">
+        <div>
+          <label
+            style="
+              display: block;
+              font-size: 14px;
+              font-weight: 600;
+              margin-bottom: 4px;
+              color: #475569;
+            "
+          >
+            Your FTP (Watts)
+          </label>
+          <input
+            type="number"
+            id="ftp-input"
+            min="100"
+            max="500"
+            value="250"
+            style="
+              width: 100%;
+              padding: 8px;
+              border: 1px solid #cbd5e1;
+              border-radius: 6px;
+              font-size: 16px;
+            "
+          />
+          <p style="font-size: 12px; color: #64748b; margin-top: 4px">Functional Threshold Power</p>
+        </div>
+
+        <div>
+          <label
+            style="
+              display: block;
+              font-size: 14px;
+              font-weight: 600;
+              margin-bottom: 4px;
+              color: #475569;
+            "
+          >
+            Tire Size
+          </label>
+          <select
+            id="tire-select"
+            style="
+              width: 100%;
+              padding: 8px;
+              border: 1px solid #cbd5e1;
+              border-radius: 6px;
+              font-size: 16px;
+            "
+          >
+            <option value="2.096">700x23c (2.096m)</option>
+            <option value="2.105">700x25c (2.105m)</option>
+            <option value="2.136" selected>700x28c (2.136m)</option>
+            <option value="2.168">700x32c (2.168m)</option>
+            <option value="2.199">700x35c (2.199m)</option>
+          </select>
+          <p style="font-size: 12px; color: #64748b; margin-top: 4px">Wheel circumference</p>
+        </div>
+      </div>
+
+      <div
+        style="
+          background: #dbeafe;
+          border-left: 4px solid #2563eb;
+          padding: 12px;
+          margin-bottom: 16px;
+          border-radius: 4px;
+        "
+      >
+        <strong style="color: #1e40af">📊 Calibration Test Overview</strong>
+        <p style="margin: 4px 0 0 0; font-size: 14px; color: #1e3a8a">
+          <strong>During this test:</strong> You WILL physically shift through 8 gears (34/28 →
+          50/13). Each gear gets 10 seconds to shift/stabilize, then 10 seconds recording. Total
+          time: ~3 minutes.
+        </p>
+        <p style="margin: 4px 0 0 0; font-size: 14px; color: #1e3a8a">
+          <strong>During workouts:</strong> You'll stay locked in 34/17 and use virtual shifting
+          (keyboard arrows) based on this calibration data.
+        </p>
+      </div>
+
+      <ol>
+        <li>
+          <strong>Starting Gear:</strong> Begin in <strong>34/28</strong> (small ring, easiest cog)
+        </li>
+        <li>
+          <strong>Cadence:</strong> Pedal at your <em>natural, comfortable cadence</em> for each
+          gear:
+          <ul style="margin-top: 4px; font-size: 14px; color: #64748b">
+            <li>Easy gears (34/28, 34/23): expect higher cadence (90-110 RPM)</li>
+            <li>Mid gears (34/21, 50/21): optimal cadence (80-90 RPM)</li>
+            <li>Hard gears (50/17, 50/13): lower cadence (65-80 RPM)</li>
+          </ul>
+          <strong style="color: #dc2626">Don't force a fixed RPM!</strong> Let each gear find its
+          natural rhythm.
+        </li>
+        <li>
+          <strong>Test Flow:</strong> For each of 8 gears:
+          <ul style="margin-top: 4px; font-size: 14px; color: #64748b">
+            <li>Instruction screen tells you which gear to shift to</li>
+            <li>10 seconds to physically shift and stabilize cadence</li>
+            <li>10 seconds recording power/cadence data</li>
+            <li>Total: ~3 minutes for complete test</li>
+          </ul>
+        </li>
+      </ol>
+
+      <button id="connect-btn">Connect Trainer</button>
+      <button id="start-test-btn" disabled>Start Calibration Test</button>
+      <p class="status" id="connection-status">Not connected</p>
+    </div>
+
+    <div id="test-section" class="card" style="display: none">
+      <h2>Active Test</h2>
+
+      <div class="instruction" id="instruction">
+        <h3 id="instruction-title">Ready to begin</h3>
+        <p id="instruction-text">Click "Start Test" when ready</p>
+      </div>
+
+      <div class="timer" id="timer">--</div>
+
+      <div class="progress">
+        <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Power</div>
+          <div class="metric-value" id="power">—</div>
+          <div class="metric-unit">watts</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Cadence</div>
+          <div class="metric-value" id="cadence">—</div>
+          <div class="metric-unit">rpm</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Speed</div>
+          <div class="metric-value" id="speed">—</div>
+          <div class="metric-unit">kph</div>
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px">Collected Data:</h3>
+      <div id="data-log"></div>
+    </div>
+
+    <div id="results-section" class="card" style="display: none">
+      <div class="complete">
+        <h2 style="margin: 0 0 8px 0; color: #16a34a">✅ Calibration Complete!</h2>
+        <p>
+          Copy the prompt below and paste it into ChatGPT or Claude to generate your personalized
+          power curve.
+        </p>
+      </div>
+
+      <h3>AI Prompt (Copy Everything Below):</h3>
+      <div class="prompt-box" id="ai-prompt"></div>
+      <button class="copy-btn" id="copy-btn">📋 Copy Prompt to Clipboard</button>
+    </div>
+
+    <script type="module">
+      import '../js/ftms.js'
+
+      const GEARS_TO_TEST = [
+        {
+          index: 0,
+          gear: '34/28',
+          front: 34,
+          rear: 28,
+          ratio: 1.21,
+          cassPos: '1st (biggest)',
+          description: 'Small ring, 1st cog (biggest/easiest) - Recovery',
+        },
+        {
+          index: 2,
+          gear: '34/23',
+          front: 34,
+          rear: 23,
+          ratio: 1.48,
+          cassPos: '3rd',
+          description: 'Small ring, 3rd cog - Endurance',
+        },
+        {
+          index: 5,
+          gear: '34/17',
+          front: 34,
+          rear: 17,
+          ratio: 2.0,
+          cassPos: '6th (middle)',
+          description: 'Small ring, 6th cog (BASELINE straight chainline)',
+        },
+        {
+          index: 8,
+          gear: '34/13',
+          front: 34,
+          rear: 13,
+          ratio: 2.62,
+          cassPos: '9th',
+          description: 'Small ring, 9th cog - Sweet spot',
+        },
+        {
+          index: 12,
+          gear: '50/25',
+          front: 50,
+          rear: 25,
+          ratio: 2.0,
+          cassPos: '2nd',
+          description: 'BIG ring, 2nd cog - Easy tempo',
+        },
+        {
+          index: 14,
+          gear: '50/21',
+          front: 50,
+          rear: 21,
+          ratio: 2.38,
+          cassPos: '4th',
+          description: 'BIG ring, 4th cog - Threshold',
+        },
+        {
+          index: 16,
+          gear: '50/17',
+          front: 50,
+          rear: 17,
+          ratio: 2.94,
+          cassPos: '6th (middle)',
+          description: 'BIG ring, 6th cog - FTP gear',
+        },
+        {
+          index: 19,
+          gear: '50/13',
+          front: 50,
+          rear: 13,
+          ratio: 3.85,
+          cassPos: '9th',
+          description: 'BIG ring, 9th cog - Sprint',
+        },
+      ]
+
+      const TEST_DURATION_SEC = 10 // Recording phase
+      const WARMUP_DURATION_SEC = 10 // Time to shift and stabilize
+
+      let currentGearIndex = 0
+      let testData = []
+      let sampleBuffer = []
+      let testActive = false
+      let timerInterval = null
+      let remainingSeconds = 0
+
+      // DOM elements
+      const connectBtn = document.getElementById('connect-btn')
+      const startTestBtn = document.getElementById('start-test-btn')
+      const connectionStatus = document.getElementById('connection-status')
+      const testSection = document.getElementById('test-section')
+      const resultsSection = document.getElementById('results-section')
+      const instructionTitle = document.getElementById('instruction-title')
+      const instructionText = document.getElementById('instruction-text')
+      const timerDisplay = document.getElementById('timer')
+      const progressBar = document.getElementById('progress-bar')
+      const powerDisplay = document.getElementById('power')
+      const cadenceDisplay = document.getElementById('cadence')
+      const speedDisplay = document.getElementById('speed')
+      const dataLog = document.getElementById('data-log')
+      const aiPromptDiv = document.getElementById('ai-prompt')
+      const copyBtn = document.getElementById('copy-btn')
+
+      // Connect to trainer
+      connectBtn.addEventListener('click', async () => {
+        try {
+          connectionStatus.textContent = 'Connecting...'
+          await window.ftms.connect({ log: true })
+
+          connectionStatus.textContent = '✅ Connected! Setting trainer to 0% gradient...'
+
+          // Set SIM mode to 0% (flat road)
+          await window.ftms.setSim({ gradePct: 0, crr: 0.003, cwa: 0.45, windMps: 0 })
+
+          connectionStatus.textContent = '✅ Connected & Ready (0% gradient)'
+          connectBtn.disabled = true
+          startTestBtn.disabled = false
+
+          // Start listening to data
+          window.ftms.on('ibd', handleFtmsData)
+        } catch (err) {
+          connectionStatus.textContent = `❌ Error: ${err.message}`
+          console.error('Connection error:', err)
+        }
+      })
+
+      // Handle FTMS data stream
+      function handleFtmsData(data) {
+        if (!testActive) return
+
+        powerDisplay.textContent = data.powerW || '—'
+        cadenceDisplay.textContent = data.cadenceRpm ? Math.round(data.cadenceRpm) : '—'
+        speedDisplay.textContent = data.speedKph ? data.speedKph.toFixed(1) : '—'
+
+        // Collect samples during test period
+        if (data.powerW && data.cadenceRpm && data.speedKph) {
+          sampleBuffer.push({
+            power: data.powerW,
+            cadence: data.cadenceRpm,
+            speed: data.speedKph,
+          })
+        }
+      }
+
+      // Start test
+      startTestBtn.addEventListener('click', () => {
+        testSection.style.display = 'block'
+        startTestBtn.disabled = true
+        currentGearIndex = 0
+        testData = []
+        runNextGear()
+      })
+
+      async function runNextGear() {
+        if (currentGearIndex >= GEARS_TO_TEST.length) {
+          finishTest()
+          return
+        }
+
+        const gear = GEARS_TO_TEST[currentGearIndex]
+
+        // Instruction phase
+        instructionTitle.textContent = `Gear ${currentGearIndex + 1}/${GEARS_TO_TEST.length}: ${gear.gear} (${gear.cassPos} cog)`
+        instructionText.textContent = `🔧 SHIFT NOW: ${gear.description}. You have 10 seconds to shift and stabilize cadence...`
+
+        console.log(
+          `\n🔧 GEAR ${currentGearIndex + 1}/${GEARS_TO_TEST.length}: SHIFT TO ${gear.gear} (${gear.description})`
+        )
+
+        // Warmup countdown (10 seconds to shift and stabilize)
+        await runCountdown(WARMUP_DURATION_SEC, 'Shifting/Stabilizing')
+
+        // Test phase
+        instructionText.textContent = `Keep steady cadence! Recording data for ${TEST_DURATION_SEC} seconds...`
+        sampleBuffer = []
+        testActive = true
+
+        await runCountdown(TEST_DURATION_SEC, 'Recording')
+
+        testActive = false
+
+        // Calculate averages
+        if (sampleBuffer.length > 0) {
+          const avgPower = sampleBuffer.reduce((sum, s) => sum + s.power, 0) / sampleBuffer.length
+          const avgCadence =
+            sampleBuffer.reduce((sum, s) => sum + s.cadence, 0) / sampleBuffer.length
+          const avgSpeed = sampleBuffer.reduce((sum, s) => sum + s.speed, 0) / sampleBuffer.length
+
+          const dataPoint = {
+            gearIndex: gear.index,
+            gear: gear.gear,
+            front: gear.front,
+            rear: gear.rear,
+            ratio: gear.ratio,
+            avgPower: Math.round(avgPower),
+            avgCadence: Math.round(avgCadence),
+            avgSpeed: avgSpeed.toFixed(1),
+            samples: sampleBuffer.length,
+          }
+
+          testData.push(dataPoint)
+
+          // Display in UI
+          const dataDiv = document.createElement('div')
+          dataDiv.className = 'data-point'
+          dataDiv.textContent = `${gear.gear}: ${dataPoint.avgPower}W @ ${dataPoint.avgCadence} RPM, ${dataPoint.avgSpeed} kph (${dataPoint.samples} samples)`
+          dataLog.appendChild(dataDiv)
+
+          // Console log
+          console.log(
+            `✅ DATA: Power=${dataPoint.avgPower}W, Cadence=${dataPoint.avgCadence}rpm, Speed=${dataPoint.avgSpeed}kph`
+          )
+        } else {
+          console.warn('⚠️  No data collected for this gear!')
+        }
+
+        // Update progress
+        const progress = ((currentGearIndex + 1) / GEARS_TO_TEST.length) * 100
+        progressBar.style.width = `${progress}%`
+
+        currentGearIndex++
+
+        // 2 second rest between gears
+        instructionText.textContent = 'Rest for 2 seconds...'
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        runNextGear()
+      }
+
+      function runCountdown(seconds, phase) {
+        return new Promise((resolve) => {
+          remainingSeconds = seconds
+          timerDisplay.textContent = remainingSeconds
+
+          timerInterval = setInterval(() => {
+            remainingSeconds--
+            timerDisplay.textContent = remainingSeconds
+
+            if (remainingSeconds <= 0) {
+              clearInterval(timerInterval)
+              resolve()
+            }
+          }, 1000)
+        })
+      }
+
+      function finishTest() {
+        testSection.style.display = 'none'
+        resultsSection.style.display = 'block'
+
+        console.log('\n' + '='.repeat(80))
+        console.log('🎉 CALIBRATION TEST COMPLETE')
+        console.log('='.repeat(80))
+        console.log(JSON.stringify(testData, null, 2))
+
+        generateAIPrompt()
+      }
+
+      function generateAIPrompt() {
+        // Read values from inputs
+        const userFTP = document.getElementById('ftp-input').value
+        const tireCircumference = document.getElementById('tire-select').value
+        const tireLabel = document.getElementById('tire-select').selectedOptions[0].text
+
+        const prompt = `# Virtual Gearing Power Curve Calibration - FTMS Multiplier Generation
+
+I need you to analyze my power curve data and generate **two complete power curve models** with **FTMS gradient multipliers** for virtual shifting.
+
+## Critical Context: The Mechanical Floor Problem
+
+When using virtual shifting, your **physical gear sets the resistance floor**. If you're in 50/17 physically, the trainer can't go below ~100W no matter what software commands it receives.
+
+**Solution:** I'm physically in **34/17** (small ring, middle cassette) which gives me a mechanical floor of ~40-50W, allowing full range from recovery (45W) to sprint (440W+) gears.
+
+## My Setup
+- **Bike:** Shimano 105 2x11 drivetrain (50/34 front, 11-28 rear cassette)
+- **Tires:** ${tireLabel} (circumference: ${tireCircumference}m)
+- **Physical Baseline Gear:** 34/17 (straight chainline, NEVER shift during workouts)
+- **User FTP:** ${userFTP}W
+- **Test Conditions:** KICKR Core in SIM mode at 0% gradient, natural cadence per virtual gear
+
+## Collected Calibration Data (Real Measurements)
+${JSON.stringify(testData, null, 2)}
+
+## Complete Gear Table (Shimano 105 2x11)
+${JSON.stringify(
+  [
+    { index: 0, front: 34, rear: 28, ratio: 1.21 },
+    { index: 1, front: 34, rear: 25, ratio: 1.36 },
+    { index: 2, front: 34, rear: 23, ratio: 1.48 },
+    { index: 3, front: 34, rear: 21, ratio: 1.62 },
+    { index: 4, front: 34, rear: 19, ratio: 1.79 },
+    { index: 5, front: 34, rear: 17, ratio: 2.0 }, // PHYSICAL BASELINE
+    { index: 6, front: 34, rear: 15, ratio: 2.27 },
+    { index: 7, front: 34, rear: 14, ratio: 2.43 },
+    { index: 8, front: 34, rear: 13, ratio: 2.62 },
+    { index: 9, front: 34, rear: 12, ratio: 2.83 },
+    { index: 10, front: 34, rear: 11, ratio: 3.09 },
+    { index: 11, front: 50, rear: 28, ratio: 1.79 },
+    { index: 12, front: 50, rear: 25, ratio: 2.0 },
+    { index: 13, front: 50, rear: 23, ratio: 2.17 },
+    { index: 14, front: 50, rear: 21, ratio: 2.38 },
+    { index: 15, front: 50, rear: 19, ratio: 2.63 },
+    { index: 16, front: 50, rear: 17, ratio: 2.94 },
+    { index: 17, front: 50, rear: 15, ratio: 3.33 },
+    { index: 18, front: 50, rear: 14, ratio: 3.57 },
+    { index: 19, front: 50, rear: 13, ratio: 3.85 },
+    { index: 20, front: 50, rear: 12, ratio: 4.17 },
+    { index: 21, front: 50, rear: 11, ratio: 4.55 },
+  ],
+  null,
+  2
+)}
+
+## Task: Generate Two Complete Power Curve Models
+
+### Model 1: Pure FTP-Based Curve (Physics Model)
+
+**Anchoring Method (like Gemini's approach):**
+1. Anchor FTP (${userFTP}W) to the "bread and butter" gear: **50/17 @ 90 RPM**
+2. Use cubic power curve physics: P = k·v³ + C·v (KICKR Core resistance model)
+3. Calculate power for all 22 gears at their natural cadence for 30 kph speed
+4. Generate multiplier for each gear relative to **34/17 (index 5)** physical baseline
+
+**Key insight:** 50/17 is typically where riders hit FTP at 90 RPM on flat roads.
+
+### Model 2: Calibrated Curve (Real Data-Driven)
+
+1. Use my actual measured data points from the test above
+2. Fit a curve (polynomial or cubic spline) through the real measurements
+3. Interpolate missing gears using the fitted curve
+4. Generate multiplier for each gear relative to **34/17 (index 5)** physical baseline
+
+**Key insight:** This captures MY specific power-cadence relationship, which may differ from the theoretical model.
+
+## Required Output Format
+
+Return **JSON only** (no markdown, no explanations) in this exact structure:
+
+\`\`\`json
+{
+  "metadata": {
+    "userFTP": ${userFTP},
+    "physicalBaselineGear": "34/17",
+    "physicalBaselineIndex": 5,
+    "tireCircumference": ${tireCircumference},
+    "generatedAt": "ISO_TIMESTAMP"
+  },
+  "ftpBasedCurve": [
+    {
+      "gearIndex": 0,
+      "gear": "34/28",
+      "front": 34,
+      "rear": 28,
+      "ratio": 1.21,
+      "predictedCadence": 95,
+      "predictedPower": 45,
+      "multiplier": 0.36,
+      "effortZone": "Recovery"
+    }
+    // ... all 22 gears
+  ],
+  "calibratedCurve": [
+    {
+      "gearIndex": 0,
+      "gear": "34/28",
+      "front": 34,
+      "rear": 28,
+      "ratio": 1.21,
+      "measuredCadence": 92,
+      "measuredPower": 48,
+      "multiplier": 0.38,
+      "interpolated": false,
+      "effortZone": "Recovery"
+    }
+    // ... all 22 gears
+  ],
+  "comparison": {
+    "averageDifference": 8.5,
+    "maxDifference": 15.2,
+    "recommendation": "Use calibrated model - shows 8.5W average difference from FTP model"
+  }
+}
+\`\`\`
+
+## Multiplier Calculation
+
+**CRITICAL:** The multiplier is what FTMS uses to adjust gradient on-the-fly during virtual shifting.
+
+**Formula:** \`multiplier = gearPower / baselineGearPower\`
+
+Where **baseline = 34/17 (index 5)**
+
+**Example:**
+- If 34/17 baseline = 125W (multiplier 1.00)
+- And 34/28 easy gear = 45W
+- Then 34/28 multiplier = 45/125 = 0.36
+
+**Usage in FTMS:**
+When climbing 10% gradient in baseline gear (125W feel), shift to easy gear (34/28), FTMS applies 0.36x multiplier → 10% × 0.36 = 3.6% effective gradient (makes climb easier).
+
+## What I Need From You
+
+1. Generate the pure FTP-based curve using physics
+2. Generate the calibrated curve from my real data
+3. Return ONLY the JSON (no extra text)
+4. Include multipliers for all 22 gears
+5. Show which model is more accurate for my riding style
+
+I will paste this JSON directly into my \`ftms.js\` VirtualGear class.`
+
+        aiPromptDiv.textContent = prompt
+      }
+
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(aiPromptDiv.textContent)
+        copyBtn.textContent = '✅ Copied!'
+        setTimeout(() => {
+          copyBtn.textContent = '📋 Copy Prompt to Clipboard'
+        }, 2000)
+      })
+    </script>
+  </body>
+</html>

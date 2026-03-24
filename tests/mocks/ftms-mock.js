@@ -1,6 +1,4 @@
 // Mock FTMS client for testing
-import { vi } from 'vitest'
-
 export class MockFTMSClient {
   constructor() {
     this.connected = false
@@ -28,9 +26,9 @@ export class MockFTMSClient {
   }
 
   async setSim({ gradePct, crr = 0.004, cwa = 0.51, windMps = 0 }) {
-    this.callLog.push({ 
-      method: 'setSim', 
-      args: [{ gradePct, crr, cwa, windMps }] 
+    this.callLog.push({
+      method: 'setSim',
+      args: [{ gradePct, crr, cwa, windMps }],
     })
     return Promise.resolve()
   }
@@ -59,7 +57,7 @@ export class MockFTMSClient {
 
   emit(event, data) {
     const handlers = this.eventHandlers.get(event) || []
-    handlers.forEach(handler => handler(data))
+    handlers.forEach((handler) => handler(data))
   }
 
   // Test utilities
@@ -72,11 +70,11 @@ export class MockFTMSClient {
   }
 
   getLastCall(method) {
-    return this.callLog.filter(call => call.method === method).pop()
+    return this.callLog.filter((call) => call.method === method).pop()
   }
 
   getCallCount(method) {
-    return this.callLog.filter(call => call.method === method).length
+    return this.callLog.filter((call) => call.method === method).length
   }
 
   // Simulate trainer data
@@ -85,7 +83,7 @@ export class MockFTMSClient {
       powerW: data.power || 0,
       speedKph: data.speed || 0,
       cadenceRpm: data.cadence || 0,
-      raw: new ArrayBuffer(0)
+      raw: new ArrayBuffer(0),
     })
   }
 }

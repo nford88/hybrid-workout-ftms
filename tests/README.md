@@ -5,6 +5,7 @@ This directory contains comprehensive tests for the FTMS Hybrid Workout App, foc
 ## Setup
 
 Install dependencies:
+
 ```bash
 npm install
 ```
@@ -46,18 +47,21 @@ npm run test:watch
 ## Key Test Scenarios
 
 ### Route Processing
+
 - ✅ GPS coordinate processing and distance calculation
 - ✅ Elevation to gradient conversion
 - ✅ Distance-based gradient lookup
 - ✅ Edge cases (empty routes, single points, flat routes)
 
 ### SIM Mode Logic
+
 - ✅ Distance accumulation based on speed and time
 - ✅ Route completion detection at 8.35km (like your Leap Lane Hills)
 - ✅ Gradient smoothing and momentum simulation
 - ✅ Route distance vs total step distance tracking
 
 ### Step Transitions (Critical for Bug Prevention)
+
 - ✅ **SIM→ERG transitions with proper FTMS command sequencing**
 - ✅ **ERG power setting after SIM mode cleanup**
 - ✅ State reset between steps
@@ -70,15 +74,11 @@ The mock FTMS client records all commands, allowing us to verify:
 
 ```javascript
 // Check that ERG was set to 0 before SIM→ERG transition
-const ergZeroCall = ftmsLog.find(call => 
-  call.method === 'setErgWatts' && call.args[0] === 0
-)
+const ergZeroCall = ftmsLog.find((call) => call.method === 'setErgWatts' && call.args[0] === 0)
 expect(ergZeroCall).toBeDefined()
 
 // Verify final ERG power was set correctly
-const finalErgCall = ftmsLog.find(call => 
-  call.method === 'setErgWatts' && call.args[0] === 200
-)
+const finalErgCall = ftmsLog.find((call) => call.method === 'setErgWatts' && call.args[0] === 200)
 expect(finalErgCall).toBeDefined()
 ```
 
@@ -104,7 +104,7 @@ If tests fail, check:
 Run `npm run test:coverage` to see test coverage report. Key areas covered:
 
 - Route preprocessing: 100%
-- Distance tracking: 100% 
+- Distance tracking: 100%
 - Gradient calculations: 100%
 - Step transitions: 100%
 - Error handling: 95%

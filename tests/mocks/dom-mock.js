@@ -14,25 +14,29 @@ export function createMockDOM() {
     errorDiv: { classList: { add: vi.fn(), remove: vi.fn() } },
     errorText: { textContent: '' },
 
-    stepTypeSelect: { 
+    stepTypeSelect: {
       value: 'erg',
       addEventListener: vi.fn(),
-      querySelector: vi.fn().mockReturnValue({ disabled: false })
+      querySelector: vi.fn().mockReturnValue({ disabled: false }),
     },
     ergInputsDiv: { classList: { add: vi.fn(), remove: vi.fn() } },
     simInputsDiv: { classList: { add: vi.fn(), remove: vi.fn() } },
     ergDurationInput: { value: '' },
     ergPowerInput: { value: '' },
     addStepButton: { addEventListener: vi.fn() },
-    workoutListDiv: { innerHTML: '', appendChild: vi.fn(), querySelectorAll: vi.fn().mockReturnValue([]) },
+    workoutListDiv: {
+      innerHTML: '',
+      appendChild: vi.fn(),
+      querySelectorAll: vi.fn().mockReturnValue([]),
+    },
     clearWorkoutButton: { classList: { add: vi.fn(), remove: vi.fn() } },
     noStepsMessage: { classList: { add: vi.fn(), remove: vi.fn() } },
 
-    connectButton: { 
+    connectButton: {
       addEventListener: vi.fn(),
       disabled: false,
       textContent: 'Connect Trainer',
-      className: ''
+      className: '',
     },
     startWorkoutButton: { addEventListener: vi.fn() },
     skipStepButton: { addEventListener: vi.fn() },
@@ -48,7 +52,7 @@ export function createMockDOM() {
     workoutProgressText: { textContent: 'Ready to ride!' },
     progressBar: { style: { width: '0%' } },
     targetDisplay: { textContent: '' },
-    simSegmentSelect: { innerHTML: '' }
+    simSegmentSelect: { innerHTML: '' },
   }
 }
 
@@ -65,8 +69,8 @@ export function mockDocument() {
       innerHTML: '',
       appendChild: vi.fn(),
       addEventListener: vi.fn(),
-      dataset: {}
+      dataset: {},
     })),
-    addEventListener: vi.fn()
+    addEventListener: vi.fn(),
   }
 }

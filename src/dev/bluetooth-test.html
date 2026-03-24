@@ -1,194 +1,246 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Web Bluetooth Debug Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 p-8">
+  </head>
+  <body class="bg-gray-100 p-8">
     <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
-        <h1 class="text-2xl font-bold mb-6">Web Bluetooth API Debug Test</h1>
-        
-        <div class="space-y-4">
-            <div class="p-4 border rounded-lg">
-                <h2 class="font-bold text-lg mb-2">Environment Checks</h2>
-                <div id="environment-info" class="space-y-2 text-sm font-mono"></div>
-            </div>
-            
-            <div class="p-4 border rounded-lg">
-                <h2 class="font-bold text-lg mb-2">Web Bluetooth Test</h2>
-                <button id="test-bluetooth" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2">
-                    Test Basic API
-                </button>
-                <button id="test-device" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                    🚴 Find FTMS Trainers
-                </button>
-                <div id="bluetooth-result" class="mt-2 p-2 rounded"></div>
-            </div>
-            
-            <div class="p-4 border rounded-lg">
-                <h2 class="font-bold text-lg mb-2">HTTPS/Security Info</h2>
-                <div id="security-info" class="space-y-2 text-sm font-mono"></div>
-            </div>
-            
-            <div class="p-4 border rounded-lg bg-yellow-50">
-                <h2 class="font-bold text-lg mb-2">Solutions</h2>
-                <div class="text-sm space-y-2">
-                    <div><strong>If Web Bluetooth is not supported:</strong></div>
-                    <ul class="list-disc list-inside ml-4 space-y-1">
-                        <li>Use Chrome or Edge browser (not Firefox, Safari)</li>
-                        <li>Serve over HTTPS: <code class="bg-gray-200 px-1">python3 -m http.server 8080</code> then <code class="bg-gray-200 px-1">ngrok http 8080</code></li>
-                        <li>Or use Chrome with <code class="bg-gray-200 px-1">--enable-web-bluetooth</code> flag</li>
-                        <li>Enable Web Bluetooth in chrome://flags/#enable-web-bluetooth</li>
-                    </ul>
-                </div>
-            </div>
+      <h1 class="text-2xl font-bold mb-6">Web Bluetooth API Debug Test</h1>
+
+      <div class="space-y-4">
+        <div class="p-4 border rounded-lg">
+          <h2 class="font-bold text-lg mb-2">Environment Checks</h2>
+          <div id="environment-info" class="space-y-2 text-sm font-mono"></div>
         </div>
+
+        <div class="p-4 border rounded-lg">
+          <h2 class="font-bold text-lg mb-2">Web Bluetooth Test</h2>
+          <button
+            id="test-bluetooth"
+            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
+          >
+            Test Basic API
+          </button>
+          <button
+            id="test-device"
+            class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            🚴 Find FTMS Trainers
+          </button>
+          <div id="bluetooth-result" class="mt-2 p-2 rounded"></div>
+        </div>
+
+        <div class="p-4 border rounded-lg">
+          <h2 class="font-bold text-lg mb-2">HTTPS/Security Info</h2>
+          <div id="security-info" class="space-y-2 text-sm font-mono"></div>
+        </div>
+
+        <div class="p-4 border rounded-lg bg-yellow-50">
+          <h2 class="font-bold text-lg mb-2">Solutions</h2>
+          <div class="text-sm space-y-2">
+            <div><strong>If Web Bluetooth is not supported:</strong></div>
+            <ul class="list-disc list-inside ml-4 space-y-1">
+              <li>Use Chrome or Edge browser (not Firefox, Safari)</li>
+              <li>
+                Serve over HTTPS:
+                <code class="bg-gray-200 px-1">python3 -m http.server 8080</code> then
+                <code class="bg-gray-200 px-1">ngrok http 8080</code>
+              </li>
+              <li>
+                Or use Chrome with <code class="bg-gray-200 px-1">--enable-web-bluetooth</code> flag
+              </li>
+              <li>Enable Web Bluetooth in chrome://flags/#enable-web-bluetooth</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
-        function updateEnvironmentInfo() {
-            const info = document.getElementById('environment-info');
-            const checks = [
-                { label: 'Browser', value: navigator.userAgent },
-                { label: 'Protocol', value: window.location.protocol },
-                { label: 'Host', value: window.location.host },
-                { label: 'URL', value: window.location.href },
-                { label: 'navigator.bluetooth', value: !!navigator.bluetooth ? '✅ Available' : '❌ Not available' },
-                { label: 'HTTPS', value: window.location.protocol === 'https:' ? '✅ Yes' : '❌ No (required for Web Bluetooth)' },
-                { label: 'localhost', value: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '✅ Yes' : '❌ No' }
-            ];
-            
-            info.innerHTML = checks.map(check => 
-                `<div><span class="font-bold">${check.label}:</span> ${check.value}</div>`
-            ).join('');
-        }
-        
-        function updateSecurityInfo() {
-            const info = document.getElementById('security-info');
-            const securityState = document.visibilityState;
-            const isSecureContext = window.isSecureContext;
-            
-            const securityChecks = [
-                { label: 'Secure Context', value: isSecureContext ? '✅ Yes' : '❌ No' },
-                { label: 'HTTPS/localhost', value: (window.location.protocol === 'https:' || window.location.hostname === 'localhost') ? '✅ Yes' : '❌ No' },
-                { label: 'Cross-origin isolated', value: window.crossOriginIsolated ? '✅ Yes' : '❌ No (not required)' }
-            ];
-            
-            info.innerHTML = securityChecks.map(check => 
-                `<div><span class="font-bold">${check.label}:</span> ${check.value}</div>`
-            ).join('');
-        }
-        
-        async function testBluetoothBasic() {
-            const resultDiv = document.getElementById('bluetooth-result');
-            const button = document.getElementById('test-bluetooth');
-            
-            button.disabled = true;
-            button.textContent = 'Testing...';
-            resultDiv.innerHTML = '';
-            
-            try {
-                if (!navigator.bluetooth) {
-                    throw new Error('navigator.bluetooth is not available');
-                }
-                
-                console.log('Web Bluetooth API is available');
-                resultDiv.innerHTML = '<div class="text-green-700 bg-green-100 p-2 rounded">✅ Web Bluetooth API is available!</div>';
-                
-                // Try to get availability (this doesn't require user gesture)
-                const available = await navigator.bluetooth.getAvailability();
-                console.log('Bluetooth adapter available:', available);
-                
-                if (available) {
-                    resultDiv.innerHTML += '<div class="text-green-700 bg-green-100 p-2 rounded mt-2">✅ Bluetooth adapter is available!</div>';
-                    resultDiv.innerHTML += '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">✅ Basic Web Bluetooth test passed! You can now try "Test Device Request" to test device pairing.</div>';
-                } else {
-                    resultDiv.innerHTML += '<div class="text-yellow-700 bg-yellow-100 p-2 rounded mt-2">⚠️ Bluetooth adapter not available (enable Bluetooth in system settings)</div>';
-                }
-                
-            } catch (error) {
-                console.error('Bluetooth basic test failed:', error);
-                resultDiv.innerHTML = `<div class="text-red-700 bg-red-100 p-2 rounded">❌ Error: ${error.message}</div>`;
-                
-                // Provide specific solutions
-                if (error.message.includes('not available')) {
-                    resultDiv.innerHTML += `
+      function updateEnvironmentInfo() {
+        const info = document.getElementById('environment-info')
+        const checks = [
+          { label: 'Browser', value: navigator.userAgent },
+          { label: 'Protocol', value: window.location.protocol },
+          { label: 'Host', value: window.location.host },
+          { label: 'URL', value: window.location.href },
+          {
+            label: 'navigator.bluetooth',
+            value: !!navigator.bluetooth ? '✅ Available' : '❌ Not available',
+          },
+          {
+            label: 'HTTPS',
+            value:
+              window.location.protocol === 'https:'
+                ? '✅ Yes'
+                : '❌ No (required for Web Bluetooth)',
+          },
+          {
+            label: 'localhost',
+            value:
+              window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? '✅ Yes'
+                : '❌ No',
+          },
+        ]
+
+        info.innerHTML = checks
+          .map(
+            (check) => `<div><span class="font-bold">${check.label}:</span> ${check.value}</div>`
+          )
+          .join('')
+      }
+
+      function updateSecurityInfo() {
+        const info = document.getElementById('security-info')
+        const securityState = document.visibilityState
+        const isSecureContext = window.isSecureContext
+
+        const securityChecks = [
+          { label: 'Secure Context', value: isSecureContext ? '✅ Yes' : '❌ No' },
+          {
+            label: 'HTTPS/localhost',
+            value:
+              window.location.protocol === 'https:' || window.location.hostname === 'localhost'
+                ? '✅ Yes'
+                : '❌ No',
+          },
+          {
+            label: 'Cross-origin isolated',
+            value: window.crossOriginIsolated ? '✅ Yes' : '❌ No (not required)',
+          },
+        ]
+
+        info.innerHTML = securityChecks
+          .map(
+            (check) => `<div><span class="font-bold">${check.label}:</span> ${check.value}</div>`
+          )
+          .join('')
+      }
+
+      async function testBluetoothBasic() {
+        const resultDiv = document.getElementById('bluetooth-result')
+        const button = document.getElementById('test-bluetooth')
+
+        button.disabled = true
+        button.textContent = 'Testing...'
+        resultDiv.innerHTML = ''
+
+        try {
+          if (!navigator.bluetooth) {
+            throw new Error('navigator.bluetooth is not available')
+          }
+
+          console.log('Web Bluetooth API is available')
+          resultDiv.innerHTML =
+            '<div class="text-green-700 bg-green-100 p-2 rounded">✅ Web Bluetooth API is available!</div>'
+
+          // Try to get availability (this doesn't require user gesture)
+          const available = await navigator.bluetooth.getAvailability()
+          console.log('Bluetooth adapter available:', available)
+
+          if (available) {
+            resultDiv.innerHTML +=
+              '<div class="text-green-700 bg-green-100 p-2 rounded mt-2">✅ Bluetooth adapter is available!</div>'
+            resultDiv.innerHTML +=
+              '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">✅ Basic Web Bluetooth test passed! You can now try "Test Device Request" to test device pairing.</div>'
+          } else {
+            resultDiv.innerHTML +=
+              '<div class="text-yellow-700 bg-yellow-100 p-2 rounded mt-2">⚠️ Bluetooth adapter not available (enable Bluetooth in system settings)</div>'
+          }
+        } catch (error) {
+          console.error('Bluetooth basic test failed:', error)
+          resultDiv.innerHTML = `<div class="text-red-700 bg-red-100 p-2 rounded">❌ Error: ${error.message}</div>`
+
+          // Provide specific solutions
+          if (error.message.includes('not available')) {
+            resultDiv.innerHTML += `
                         <div class="text-red-700 bg-red-100 p-2 rounded mt-2">
                             <strong>Solutions:</strong><br>
                             • Use Chrome or Edge browser<br>
                             • Serve over HTTPS or localhost<br>
                             • Enable Web Bluetooth in chrome://flags/<br>
                             • Check if Bluetooth is enabled on your device
-                        </div>`;
-                }
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Test Basic API';
-            }
+                        </div>`
+          }
+        } finally {
+          button.disabled = false
+          button.textContent = 'Test Basic API'
         }
+      }
 
-        async function testDeviceRequest() {
-            const resultDiv = document.getElementById('bluetooth-result');
-            const button = document.getElementById('test-device');
-            
-            button.disabled = true;
-            button.textContent = 'Testing...';
-            
-            try {
-                if (!navigator.bluetooth) {
-                    throw new Error('navigator.bluetooth is not available');
-                }
+      async function testDeviceRequest() {
+        const resultDiv = document.getElementById('bluetooth-result')
+        const button = document.getElementById('test-device')
 
-                resultDiv.innerHTML += '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">🔍 Searching for FTMS devices (fitness trainers)...</div>';
-                
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{
-                        services: ['00001826-0000-1000-8000-00805f9b34fb'] // FTMS service UUID
-                    }],
-                    optionalServices: [
-                        '00001826-0000-1000-8000-00805f9b34fb', // FTMS
-                        '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
-                        '00001800-0000-1000-8000-00805f9b34fb'  // Generic Access
-                    ]
-                });
-                
-                resultDiv.innerHTML += '<div class="text-green-700 bg-green-100 p-2 rounded mt-2">✅ FTMS device found and selected! Web Bluetooth is fully working.</div>';
-                resultDiv.innerHTML += `<div class="text-green-700 bg-green-100 p-2 rounded mt-2">� Trainer: ${device.name || 'Unknown FTMS device'}</div>`;
-                resultDiv.innerHTML += '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">💡 Your trainer is compatible with this app!</div>';
-                
-            } catch (error) {
-                console.error('Device request failed:', error);
-                
-                if (error.name === 'NotFoundError') {
-                    resultDiv.innerHTML += '<div class="text-yellow-700 bg-yellow-100 p-2 rounded mt-2">⚠️ No FTMS devices found</div>';
-                    resultDiv.innerHTML += '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">💡 Make sure your trainer is:<br>• Powered on<br>• In pairing mode<br>• FTMS-compatible (Zwift/TrainerRoad supported)</div>';
-                } else if (error.name === 'NotAllowedError') {
-                    resultDiv.innerHTML += '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">ℹ️ User cancelled device selection - this is normal for testing</div>';
-                } else {
-                    resultDiv.innerHTML += `<div class="text-red-700 bg-red-100 p-2 rounded mt-2">❌ Device request error: ${error.message}</div>`;
-                }
-            } finally {
-                button.disabled = false;
-                button.textContent = '🚴 Find FTMS Trainers';
-            }
+        button.disabled = true
+        button.textContent = 'Testing...'
+
+        try {
+          if (!navigator.bluetooth) {
+            throw new Error('navigator.bluetooth is not available')
+          }
+
+          resultDiv.innerHTML +=
+            '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">🔍 Searching for FTMS devices (fitness trainers)...</div>'
+
+          const device = await navigator.bluetooth.requestDevice({
+            filters: [
+              {
+                services: ['00001826-0000-1000-8000-00805f9b34fb'], // FTMS service UUID
+              },
+            ],
+            optionalServices: [
+              '00001826-0000-1000-8000-00805f9b34fb', // FTMS
+              '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
+              '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+            ],
+          })
+
+          resultDiv.innerHTML +=
+            '<div class="text-green-700 bg-green-100 p-2 rounded mt-2">✅ FTMS device found and selected! Web Bluetooth is fully working.</div>'
+          resultDiv.innerHTML += `<div class="text-green-700 bg-green-100 p-2 rounded mt-2">� Trainer: ${device.name || 'Unknown FTMS device'}</div>`
+          resultDiv.innerHTML +=
+            '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">💡 Your trainer is compatible with this app!</div>'
+        } catch (error) {
+          console.error('Device request failed:', error)
+
+          if (error.name === 'NotFoundError') {
+            resultDiv.innerHTML +=
+              '<div class="text-yellow-700 bg-yellow-100 p-2 rounded mt-2">⚠️ No FTMS devices found</div>'
+            resultDiv.innerHTML +=
+              '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">💡 Make sure your trainer is:<br>• Powered on<br>• In pairing mode<br>• FTMS-compatible (Zwift/TrainerRoad supported)</div>'
+          } else if (error.name === 'NotAllowedError') {
+            resultDiv.innerHTML +=
+              '<div class="text-blue-700 bg-blue-100 p-2 rounded mt-2">ℹ️ User cancelled device selection - this is normal for testing</div>'
+          } else {
+            resultDiv.innerHTML += `<div class="text-red-700 bg-red-100 p-2 rounded mt-2">❌ Device request error: ${error.message}</div>`
+          }
+        } finally {
+          button.disabled = false
+          button.textContent = '🚴 Find FTMS Trainers'
         }
-        
-        document.getElementById('test-bluetooth').addEventListener('click', testBluetoothBasic);
-        document.getElementById('test-device').addEventListener('click', testDeviceRequest);
-        
-        // Initialize on page load
-        updateEnvironmentInfo();
-        updateSecurityInfo();
-        
-        // Just check if Web Bluetooth is available (don't auto-run any tests that require user gesture)
-        if (navigator.bluetooth) {
-            console.log('🎉 Web Bluetooth API detected! Click buttons to test.');
-            document.getElementById('bluetooth-result').innerHTML = '<div class="text-blue-700 bg-blue-100 p-2 rounded">✅ Web Bluetooth API is available! Click "Test Basic API" to start testing.</div>';
-        } else {
-            document.getElementById('bluetooth-result').innerHTML = '<div class="text-red-700 bg-red-100 p-2 rounded">❌ Web Bluetooth API is not available in this browser/environment.</div>';
-        }
+      }
+
+      document.getElementById('test-bluetooth').addEventListener('click', testBluetoothBasic)
+      document.getElementById('test-device').addEventListener('click', testDeviceRequest)
+
+      // Initialize on page load
+      updateEnvironmentInfo()
+      updateSecurityInfo()
+
+      // Just check if Web Bluetooth is available (don't auto-run any tests that require user gesture)
+      if (navigator.bluetooth) {
+        console.log('🎉 Web Bluetooth API detected! Click buttons to test.')
+        document.getElementById('bluetooth-result').innerHTML =
+          '<div class="text-blue-700 bg-blue-100 p-2 rounded">✅ Web Bluetooth API is available! Click "Test Basic API" to start testing.</div>'
+      } else {
+        document.getElementById('bluetooth-result').innerHTML =
+          '<div class="text-red-700 bg-red-100 p-2 rounded">❌ Web Bluetooth API is not available in this browser/environment.</div>'
+      }
     </script>
-</body>
+  </body>
 </html>

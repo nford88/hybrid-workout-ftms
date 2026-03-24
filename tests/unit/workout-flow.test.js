@@ -1,7 +1,8 @@
 // Tests for workout state management and flow
-import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { describe, test, expect, beforeEach } from 'vitest'
 import { createTestEnvironment } from '../test-utils.js'
 import { createMockTimer, setupTimerMocks } from '../mocks/timer-mock.js'
+import { buildStepSummary } from '../../src/services/workoutService'
 
 describe('Workout Flow Management', () => {
   let testEnv, mockTimer
@@ -13,7 +14,7 @@ describe('Workout Flow Management', () => {
     testEnv.resetState()
   })
 
-  // Extract workout functions for testing
+  // Helper: builds a step summary and pushes it to W.stepSummary (mirrors main.js recordStepSummary)
   function recordStepSummary() {
     const S = global.Hybrid.state
     const W = S.workout
@@ -21,36 +22,18 @@ describe('Workout Flow Management', () => {
 
     if (W.currentStepIndex >= plan.length) return null
 
-    const currentStep = plan[W.currentStepIndex]
-    const stepEndTime = mockTimer.getCurrentTime()
-    const stepDurationSec = (stepEndTime - W.stepStartTime) / 1000
-    const stepDistanceMeters = currentStep.type === 'sim' ? 
-      (W.stepSimDistance || 0) : 
-      calculateErgStepDistance()
-    
-    const validatedDistance = Math.max(0, stepDistanceMeters)
-
-    const summary = {
-      stepNumber: W.currentStepIndex + 1,
-      type: currentStep.type,
-      plannedDuration: currentStep.duration ? currentStep.duration * 60 : null,
-      actualDuration: stepDurationSec,
-      distance: validatedDistance,
-      averageSpeed: validatedDistance > 0 ? (validatedDistance / stepDurationSec) * 3.6 : 0,
-      target: currentStep.type === 'erg' ? `${currentStep.power}W` : 'Route Grade',
-      segmentName: currentStep.segmentName || null,
-      routeDistance: currentStep.type === 'sim' ? (W.simDistanceTraveled || 0) : null,
-      routeCompleted: currentStep.type === 'sim' ? (W.routeCompleted || false) : null
-    }
+    const step = plan[W.currentStepIndex]
+    const speedKph = parseFloat(testEnv.mockDOM.speedDisplay.textContent) || 0
+    const summary = buildStepSummary(
+      step,
+      W.currentStepIndex,
+      W,
+      speedKph,
+      mockTimer.getCurrentTime()
+    )
 
     W.stepSummary.push(summary)
     return summary
-  }
-
-  function calculateErgStepDistance() {
-    const stepDurationSec = (mockTimer.getCurrentTime() - global.Hybrid.state.workout.stepStartTime) / 1000
-    const currentSpeedKph = parseFloat(testEnv.mockDOM.speedDisplay.textContent) || 0
-    return (currentSpeedKph / 3.6) * stepDurationSec
   }
 
   function initializeWorkout() {
@@ -67,10 +50,10 @@ describe('Workout Flow Management', () => {
     W.routeCompleted = false
   }
 
-  function initializeStep(stepType, options = {}) {
+  function initializeStep(stepType, _options = {}) {
     const W = global.Hybrid.state.workout
     W.stepStartTime = mockTimer.getCurrentTime()
-    
+
     if (stepType === 'sim') {
       W.stepSimDistance = 0
       W.simDistanceTraveled = 0
@@ -86,19 +69,17 @@ describe('Workout Flow Management', () => {
 
   describe('Step Summary Recording', () => {
     test('records ERG step summary correctly', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'erg', duration: 5, power: 200 }
-      ]
-      
+      global.Hybrid.state.workoutPlan = [{ type: 'erg', duration: 5, power: 200 }]
+
       initializeWorkout()
       initializeStep('erg')
-      
+
       // Simulate ERG step for 2 minutes at 30 kph
       testEnv.mockDOM.speedDisplay.textContent = '30'
       mockTimer.advanceTime(120000) // 2 minutes
-      
+
       const summary = recordStepSummary()
-      
+
       expect(summary.stepNumber).toBe(1)
       expect(summary.type).toBe('erg')
       expect(summary.plannedDuration).toBe(300) // 5 minutes in seconds
@@ -106,33 +87,31 @@ describe('Workout Flow Management', () => {
       expect(summary.target).toBe('200W')
       expect(summary.routeDistance).toBeNull() // ERG steps don't have route distance
       expect(summary.routeCompleted).toBeNull()
-      
+
       expect(summary.distance).toBeCloseTo(1000, 0) // 30kph for 2min = 1km
       expect(summary.averageSpeed).toBeCloseTo(30, 1)
     })
 
     test('records SIM step summary correctly', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'sim', segmentName: 'Test Route' }
-      ]
-      
+      global.Hybrid.state.workoutPlan = [{ type: 'sim', segmentName: 'Test Route' }]
+
       global.Hybrid.state.garminRoute = {
         name: 'Test Route',
-        totalDistance: 5000
+        totalDistance: 5000,
       }
-      
+
       initializeWorkout()
       initializeStep('sim')
-      
+
       // Simulate SIM step
       global.Hybrid.state.workout.stepSimDistance = 6000 // Total distance
       global.Hybrid.state.workout.simDistanceTraveled = 5000 // Route distance (completed)
       global.Hybrid.state.workout.routeCompleted = true
-      
+
       mockTimer.advanceTime(900000) // 15 minutes
-      
+
       const summary = recordStepSummary()
-      
+
       expect(summary.stepNumber).toBe(1)
       expect(summary.type).toBe('sim')
       expect(summary.plannedDuration).toBeNull() // SIM steps don't have planned duration
@@ -142,7 +121,7 @@ describe('Workout Flow Management', () => {
       expect(summary.segmentName).toBe('Test Route')
       expect(summary.routeDistance).toBe(5000) // Route distance
       expect(summary.routeCompleted).toBe(true)
-      
+
       expect(summary.averageSpeed).toBeCloseTo(24, 1) // 6km in 15min = 24kph
     })
 
@@ -150,17 +129,17 @@ describe('Workout Flow Management', () => {
       global.Hybrid.state.workoutPlan = [
         { type: 'erg', duration: 5, power: 150 },
         { type: 'sim', segmentName: 'Test Route' },
-        { type: 'erg', duration: 3, power: 250 }
+        { type: 'erg', duration: 3, power: 250 },
       ]
-      
+
       initializeWorkout()
-      
+
       // Step 1: ERG
       initializeStep('erg')
       testEnv.mockDOM.speedDisplay.textContent = '25'
       mockTimer.advanceTime(300000) // 5 minutes
       const summary1 = recordStepSummary()
-      
+
       // Step 2: SIM
       global.Hybrid.state.workout.currentStepIndex = 1
       initializeStep('sim')
@@ -168,38 +147,36 @@ describe('Workout Flow Management', () => {
       global.Hybrid.state.workout.simDistanceTraveled = 3000
       mockTimer.advanceTime(600000) // 10 minutes
       const summary2 = recordStepSummary()
-      
+
       // Step 3: ERG
       global.Hybrid.state.workout.currentStepIndex = 2
       initializeStep('erg')
       testEnv.mockDOM.speedDisplay.textContent = '28'
       mockTimer.advanceTime(180000) // 3 minutes
       const summary3 = recordStepSummary()
-      
+
       expect(global.Hybrid.state.workout.stepSummary).toHaveLength(3)
       expect(summary1.stepNumber).toBe(1)
       expect(summary2.stepNumber).toBe(2)
       expect(summary3.stepNumber).toBe(3)
-      
+
       expect(summary1.type).toBe('erg')
       expect(summary2.type).toBe('sim')
       expect(summary3.type).toBe('erg')
     })
 
     test('prevents negative distances', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'sim', segmentName: 'Test Route' }
-      ]
-      
+      global.Hybrid.state.workoutPlan = [{ type: 'sim', segmentName: 'Test Route' }]
+
       initializeWorkout()
       initializeStep('sim')
-      
+
       // Set negative distance (shouldn't happen but test safety)
       global.Hybrid.state.workout.stepSimDistance = -100
       mockTimer.advanceTime(60000)
-      
+
       const summary = recordStepSummary()
-      
+
       expect(summary.distance).toBe(0) // Should be corrected to 0
       expect(summary.averageSpeed).toBe(0)
     })
@@ -207,10 +184,8 @@ describe('Workout Flow Management', () => {
 
   describe('Workout State Management', () => {
     test('initializes workout state correctly', () => {
-      const stateBefore = { ...global.Hybrid.state.workout }
-      
       initializeWorkout()
-      
+
       expect(global.Hybrid.state.workout.isRunning).toBe(true)
       expect(global.Hybrid.state.workout.currentStepIndex).toBe(0)
       expect(global.Hybrid.state.workout.workoutStartTime).toBeGreaterThan(0)
@@ -224,9 +199,9 @@ describe('Workout Flow Management', () => {
       global.Hybrid.state.workout.simDistanceTraveled = 800
       global.Hybrid.state.workout.routeCompleted = true
       global.Hybrid.state.workout.currentGrade = 5
-      
+
       initializeStep('sim')
-      
+
       expect(global.Hybrid.state.workout.stepSimDistance).toBe(0)
       expect(global.Hybrid.state.workout.simDistanceTraveled).toBe(0)
       expect(global.Hybrid.state.workout.routeCompleted).toBe(false)
@@ -236,9 +211,9 @@ describe('Workout Flow Management', () => {
     test('step initialization does not affect ERG mode unnecessarily', () => {
       // SIM-specific state should not interfere with ERG
       global.Hybrid.state.workout.someErgState = 'preserved'
-      
+
       initializeStep('erg')
-      
+
       expect(global.Hybrid.state.workout.someErgState).toBe('preserved')
       expect(global.Hybrid.state.workout.stepStartTime).toBeGreaterThan(0)
     })
@@ -246,41 +221,36 @@ describe('Workout Flow Management', () => {
 
   describe('Workout Timing', () => {
     test('tracks step duration accurately', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'erg', duration: 1, power: 100 }
-      ]
-      
+      global.Hybrid.state.workoutPlan = [{ type: 'erg', duration: 1, power: 100 }]
+
       initializeWorkout()
       initializeStep('erg')
-      
-      const startTime = mockTimer.getCurrentTime()
+
       mockTimer.advanceTime(45000) // 45 seconds
-      
+
       const summary = recordStepSummary()
-      
+
       expect(summary.actualDuration).toBe(45)
       expect(summary.plannedDuration).toBe(60) // 1 minute
     })
 
     test('handles multiple timing scenarios', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'erg', duration: 2, power: 100 }
-      ]
-      
+      global.Hybrid.state.workoutPlan = [{ type: 'erg', duration: 2, power: 100 }]
+
       initializeWorkout()
-      
+
       // Short step
       initializeStep('erg')
       mockTimer.advanceTime(30000) // 30 seconds
       const shortSummary = recordStepSummary()
-      
+
       // Long step (reset for new step)
       global.Hybrid.state.workout.currentStepIndex = 0
       global.Hybrid.state.workout.stepSummary = []
       initializeStep('erg')
       mockTimer.advanceTime(180000) // 3 minutes
       const longSummary = recordStepSummary()
-      
+
       expect(shortSummary.actualDuration).toBe(30)
       expect(longSummary.actualDuration).toBe(180)
     })
@@ -290,35 +260,31 @@ describe('Workout Flow Management', () => {
     test('handles empty workout plan', () => {
       global.Hybrid.state.workoutPlan = []
       global.Hybrid.state.workout.currentStepIndex = 0
-      
+
       const summary = recordStepSummary()
-      
+
       expect(summary).toBeNull()
       expect(global.Hybrid.state.workout.stepSummary).toEqual([])
     })
 
     test('handles step index beyond plan length', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'erg', duration: 1, power: 100 }
-      ]
+      global.Hybrid.state.workoutPlan = [{ type: 'erg', duration: 1, power: 100 }]
       global.Hybrid.state.workout.currentStepIndex = 5 // Beyond plan
-      
+
       const summary = recordStepSummary()
-      
+
       expect(summary).toBeNull()
     })
 
     test('handles zero duration steps', () => {
-      global.Hybrid.state.workoutPlan = [
-        { type: 'erg', duration: 1, power: 100 }
-      ]
-      
+      global.Hybrid.state.workoutPlan = [{ type: 'erg', duration: 1, power: 100 }]
+
       initializeWorkout()
       initializeStep('erg')
-      
+
       // Record immediately (0 duration)
       const summary = recordStepSummary()
-      
+
       expect(summary.actualDuration).toBe(0)
       expect(summary.distance).toBe(0)
       expect(summary.averageSpeed).toBe(0)

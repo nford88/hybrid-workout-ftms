@@ -1,135 +1,130 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-/* Custom component classes for the FTMS app */
+/* ── Design tokens (Tailwind v4 @theme) ────────────────────────── */
+@theme {
+  --color-app: #0d0f18;
+  --color-surface: #161929;
+  --color-surface-elevated: #1e2235;
+  --color-border: #2a2f47;
+}
+
+/* ── Component classes ──────────────────────────────────────────── */
 @layer components {
-  /* Metric card - compact version for 5-in-a-row layout */
+  /* Metric card — compact 5-in-a-row */
   .metric-card-compact {
-    @apply bg-white rounded-lg sm:rounded-xl shadow-md p-1.5 sm:p-3 md:p-6 text-center;
+    @apply bg-surface rounded-xl border border-border p-2 sm:p-3 md:p-5 text-center;
   }
-  
   .metric-card-compact h3 {
-    @apply text-[10px] sm:text-xs md:text-lg font-semibold text-gray-800 mb-0.5 sm:mb-1 md:mb-2 truncate;
+    @apply text-[9px] sm:text-xs font-semibold text-gray-500 mb-0.5 sm:mb-1 uppercase tracking-wider truncate;
   }
-  
   .metric-value {
-    @apply text-base sm:text-xl md:text-3xl font-bold leading-tight;
+    @apply text-lg sm:text-2xl md:text-3xl font-bold leading-tight tabular-nums;
   }
-  
   .metric-unit {
-    @apply text-[8px] sm:text-xs md:text-sm text-gray-500;
-  }
-  
-  /* Standard metric card - for larger layouts */
-  .metric-card {
-    @apply bg-white rounded-xl shadow-md p-4 sm:p-6 text-center;
-  }
-  
-  .metric-card h3 {
-    @apply text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2;
+    @apply text-[8px] sm:text-xs text-gray-600 mt-0.5;
   }
 
-  /* Section card - used for main content sections */
+  /* Section card */
   .section-card {
-    @apply bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6 sm:mb-8;
+    @apply bg-surface rounded-xl border border-border p-4 sm:p-6 mb-4 sm:mb-6;
   }
-  
   .section-title {
-    @apply text-xl sm:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4;
+    @apply text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4;
   }
 
-  /* Button base styles (shared) */
+  /* Buttons */
   .btn-connect {
-    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-purple-600 hover:bg-purple-700;
+    @apply px-4 sm:px-5 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-violet-600 hover:bg-violet-500 border border-violet-500;
   }
-  
   .btn-start {
-    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-orange-600 hover:bg-orange-700;
+    @apply px-4 sm:px-5 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-orange-600 hover:bg-orange-500 border border-orange-500;
   }
-  
   .btn-skip {
-    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-gray-600 hover:bg-gray-700;
+    @apply px-4 sm:px-5 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-gray-700 hover:bg-gray-600 border border-gray-600;
   }
-  
   .btn-debug {
-    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-yellow-600 hover:bg-yellow-700;
+    @apply px-4 sm:px-5 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-yellow-700 hover:bg-yellow-600 border border-yellow-600;
   }
-  
   .btn-import {
-    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-blue-600 hover:bg-blue-700;
+    @apply px-4 sm:px-5 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-cyan-700 hover:bg-cyan-600 border border-cyan-600;
   }
-  
   .btn-add {
-    @apply px-4 sm:px-6 py-2 rounded-lg text-white font-medium transition-colors text-sm sm:text-base bg-green-600 hover:bg-green-700;
+    @apply px-4 sm:px-5 py-2 rounded-lg text-white font-medium transition-colors text-sm bg-emerald-700 hover:bg-emerald-600 border border-emerald-600;
   }
-  
   .btn-danger {
-    @apply px-3 sm:px-4 py-1 rounded-sm text-white text-xs sm:text-sm bg-red-600 hover:bg-red-700 transition-colors;
+    @apply px-3 py-1.5 rounded-lg text-white text-xs font-medium bg-red-800 hover:bg-red-700 transition-colors border border-red-700;
   }
 
-  /* Form inputs */
+  /* Form controls */
   .form-input {
-    @apply w-full p-2 sm:p-3 border border-gray-300 rounded-lg text-sm sm:text-base;
+    @apply w-full px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-white placeholder-gray-600
+           focus:outline-none focus:border-cyan-600 transition-colors;
   }
-  
   .form-select {
-    @apply w-full p-2 sm:p-3 border border-gray-300 rounded-lg text-sm sm:text-base;
+    @apply w-full px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-white
+           focus:outline-none focus:border-cyan-600 transition-colors;
   }
-  
   .form-textarea {
-    @apply w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 rounded-lg resize-none font-mono text-xs sm:text-sm;
+    @apply w-full h-32 sm:h-40 px-3 py-3 bg-surface-elevated border border-border rounded-lg
+           resize-none font-mono text-xs sm:text-sm text-gray-300 placeholder-gray-600
+           focus:outline-none focus:border-cyan-600 transition-colors;
   }
-
-  /* Labels */
   .form-label {
-    @apply block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2;
+    @apply block text-xs font-medium text-gray-400 mb-1;
   }
 }
 
-/* Custom utilities */
+/* ── Workout graph ───────────────────────────────────────────────── */
+#workout-graph-container {
+  min-height: 100px;
+  max-height: 200px;
+}
+#workout-graph {
+  height: 100%;
+  min-height: 100px;
+}
+#graph-position-marker {
+  transition: transform 0.5s linear;
+}
+#graph-position-marker line {
+  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.6));
+}
+
+@media (max-width: 640px) {
+  #workout-graph-container {
+    min-height: 80px;
+  }
+  #workout-graph {
+    min-height: 80px;
+  }
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
 @layer utilities {
-  /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
 }
 
-/* Workout Graph Styles */
-#workout-graph-container {
-  min-height: 100px;
-  max-height: 200px;
+/* ── Global base ─────────────────────────────────────────────────── */
+body {
+  background-color: var(--color-app);
+  color: #e5e7eb;
 }
 
-#workout-graph {
-  height: 100%;
-  min-height: 100px;
+/* Workout step items injected by main.js */
+.workout-step-item {
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: #e5e7eb;
 }
-
-/* Graph profile styling */
-#graph-profile {
-  transition: d 0.3s ease-out;
-}
-
-/* Position marker animation */
-#graph-position-marker {
-  transition: transform 0.5s linear;
-}
-
-#graph-position-marker line {
-  filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
-}
-
-/* Responsive graph sizing */
-@media (max-width: 640px) {
-  #workout-graph-container {
-    min-height: 80px;
-  }
-  
-  #workout-graph {
-    min-height: 80px;
-  }
+.workout-step-item.active-step {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.25);
 }
