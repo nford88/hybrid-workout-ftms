@@ -19,7 +19,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --audit false
 
       - name: Run E2E tests
         run: npm run test:e2e
