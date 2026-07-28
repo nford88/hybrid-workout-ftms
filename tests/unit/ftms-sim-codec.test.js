@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest'
-import { encodeSimParams, decodeSimParams } from '../../src/dev/protocols/ftmsSim'
+import {
+  encodeSimParams,
+  decodeSimParams,
+  encodeTargetResistance,
+  decodeFitnessMachineFeature,
+} from '../../src/dev/protocols/ftmsSim'
 
 describe('encodeSimParams', () => {
   test('encodes Zwift-observed Crr/Cw bytes (0.0051 -> 51, 0.41 -> 41)', () => {
@@ -43,5 +48,42 @@ describe('decodeSimParams', () => {
     const decoded = decodeSimParams([0x11, 0x00, 0x00, 0x00, 0x00, 51, 41])
     expect(decoded.crr).toBeCloseTo(0.0051, 4)
     expect(decoded.cw).toBeCloseTo(0.41, 2)
+  })
+})
+
+describe('encodeTargetResistance', () => {
+  test('opcode byte is 0x04', () => {
+    expect(encodeTargetResistance(0)[0]).toBe(0x04)
+  })
+
+  test('encodes level at 0.1 resolution, little-endian', () => {
+    // 50 / 0.1 = 500 -> little-endian s16
+    const bytes = encodeTargetResistance(50)
+    expect(bytes[1]).toBe(500 & 0xff)
+    expect(bytes[2]).toBe((500 >> 8) & 0xff)
+  })
+})
+
+describe('decodeFitnessMachineFeature', () => {
+  test('detects Resistance Target Setting Supported (bit 2 of Target Setting Features)', () => {
+    // Fitness Machine Features = 0; Target Setting Features = bit 2 set (0x04)
+    const decoded = decodeFitnessMachineFeature([0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00])
+    expect(decoded.resistanceTargetSupported).toBe(true)
+    expect(decoded.powerTargetSupported).toBe(false)
+  })
+
+  test('detects Sim Params Supported (bit 13) and Power Target Supported (bit 3) together', () => {
+    // Target Setting Features = bit 3 (0x08) | bit 13 (0x2000) = 0x2008
+    const decoded = decodeFitnessMachineFeature([0x00, 0x00, 0x00, 0x00, 0x08, 0x20, 0x00, 0x00])
+    expect(decoded.powerTargetSupported).toBe(true)
+    expect(decoded.simParamsSupported).toBe(true)
+    expect(decoded.resistanceTargetSupported).toBe(false)
+  })
+
+  test('reports false when no relevant bits set', () => {
+    const decoded = decodeFitnessMachineFeature([0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00])
+    expect(decoded.resistanceTargetSupported).toBe(false)
+    expect(decoded.powerTargetSupported).toBe(false)
+    expect(decoded.simParamsSupported).toBe(false)
   })
 })

@@ -36,6 +36,42 @@
         <div id="env-check" class="mt-2 text-sm font-mono"></div>
       </div>
 
+      <div class="bg-white rounded-lg shadow p-4 space-y-2">
+        <h2 class="font-bold text-lg">Rider &amp; Bike Settings</h2>
+        <p class="text-sm text-gray-600">
+          Feeds the Crr/Cw fields below (Send 0x11 panel) and is persisted as a cookie
+          on this browser — see
+          <code>docs/virtual-shifting/experiments/10-offline-fit-physics-analysis.md</code>
+          for how these presets were derived. Rider/bike weight aren't wired into any
+          calculation yet — the virtual-speed drivetrain model
+          (<code>VIRTUAL_SHIFTING_DESIGN.md</code> §4.3) hasn't been implemented — they're
+          stored here for when it is.
+        </p>
+        <div class="flex gap-4 items-center text-sm flex-wrap">
+          <label class="flex items-center gap-1">
+            Rider weight
+            <select id="rider-weight" class="border rounded px-1 py-0.5"></select>
+            kg
+          </label>
+          <label class="flex items-center gap-1">
+            Bike weight
+            <select id="bike-weight" class="border rounded px-1 py-0.5"></select>
+            kg
+          </label>
+          <label class="flex items-center gap-1">
+            Tire type
+            <select id="tire-type" class="border rounded px-1 py-0.5"></select>
+          </label>
+          <label class="flex items-center gap-1">
+            Riding position
+            <select id="riding-position" class="border rounded px-1 py-0.5"></select>
+          </label>
+          <span class="text-gray-500">
+            Total system weight: <span id="total-weight" class="font-mono"></span> kg
+          </span>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Trainer panel -->
         <div class="bg-white rounded-lg shadow p-4 space-y-3">
@@ -63,7 +99,11 @@
                 Start/Resume (0x07)
               </button>
               <button id="trainer-reset" class="bg-red-600 text-white px-2 py-1 rounded text-sm">Reset (0x01)</button>
+              <button id="trainer-read-feature" class="bg-indigo-600 text-white px-2 py-1 rounded text-sm">
+                Read Feature (0x2ACC)
+              </button>
             </div>
+            <div id="trainer-feature-result" class="text-xs font-mono"></div>
             <div class="flex gap-1 items-center text-sm flex-wrap">
               <label>Watts <input id="erg-watts" type="number" value="150" class="w-16 border rounded px-1" /></label>
               <button id="send-erg" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Send 0x05</button>
@@ -74,6 +114,10 @@
               <label>Crr <input id="sim-crr" type="number" step="0.0001" value="0.004" class="w-20 border rounded px-1" /></label>
               <label>Cw <input id="sim-cw" type="number" step="0.01" value="0.51" class="w-16 border rounded px-1" /></label>
               <button id="send-sim" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Send 0x11</button>
+            </div>
+            <div class="flex gap-1 items-center text-sm flex-wrap">
+              <label>Resistance level <input id="target-resistance" type="number" step="1" value="0" class="w-16 border rounded px-1" /></label>
+              <button id="send-target-resistance" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Send 0x04</button>
             </div>
             <div class="flex gap-1 items-center text-sm">
               <label>Raw hex to Control Point <input id="trainer-raw-hex" placeholder="11 00 00 00 00 04 33" class="border rounded px-1 flex-1 font-mono" /></label>
@@ -134,7 +178,12 @@
 
     <script type="module">
       import { parseZapFrame, createShiftEdgeDetector, toHex } from './protocols/zapFrame.js'
-      import { encodeSimParams, decodeSimParams } from './protocols/ftmsSim.js'
+      import {
+        encodeSimParams,
+        decodeSimParams,
+        encodeTargetResistance,
+        decodeFitnessMachineFeature,
+      } from './protocols/ftmsSim.js'
 
       // ── UUIDs ──────────────────────────────────────────────────────────────
       const FTMS = {
@@ -256,17 +305,22 @@
             if (ch.properties.notify || ch.properties.indicate) {
               try {
                 await ch.startNotifications()
-                ch.addEventListener('characteristicvaluechanged', (evt) => {
-                  const hex = bufToHex(evt.target.value)
-                  let decoded
-                  if (ch.uuid === ZWIFT_CHAR.ASYNC || ch.uuid === ZWIFT_CHAR.SYNC_TX) {
-                    decoded = parseZapFrame(new Uint8Array(evt.target.value.buffer))
-                    if (decoded.type === 'click-v1-buttons' || decoded.type === 'v2-buttons') {
-                      feedShiftDetector(decoded)
+                // Reconnecting (same underlying characteristic object reused by Chrome)
+                // must not stack a second listener — guard like attachDisconnectListener.
+                if (!ch._bleLabValueListenerAttached) {
+                  ch._bleLabValueListenerAttached = true
+                  ch.addEventListener('characteristicvaluechanged', (evt) => {
+                    const hex = bufToHex(evt.target.value)
+                    let decoded
+                    if (ch.uuid === ZWIFT_CHAR.ASYNC || ch.uuid === ZWIFT_CHAR.SYNC_TX) {
+                      decoded = parseZapFrame(new Uint8Array(evt.target.value.buffer))
+                      if (decoded.type === 'click-v1-buttons' || decoded.type === 'v2-buttons') {
+                        feedShiftDetector(decoded)
+                      }
                     }
-                  }
-                  log(label, ch.properties.indicate ? 'indicate' : 'notify', ch.uuid, hex, decoded)
-                })
+                    log(label, ch.properties.indicate ? 'indicate' : 'notify', ch.uuid, hex, decoded)
+                  })
+                }
               } catch (err) {
                 lines.push(`    (subscribe failed: ${err})`)
               }
@@ -290,6 +344,135 @@
         document.getElementById('shift-up-count').textContent = shiftUpCount
         document.getElementById('shift-down-count').textContent = shiftDownCount
       }
+
+      // ── Rider & bike settings (persisted as a cookie) ───────────────────────
+      // Crr/Cw presets derived from docs/virtual-shifting/experiments/10-offline-fit-
+      // physics-analysis.md: TRAINER default (0.004/0.51) stays the zero-surprise
+      // default so existing Send-0x11 behavior doesn't change until a preset is
+      // deliberately picked; 'road-worn' Crr=0.017 is this rider's own fitted average
+      // (mass fixed at a real known weight) from that analysis.
+      const TIRE_CRR_PRESETS = [
+        { id: 'trainer-smooth', label: 'Smooth trainer/indoor tire', crr: 0.004 },
+        { id: 'road-slick', label: 'Racing slick, smooth road', crr: 0.005 },
+        { id: 'road-average', label: 'Standard road tire, average pavement', crr: 0.011 },
+        { id: 'road-worn', label: 'Worn/rough road tire (this rider’s fitted avg)', crr: 0.017 },
+        { id: 'gravel', label: 'Gravel / knobby tire', crr: 0.02 },
+      ]
+      const POSITION_CW_PRESETS = [
+        { id: 'aero-bars', label: 'Aero bars / TT position', cw: 0.2 },
+        { id: 'drops', label: 'Drops, aggressive', cw: 0.28 },
+        { id: 'hoods', label: 'Hoods, normal', cw: 0.36 },
+        { id: 'upright', label: 'Upright / tops', cw: 0.45 },
+        { id: 'trainer-default', label: 'HW-V8 trainer default', cw: 0.51 },
+      ]
+      const RIDER_SETTINGS_COOKIE = 'ble_lab_rider_settings'
+      const RIDER_SETTINGS_DEFAULTS = {
+        riderWeight: 75,
+        bikeWeight: 8,
+        tireType: 'trainer-smooth',
+        position: 'trainer-default',
+      }
+
+      function setCookie(name, value, days = 365) {
+        const expires = new Date(Date.now() + days * 864e5).toUTCString()
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`
+      }
+      function getCookie(name) {
+        const escaped = name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1')
+        const match = document.cookie.match(new RegExp('(?:^|; )' + escaped + '=([^;]*)'))
+        return match ? decodeURIComponent(match[1]) : null
+      }
+
+      function populateNumberOptions(selectEl, min, max, step) {
+        for (let v = min; v <= max; v += step) {
+          const opt = document.createElement('option')
+          opt.value = String(v)
+          opt.textContent = String(v)
+          selectEl.appendChild(opt)
+        }
+      }
+      function populatePresetOptions(selectEl, presets) {
+        for (const p of presets) {
+          const opt = document.createElement('option')
+          opt.value = p.id
+          opt.textContent = `${p.label} (${'crr' in p ? p.crr : p.cw})`
+          selectEl.appendChild(opt)
+        }
+      }
+
+      const riderWeightEl = document.getElementById('rider-weight')
+      const bikeWeightEl = document.getElementById('bike-weight')
+      const tireTypeEl = document.getElementById('tire-type')
+      const ridingPositionEl = document.getElementById('riding-position')
+      const totalWeightEl = document.getElementById('total-weight')
+
+      populateNumberOptions(riderWeightEl, 40, 150, 1)
+      populateNumberOptions(bikeWeightEl, 0, 20, 1)
+      populatePresetOptions(tireTypeEl, TIRE_CRR_PRESETS)
+      populatePresetOptions(ridingPositionEl, POSITION_CW_PRESETS)
+
+      function updateTotalWeight() {
+        const total = Number(riderWeightEl.value) + Number(bikeWeightEl.value)
+        totalWeightEl.textContent = Number.isFinite(total) ? total.toFixed(0) : '?'
+      }
+
+      function saveRiderSettings() {
+        setCookie(
+          RIDER_SETTINGS_COOKIE,
+          JSON.stringify({
+            riderWeight: Number(riderWeightEl.value),
+            bikeWeight: Number(bikeWeightEl.value),
+            tireType: tireTypeEl.value,
+            position: ridingPositionEl.value,
+          }),
+        )
+      }
+
+      function applyTirePreset() {
+        const preset = TIRE_CRR_PRESETS.find((p) => p.id === tireTypeEl.value)
+        if (preset) document.getElementById('sim-crr').value = preset.crr
+      }
+      function applyPositionPreset() {
+        const preset = POSITION_CW_PRESETS.find((p) => p.id === ridingPositionEl.value)
+        if (preset) document.getElementById('sim-cw').value = preset.cw
+      }
+
+      function loadRiderSettings() {
+        let saved = null
+        try {
+          const raw = getCookie(RIDER_SETTINGS_COOKIE)
+          if (raw) saved = JSON.parse(raw)
+        } catch {
+          saved = null
+        }
+        const settings = { ...RIDER_SETTINGS_DEFAULTS, ...saved }
+        riderWeightEl.value = String(settings.riderWeight)
+        bikeWeightEl.value = String(settings.bikeWeight)
+        tireTypeEl.value = settings.tireType
+        ridingPositionEl.value = settings.position
+        applyTirePreset()
+        applyPositionPreset()
+        updateTotalWeight()
+      }
+
+      riderWeightEl.addEventListener('change', () => {
+        updateTotalWeight()
+        saveRiderSettings()
+      })
+      bikeWeightEl.addEventListener('change', () => {
+        updateTotalWeight()
+        saveRiderSettings()
+      })
+      tireTypeEl.addEventListener('change', () => {
+        applyTirePreset()
+        saveRiderSettings()
+      })
+      ridingPositionEl.addEventListener('change', () => {
+        applyPositionPreset()
+        saveRiderSettings()
+      })
+
+      loadRiderSettings()
 
       // ── environment check ──────────────────────────────────────────────────
       const envEl = document.getElementById('env-check')
@@ -338,10 +521,36 @@
       function trainerCP() {
         return trainerChars[Object.keys(trainerChars).find((u) => u.startsWith('00002ad9'))]
       }
+      function trainerFeature() {
+        return trainerChars[Object.keys(trainerChars).find((u) => u.startsWith('00002acc'))]
+      }
 
       document.getElementById('trainer-request-control').onclick = () => writeBytes(trainerCP(), new Uint8Array([0x00]), 'trainer')
       document.getElementById('trainer-request-start').onclick = () => writeBytes(trainerCP(), new Uint8Array([0x07]), 'trainer')
       document.getElementById('trainer-reset').onclick = () => writeBytes(trainerCP(), new Uint8Array([0x01]), 'trainer')
+
+      async function readFeature() {
+        const ch = trainerFeature()
+        if (!ch) {
+          log('trainer', 'system', undefined, undefined, { event: 'read-feature-error', error: 'Feature characteristic not found — connect trainer first' })
+          return null
+        }
+        const value = await ch.readValue()
+        const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+        const decoded = decodeFitnessMachineFeature(bytes)
+        log('trainer', 'read', ch.uuid, toHex(bytes), decoded)
+        document.getElementById('trainer-feature-result').textContent =
+          `resistanceTargetSupported=${decoded.resistanceTargetSupported} ` +
+          `powerTargetSupported=${decoded.powerTargetSupported} ` +
+          `simParamsSupported=${decoded.simParamsSupported}`
+        return decoded
+      }
+      document.getElementById('trainer-read-feature').onclick = () => readFeature()
+
+      document.getElementById('send-target-resistance').onclick = () => {
+        const level = parseFloat(document.getElementById('target-resistance').value)
+        writeBytes(trainerCP(), encodeTargetResistance(level), 'trainer')
+      }
 
       document.getElementById('send-erg').onclick = () => {
         const watts = parseInt(document.getElementById('erg-watts').value, 10)
@@ -417,6 +626,16 @@
         trainerConnected: () => !!trainerServer,
         sendRaw: (bytes) => writeBytes(trainerCP(), new Uint8Array(bytes), 'trainer'),
         encodeSim: (opts) => encodeSimParams(opts),
+        sendSim: (opts) => writeBytes(trainerCP(), encodeSimParams(opts), 'trainer'),
+        sendTargetResistance: (level) => writeBytes(trainerCP(), encodeTargetResistance(level), 'trainer'),
+        sendErgWatts: (watts) => {
+          const buf = new Uint8Array(3)
+          buf[0] = 0x05
+          buf[1] = watts & 0xff
+          buf[2] = (watts >> 8) & 0xff
+          return writeBytes(trainerCP(), buf, 'trainer')
+        },
+        readFeature,
         log: (source, note) => log(source, 'note', undefined, undefined, { note }),
       }
     </script>

@@ -8,6 +8,7 @@
 // session, not this harness).
 
 const OPCODE = {
+  SET_TARGET_RESISTANCE: 0x04,
   SET_SIM_PARAMS: 0x11,
 }
 
@@ -51,5 +52,39 @@ export function decodeSimParams(bytes) {
     gradePct: readInt16LE(arr, 3) * 0.01,
     crr: arr[5] * 0.0001,
     cw: arr[6] * 0.01,
+  }
+}
+
+/**
+ * Encode a 0x04 Set Target Resistance Level payload (HW-V12 candidate (e)).
+ * @param {number} level unitless resistance level, resolution 0.1
+ * @returns {Uint8Array} 3 bytes: opcode, level s16 @0.1
+ */
+export function encodeTargetResistance(level) {
+  const buf = new Uint8Array(3)
+  buf[0] = OPCODE.SET_TARGET_RESISTANCE
+  writeInt16LE(buf, 1, level / 0.1)
+  return buf
+}
+
+/**
+ * Decode the Fitness Machine Feature characteristic (0x2ACC) — two little-endian
+ * uint32 bitfields: Fitness Machine Features, then Target Setting Features.
+ * HW-V12 candidate (e) is only viable if Target Setting Features bit 2
+ * (Resistance Target Setting Supported) is set (FTMS v1.0 §4.3.1.1).
+ * @param {Uint8Array|number[]} bytes at least 8 bytes
+ */
+export function decodeFitnessMachineFeature(bytes) {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  const readU32LE = (offset) =>
+    (arr[offset] | (arr[offset + 1] << 8) | (arr[offset + 2] << 16) | (arr[offset + 3] << 24)) >>> 0
+  const fitnessMachineFeatures = readU32LE(0)
+  const targetSettingFeatures = readU32LE(4)
+  return {
+    fitnessMachineFeatures,
+    targetSettingFeatures,
+    resistanceTargetSupported: !!(targetSettingFeatures & (1 << 2)),
+    powerTargetSupported: !!(targetSettingFeatures & (1 << 3)),
+    simParamsSupported: !!(targetSettingFeatures & (1 << 13)),
   }
 }
