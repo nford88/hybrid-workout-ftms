@@ -358,20 +358,21 @@ SwiftControl), [lord's Web Bluetooth gist](https://gist.github.com/lord/7a4e1fcc
 | # | Claim | Status |
 |---|---|---|
 | L1 | Zwift virtual shifting = gear ratio ×10000 via proprietary Zwift BLE service; trainer firmware computes resistance | CONFIRMED (makinolo, zwiftinsider) |
-| L2 | KICKR Core supports this since fw 1.3.17 (Feb 2024); exposes Zwift service alongside FTMS | CONFIRMED (zwiftinsider + §1.5 device logs) |
+| L2 | KICKR Core supports this since fw 1.3.17 (Feb 2024); exposes Zwift service alongside FTMS | CONFIRMED (zwiftinsider + §1.5 device logs); **our unit confirmed 2026-07-28**: `KICKR CORE C26B`, fw **1.5.36** — Plan A′ gate open. See `virtual-shifting/experiments/02-firmware-model-check.md` |
 | L3 | Zwift 24-gear ratio table 0.75–5.49 | CONFIRMED (SHIFTR, QZ source) |
 | L4 | Click speaks unencrypted ZAP after bare `RideOn`; buttons = 0x37 (v1) / 0x23 (v2) inverse-logic protobuf | CONFIRMED (ajchellew, QZ, bikecontrol) |
 | L5 | Click is reachable from Web Bluetooth in the browser | CONFIRMED (lord gist, BikeControl web build) |
 | L6 | Click advertised service = `…19ca…` OR `0xFC82` depending on firmware (Jan 2025 change) | CONFIRMED (makinolo, bikecontrol) |
-| L7 | Two concurrent BLE devices from one Chrome page | CONFIRMED (spec, Auuki) |
-| L8 | FTMS 0x11 field layout; 0x00 control persists; serialize on 0x80; ERG/SIM last-write-wins | CONFIRMED (FTMS v1.0 spec) |
+| L7 | Two concurrent BLE devices from one Chrome page | CONFIRMED (spec, Auuki); **re-confirmed on our own hardware pairing 2026-07-28** — see `virtual-shifting/experiments/01-dual-connection-smoke-test.md` (HW-V0: ~76s stable, zero drops) |
+| L8 | FTMS 0x11 field layout; 0x00 control persists; serialize on 0x80; ERG/SIM last-write-wins | CONFIRMED (FTMS v1.0 spec). **HW-V10, 2026-07-28** (`virtual-shifting/experiments/05-ftms-conformance-hw-v10.md`): on our KICKR, control persistence goes further than spec-required — Reset (0x01) does NOT revoke it either (spec deviation). ERG/SIM interleave accepted with no conflicts. Concurrent-write serialization untestable from one Web Bluetooth client — Chrome's own GATT layer blocks it before it reaches the trainer |
 | L9 | Trainer solves resistance from sim params + measured flywheel speed using standard road physics; mass is trainer-internal | CONFIRMED (ftmsemu; formula is convention, not spec) |
 | L10 | QZ hub-protocol recipe (handshake `RideOn 02 01`, init, 0.4 % incline first, ratio×10000 + `00 08 88 04`) drives trainer-native shifting | CONFIRMED in QZ source; UNKNOWN on this KICKR from this codebase (HW-V9) |
 | L11 | Feb-2026 prototype failed because it sent controller-family, not hub-family, messages | INFERRED (high confidence) |
 | L12 | Zwift 0x11 cadence ≈ 1 Hz; KICKR-specific FTMS command-drop quirks | INFERRED / UNKNOWN (no primary source) |
 | L13 | Trainer's assumed rider mass value on KICKR Core (affects grade-solve accuracy) | UNKNOWN (HW-V8) |
-| L14 | Click v2 vendor-unlock requirement applies to the user's specific Click | UNKNOWN until hardware identified (HW-V2) |
+| L14 | Click v2 vendor-unlock requirement applies to the user's specific Click | **CONFIRMED 2026-07-28, likely**: repeated ~44–90s disconnects pre-workaround, 5+ min stable connection after pairing once in Zwift Companion. See `virtual-shifting/experiments/03-click-buttons-partial.md` |
 | L15 | Felt latency budget app-side FTMS shift ≈ 1–1.5 s on real trainers | CONFIRMED for other hardware (simcline); UNKNOWN for KICKR Core (HW-V7) |
+| L16 | The user's two Click units (Left/Right) form a relay pair — only one needs a BLE connection to receive both controllers' button events | **CONFIRMED 2026-07-28**: `virtual-shifting/experiments/04-click-mapping-and-relay-confirmed.md`. Simplifies §4.6's connection-management design — the controller side needs only one GATT slot, not two |
 
 Conflicts surfaced during research (kept, not silently resolved):
 - Handshake status bytes after `RideOn` differ across sources (`01 02`/`01 01` captures vs
@@ -532,6 +533,13 @@ G_send = 100 × tan(asin(clamp(sin θ', −0.35, 0.35)))
 - **Rate**: steady-state ≤1 Hz 0x11 (Zwift-like, L12); shift-triggered sends are extra
   but the queue+coalescing bounds outstanding commands at 1.
 - Fix the latent wind-speed unit bug (0.01 → 0.001 m/s, §1.2) while touching `setSim`.
+- **HW-V10 update (2026-07-28)**: the queue's serialize-on-0x80 discipline must also
+  catch and retry `NetworkError: GATT operation already in progress` — this is Web
+  Bluetooth's own client-side concurrency guard firing when a second write to the same
+  characteristic is issued before the first resolves; it's a confirmed real error shape,
+  not hypothetical (`virtual-shifting/experiments/05-ftms-conformance-hw-v10.md`). Also:
+  don't assume Reset relinquishes control on all trainers — it didn't on our KICKR
+  (deviation from spec), but re-Request-Control after Reset defensively for portability.
 
 ### 4.5 Zwift Click adapter (Web Bluetooth)
 

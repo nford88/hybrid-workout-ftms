@@ -33,7 +33,12 @@ Click (and other inputs), implemented browser-first over Web Bluetooth.**
 
 ## Non-goals (for v1)
 
-- Zwift Click **v2** vendor-unlock challenge replay (detect + surface workaround only).
+- Zwift Click **v2** vendor-unlock challenge replay. **Confirmed 2026-07-28** (see
+  `experiments/03-click-buttons-partial.md` and `04-click-mapping-and-relay-confirmed.md`):
+  this Click needs to be paired/synced in the real Zwift Companion app **at least once**
+  before third-party BLE clients get a stable, long-lived connection — without it,
+  connections drop every ~45–90s. Treat this as a **required one-time onboarding step**
+  in the UX (surface clear instructions), not an edge case to merely detect.
 - WebHID adapter (no concrete target device; Gamepad covers fallbacks).
 - Native/WebSocket bridge (**explicitly not needed** — Web Bluetooth reaches the Click).
 - Encrypted ZAP (ECDH/HKDF/AES-CCM) — plaintext mode works on all current firmware.

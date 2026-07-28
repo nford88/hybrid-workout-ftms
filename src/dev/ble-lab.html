@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BLE Lab — Virtual Shifting Hardware Harness</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .log-line {
+        border-bottom: 1px solid #eee;
+        padding: 2px 0;
+      }
+      .log-line.controller {
+        background: #eef7ff;
+      }
+      .log-line.trainer {
+        background: #fff7ee;
+      }
+      .log-line.system {
+        background: #f3f3f3;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 p-6">
+    <div class="max-w-6xl mx-auto space-y-4">
+      <div class="bg-white rounded-lg shadow p-4">
+        <h1 class="text-xl font-bold">BLE Lab — Virtual Shifting Hardware Harness</h1>
+        <p class="text-sm text-gray-600">
+          Throwaway research instrumentation for
+          <code>docs/virtual-shifting/experiments/</code>. Two independent device slots
+          (trainer, controller), each needs its own Connect button click (Web Bluetooth
+          requires one user gesture per <code>requestDevice()</code>). Every log line is
+          also mirrored to <code>console.log</code> as
+          <code>[BLE-LAB] &lt;json&gt;</code> for tooling to read back.
+        </p>
+        <div id="env-check" class="mt-2 text-sm font-mono"></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Trainer panel -->
+        <div class="bg-white rounded-lg shadow p-4 space-y-3">
+          <h2 class="font-bold text-lg">Trainer (FTMS)</h2>
+          <div class="flex gap-2">
+            <button id="trainer-connect" class="bg-orange-600 text-white px-3 py-1.5 rounded hover:bg-orange-700">
+              Connect trainer
+            </button>
+            <button id="trainer-disconnect" class="bg-gray-400 text-white px-3 py-1.5 rounded hover:bg-gray-500">
+              Disconnect
+            </button>
+          </div>
+          <div id="trainer-status" class="text-sm font-mono">disconnected</div>
+          <details>
+            <summary class="cursor-pointer font-semibold text-sm">GATT tree</summary>
+            <pre id="trainer-gatt" class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48"></pre>
+          </details>
+
+          <div class="border-t pt-2 space-y-2">
+            <div class="flex gap-2 flex-wrap">
+              <button id="trainer-request-control" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">
+                Request Control (0x00)
+              </button>
+              <button id="trainer-request-start" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">
+                Start/Resume (0x07)
+              </button>
+              <button id="trainer-reset" class="bg-red-600 text-white px-2 py-1 rounded text-sm">Reset (0x01)</button>
+            </div>
+            <div class="flex gap-1 items-center text-sm flex-wrap">
+              <label>Watts <input id="erg-watts" type="number" value="150" class="w-16 border rounded px-1" /></label>
+              <button id="send-erg" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Send 0x05</button>
+            </div>
+            <div class="flex gap-1 items-center text-sm flex-wrap">
+              <label>Grade% <input id="sim-grade" type="number" step="0.1" value="0" class="w-16 border rounded px-1" /></label>
+              <label>Wind m/s <input id="sim-wind" type="number" step="0.1" value="0" class="w-14 border rounded px-1" /></label>
+              <label>Crr <input id="sim-crr" type="number" step="0.0001" value="0.004" class="w-20 border rounded px-1" /></label>
+              <label>Cw <input id="sim-cw" type="number" step="0.01" value="0.51" class="w-16 border rounded px-1" /></label>
+              <button id="send-sim" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Send 0x11</button>
+            </div>
+            <div class="flex gap-1 items-center text-sm">
+              <label>Raw hex to Control Point <input id="trainer-raw-hex" placeholder="11 00 00 00 00 04 33" class="border rounded px-1 flex-1 font-mono" /></label>
+              <button id="trainer-raw-send" class="bg-gray-700 text-white px-2 py-1 rounded text-sm">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controller panel -->
+        <div class="bg-white rounded-lg shadow p-4 space-y-3">
+          <h2 class="font-bold text-lg">Controller (Zwift Click)</h2>
+          <div class="flex gap-2">
+            <button id="click-connect" class="bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700">
+              Connect Click
+            </button>
+            <button id="click-disconnect" class="bg-gray-400 text-white px-3 py-1.5 rounded hover:bg-gray-500">
+              Disconnect
+            </button>
+          </div>
+          <div id="click-status" class="text-sm font-mono">disconnected</div>
+          <details>
+            <summary class="cursor-pointer font-semibold text-sm">GATT tree</summary>
+            <pre id="click-gatt" class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48"></pre>
+          </details>
+
+          <div class="border-t pt-2 space-y-2">
+            <div class="flex gap-2 flex-wrap">
+              <button id="click-rideon" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">
+                Write RideOn handshake
+              </button>
+              <button id="click-haptic" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">
+                Send haptic ack
+              </button>
+            </div>
+            <div class="flex gap-1 items-center text-sm">
+              <label>Raw hex to SYNC RX <input id="click-raw-hex" placeholder="52 69 64 65 4f 6e" class="border rounded px-1 flex-1 font-mono" /></label>
+              <button id="click-raw-send" class="bg-gray-700 text-white px-2 py-1 rounded text-sm">Send</button>
+            </div>
+            <div class="text-sm font-mono">
+              Shift events — up: <span id="shift-up-count">0</span>, down:
+              <span id="shift-down-count">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="font-bold text-lg">Unified log</h2>
+          <div class="flex gap-2">
+            <button id="log-clear" class="bg-gray-400 text-white px-2 py-1 rounded text-sm">Clear</button>
+            <button id="log-export" class="bg-gray-700 text-white px-2 py-1 rounded text-sm">Export JSON</button>
+          </div>
+        </div>
+        <div id="log-pane" class="text-xs font-mono overflow-auto" style="max-height: 400px"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { parseZapFrame, createShiftEdgeDetector, toHex } from './protocols/zapFrame.js'
+      import { encodeSimParams, decodeSimParams } from './protocols/ftmsSim.js'
+
+      // ── UUIDs ──────────────────────────────────────────────────────────────
+      const FTMS = {
+        SERVICE: 0x1826,
+        FEATURE: 0x2acc,
+        INDOOR_BIKE_DATA: 0x2ad2,
+        TRAINING_STATUS: 0x2ad3,
+        CONTROL_POINT: 0x2ad9,
+        MACHINE_STATUS: 0x2ada,
+      }
+      const ZWIFT_SVC_LEGACY = '00000001-19ca-4651-86e5-fa29dcdd09d1'
+      const ZWIFT_SVC_NEW = 0xfc82
+      const ZWIFT_CHAR = {
+        ASYNC: '00000002-19ca-4651-86e5-fa29dcdd09d1',
+        SYNC_RX: '00000003-19ca-4651-86e5-fa29dcdd09d1',
+        SYNC_TX: '00000004-19ca-4651-86e5-fa29dcdd09d1',
+      }
+      const UUID_NAMES = {
+        '00001826-0000-1000-8000-00805f9b34fb': 'FTMS service',
+        '00002acc-0000-1000-8000-00805f9b34fb': 'Fitness Machine Feature',
+        '00002ad2-0000-1000-8000-00805f9b34fb': 'Indoor Bike Data',
+        '00002ad3-0000-1000-8000-00805f9b34fb': 'Training Status',
+        '00002ad9-0000-1000-8000-00805f9b34fb': 'Control Point',
+        '00002ada-0000-1000-8000-00805f9b34fb': 'Machine Status',
+        '0000fc82-0000-1000-8000-00805f9b34fb': 'Zwift service (post-Jan-2025 fw)',
+        [ZWIFT_SVC_LEGACY]: 'Zwift service (legacy)',
+        [ZWIFT_CHAR.ASYNC]: 'Zwift ASYNC (notify)',
+        [ZWIFT_CHAR.SYNC_RX]: 'Zwift SYNC RX (write)',
+        [ZWIFT_CHAR.SYNC_TX]: 'Zwift SYNC TX (indicate)',
+      }
+      const nameFor = (uuid) => UUID_NAMES[uuid.toLowerCase?.() ?? uuid] || uuid
+
+      // ── log pane ───────────────────────────────────────────────────────────
+      const logPane = document.getElementById('log-pane')
+      const logEntries = []
+
+      function log(source, direction, charUuid, hex, decoded) {
+        const entry = {
+          ts: Math.round(performance.now()),
+          wallClock: new Date().toISOString(),
+          source,
+          direction,
+          char: charUuid ? nameFor(charUuid) : undefined,
+          hex,
+          decoded,
+        }
+        logEntries.push(entry)
+        console.log(`[BLE-LAB] ${JSON.stringify(entry)}`)
+        const row = document.createElement('div')
+        row.className = `log-line ${source}`
+        row.textContent = `${entry.wallClock} [${source}/${direction}]${entry.char ? ' ' + entry.char : ''} ${hex || ''} ${decoded ? JSON.stringify(decoded) : ''}`
+        logPane.appendChild(row)
+        logPane.scrollTop = logPane.scrollHeight
+      }
+
+      document.getElementById('log-clear').onclick = () => {
+        logEntries.length = 0
+        logPane.innerHTML = ''
+      }
+      document.getElementById('log-export').onclick = () => {
+        console.log('[BLE-LAB-EXPORT]', JSON.stringify(logEntries, null, 2))
+        const blob = new Blob([JSON.stringify(logEntries, null, 2)], { type: 'application/json' })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `ble-lab-log-${Date.now()}.json`
+        a.click()
+      }
+
+      // ── hex helpers ────────────────────────────────────────────────────────
+      function parseHexInput(str) {
+        const clean = str.trim().replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '')
+        const bytes = []
+        for (let i = 0; i < clean.length; i += 2) bytes.push(parseInt(clean.slice(i, i + 2), 16))
+        return new Uint8Array(bytes)
+      }
+      function bufToHex(dataView) {
+        return toHex(new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength))
+      }
+
+      async function writeBytes(characteristic, bytes, label) {
+        try {
+          if (characteristic.writeValueWithResponse) {
+            await characteristic.writeValueWithResponse(bytes)
+          } else {
+            await characteristic.writeValue(bytes)
+          }
+          log(label, 'write', characteristic.uuid, toHex(bytes))
+        } catch (err) {
+          log(label, 'write-error', characteristic.uuid, toHex(bytes), { error: String(err) })
+        }
+      }
+      async function writeBytesNoResponse(characteristic, bytes, label) {
+        try {
+          if (characteristic.writeValueWithoutResponse) {
+            await characteristic.writeValueWithoutResponse(bytes)
+          } else {
+            await characteristic.writeValue(bytes)
+          }
+          log(label, 'write', characteristic.uuid, toHex(bytes))
+        } catch (err) {
+          log(label, 'write-error', characteristic.uuid, toHex(bytes), { error: String(err) })
+        }
+      }
+
+      // ── GATT dump + auto-subscribe ────────────────────────────────────────
+      async function dumpAndSubscribe(server, label, gattPre, charStore) {
+        const lines = []
+        const services = await server.getPrimaryServices()
+        for (const service of services) {
+          lines.push(`Service ${nameFor(service.uuid)} (${service.uuid})`)
+          const chars = await service.getCharacteristics()
+          for (const ch of chars) {
+            const props = Object.entries(ch.properties)
+              .filter(([, v]) => v)
+              .map(([k]) => k)
+              .join(',')
+            lines.push(`  Char ${nameFor(ch.uuid)} (${ch.uuid}) [${props}]`)
+            charStore[ch.uuid] = ch
+            if (ch.properties.notify || ch.properties.indicate) {
+              try {
+                await ch.startNotifications()
+                ch.addEventListener('characteristicvaluechanged', (evt) => {
+                  const hex = bufToHex(evt.target.value)
+                  let decoded
+                  if (ch.uuid === ZWIFT_CHAR.ASYNC || ch.uuid === ZWIFT_CHAR.SYNC_TX) {
+                    decoded = parseZapFrame(new Uint8Array(evt.target.value.buffer))
+                    if (decoded.type === 'click-v1-buttons' || decoded.type === 'v2-buttons') {
+                      feedShiftDetector(decoded)
+                    }
+                  }
+                  log(label, ch.properties.indicate ? 'indicate' : 'notify', ch.uuid, hex, decoded)
+                })
+              } catch (err) {
+                lines.push(`    (subscribe failed: ${err})`)
+              }
+            }
+          }
+        }
+        gattPre.textContent = lines.join('\n')
+      }
+
+      // ── shift edge detector wiring ─────────────────────────────────────────
+      const shiftDetector = createShiftEdgeDetector()
+      let shiftUpCount = 0
+      let shiftDownCount = 0
+      function feedShiftDetector(decodedFrame) {
+        const events = shiftDetector.feed(decodedFrame, Math.round(performance.now()))
+        for (const e of events) {
+          if (e.direction === 'up') shiftUpCount += 1
+          else shiftDownCount += 1
+          log('controller', 'shift-event', undefined, undefined, e)
+        }
+        document.getElementById('shift-up-count').textContent = shiftUpCount
+        document.getElementById('shift-down-count').textContent = shiftDownCount
+      }
+
+      // ── environment check ──────────────────────────────────────────────────
+      const envEl = document.getElementById('env-check')
+      envEl.innerHTML = `
+        Web Bluetooth available: <b>${!!navigator.bluetooth}</b><br/>
+        Secure context: <b>${window.isSecureContext}</b><br/>
+        User agent: ${navigator.userAgent}
+      `
+
+      // A device permission-granted via requestDevice() can be the SAME underlying
+      // BluetoothDevice object across repeated connect clicks in one page session —
+      // guard so we don't stack up duplicate 'gattserverdisconnected' listeners.
+      function attachDisconnectListener(device, label, statusElId) {
+        if (device._bleLabDisconnectAttached) return
+        device._bleLabDisconnectAttached = true
+        device.addEventListener('gattserverdisconnected', () => {
+          document.getElementById(statusElId).textContent = 'disconnected (gattserverdisconnected)'
+          log(label, 'system', undefined, undefined, { event: 'gattserverdisconnected' })
+        })
+      }
+
+      // ── Trainer device ──────────────────────────────────────────────────────
+      let trainerDevice = null
+      let trainerServer = null
+      const trainerChars = {}
+
+      document.getElementById('trainer-connect').onclick = async () => {
+        try {
+          trainerDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [FTMS.SERVICE] }],
+            optionalServices: [FTMS.SERVICE, ZWIFT_SVC_LEGACY, ZWIFT_SVC_NEW, 'battery_service', 'device_information'],
+          })
+          attachDisconnectListener(trainerDevice, 'trainer', 'trainer-status')
+          trainerServer = await trainerDevice.gatt.connect()
+          document.getElementById('trainer-status').textContent = `connected: ${trainerDevice.name || '(unnamed)'}`
+          log('trainer', 'system', undefined, undefined, { event: 'connected', name: trainerDevice.name })
+          await dumpAndSubscribe(trainerServer, 'trainer', document.getElementById('trainer-gatt'), trainerChars)
+        } catch (err) {
+          log('trainer', 'system', undefined, undefined, { event: 'connect-error', error: String(err) })
+        }
+      }
+      document.getElementById('trainer-disconnect').onclick = () => {
+        trainerDevice?.gatt?.disconnect()
+      }
+
+      function trainerCP() {
+        return trainerChars[Object.keys(trainerChars).find((u) => u.startsWith('00002ad9'))]
+      }
+
+      document.getElementById('trainer-request-control').onclick = () => writeBytes(trainerCP(), new Uint8Array([0x00]), 'trainer')
+      document.getElementById('trainer-request-start').onclick = () => writeBytes(trainerCP(), new Uint8Array([0x07]), 'trainer')
+      document.getElementById('trainer-reset').onclick = () => writeBytes(trainerCP(), new Uint8Array([0x01]), 'trainer')
+
+      document.getElementById('send-erg').onclick = () => {
+        const watts = parseInt(document.getElementById('erg-watts').value, 10)
+        const buf = new Uint8Array(3)
+        buf[0] = 0x05
+        buf[1] = watts & 0xff
+        buf[2] = (watts >> 8) & 0xff
+        writeBytes(trainerCP(), buf, 'trainer')
+      }
+
+      document.getElementById('send-sim').onclick = () => {
+        const gradePct = parseFloat(document.getElementById('sim-grade').value)
+        const windMps = parseFloat(document.getElementById('sim-wind').value)
+        const crr = parseFloat(document.getElementById('sim-crr').value)
+        const cw = parseFloat(document.getElementById('sim-cw').value)
+        const bytes = encodeSimParams({ gradePct, windMps, crr, cw })
+        log('trainer', 'write-intent', ZWIFT_CHAR.SYNC_RX, toHex(bytes), decodeSimParams(bytes))
+        writeBytes(trainerCP(), bytes, 'trainer')
+      }
+
+      document.getElementById('trainer-raw-send').onclick = () => {
+        const bytes = parseHexInput(document.getElementById('trainer-raw-hex').value)
+        writeBytes(trainerCP(), bytes, 'trainer')
+      }
+
+      // ── Controller (Click) device ────────────────────────────────────────────
+      let clickDevice = null
+      let clickServer = null
+      const clickChars = {}
+
+      document.getElementById('click-connect').onclick = async () => {
+        try {
+          clickDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'Zwift Click' }],
+            optionalServices: [ZWIFT_SVC_LEGACY, ZWIFT_SVC_NEW, 'battery_service', 'device_information'],
+          })
+          attachDisconnectListener(clickDevice, 'controller', 'click-status')
+          clickServer = await clickDevice.gatt.connect()
+          document.getElementById('click-status').textContent = `connected: ${clickDevice.name || '(unnamed)'}`
+          log('controller', 'system', undefined, undefined, { event: 'connected', name: clickDevice.name })
+          await dumpAndSubscribe(clickServer, 'controller', document.getElementById('click-gatt'), clickChars)
+        } catch (err) {
+          log('controller', 'system', undefined, undefined, { event: 'connect-error', error: String(err) })
+        }
+      }
+      document.getElementById('click-disconnect').onclick = () => {
+        clickDevice?.gatt?.disconnect()
+      }
+
+      function clickSyncRx() {
+        return clickChars[Object.keys(clickChars).find((u) => u.startsWith('00000003-19ca'))]
+      }
+
+      document.getElementById('click-rideon').onclick = () => {
+        const rideOn = new Uint8Array([0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e]) // "RideOn"
+        writeBytesNoResponse(clickSyncRx(), rideOn, 'controller')
+      }
+      document.getElementById('click-haptic').onclick = () => {
+        const haptic = new Uint8Array([0x12, 0x12, 0x08, 0x0a, 0x06, 0x08, 0x02, 0x10, 0x00, 0x18, 0x20])
+        writeBytesNoResponse(clickSyncRx(), haptic, 'controller')
+      }
+      document.getElementById('click-raw-send').onclick = () => {
+        const bytes = parseHexInput(document.getElementById('click-raw-hex').value)
+        writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
+      }
+
+      // Debug hook for driving exact/concurrent command sequences via evaluate_script,
+      // so hands-free experiments (HW-V7/V8/V10/V12) don't need manual button clicks.
+      // `sendRaw` intentionally returns the write promise WITHOUT awaiting it here —
+      // callers decide whether to await (serialized) or fire multiple without awaiting
+      // (genuinely concurrent/unserialized, needed for HW-V10's race test).
+      window.__bleLab = {
+        trainerConnected: () => !!trainerServer,
+        sendRaw: (bytes) => writeBytes(trainerCP(), new Uint8Array(bytes), 'trainer'),
+        encodeSim: (opts) => encodeSimParams(opts),
+        log: (source, note) => log(source, 'note', undefined, undefined, { note }),
+      }
+    </script>
+  </body>
+</html>
