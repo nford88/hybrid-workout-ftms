@@ -37,9 +37,8 @@ export default function VirtualGearSettings() {
         Rider &amp; Bike Physics
       </h3>
       <p className="text-xs text-gray-500 mb-3">
-        Feeds the SIM-mode Crr/Cw sent to your trainer. Weight isn&apos;t used in any
-        calculation yet — reserved for the virtual-shifting drivetrain model (not yet
-        implemented).
+        Feeds the SIM-mode Crr/Cw sent to your trainer. Weight isn&apos;t used in any calculation
+        yet — reserved for the virtual-shifting drivetrain model (not yet implemented).
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -71,7 +70,11 @@ export default function VirtualGearSettings() {
 
         <div>
           <label className="form-label text-xs">Tire type</label>
-          <select id="tire-type-select" className="form-select text-sm" defaultValue="trainer-smooth">
+          <select
+            id="tire-type-select"
+            className="form-select text-sm"
+            defaultValue="trainer-smooth"
+          >
             {TIRE_CRR_PRESETS.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label} ({p.crr})
