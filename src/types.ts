@@ -86,6 +86,13 @@ export interface GearSettings {
   baselineGear: number | null
 }
 
+export interface RiderPhysicsSettings {
+  riderWeightKg: number | null
+  bikeWeightKg: number | null
+  tireType: string | null
+  ridingPosition: string | null
+}
+
 // ─── Graph ────────────────────────────────────────────────────────────────────
 
 export interface GraphConfig {

@@ -12,6 +12,8 @@ import {
   deleteFromList,
   loadGearSettings,
   saveGearSettings,
+  loadRiderPhysicsSettings,
+  saveRiderPhysicsSettings,
 } from '../../src/services/storage'
 
 // ── In-memory localStorage for these tests ───────────────────────────────────
@@ -146,5 +148,48 @@ describe('gear settings storage', () => {
     saveGearSettings({ ftp: 200, baselineGear: 3 })
     saveGearSettings({ ftp: 280, baselineGear: 5 })
     expect(loadGearSettings()).toEqual({ ftp: 280, baselineGear: 5 })
+  })
+})
+
+describe('rider physics settings storage', () => {
+  test('loadRiderPhysicsSettings returns nulls when nothing stored', () => {
+    expect(loadRiderPhysicsSettings()).toEqual({
+      riderWeightKg: null,
+      bikeWeightKg: null,
+      tireType: null,
+      ridingPosition: null,
+    })
+  })
+
+  test('saveRiderPhysicsSettings / loadRiderPhysicsSettings round-trip', () => {
+    const settings = {
+      riderWeightKg: 89,
+      bikeWeightKg: 8,
+      tireType: 'road-worn',
+      ridingPosition: 'drops',
+    }
+    saveRiderPhysicsSettings(settings)
+    expect(loadRiderPhysicsSettings()).toEqual(settings)
+  })
+
+  test('saving new settings overwrites old ones', () => {
+    saveRiderPhysicsSettings({
+      riderWeightKg: 75,
+      bikeWeightKg: 8,
+      tireType: 'trainer-smooth',
+      ridingPosition: 'trainer-default',
+    })
+    saveRiderPhysicsSettings({
+      riderWeightKg: 89,
+      bikeWeightKg: 8,
+      tireType: 'road-worn',
+      ridingPosition: 'drops',
+    })
+    expect(loadRiderPhysicsSettings()).toEqual({
+      riderWeightKg: 89,
+      bikeWeightKg: 8,
+      tireType: 'road-worn',
+      ridingPosition: 'drops',
+    })
   })
 })

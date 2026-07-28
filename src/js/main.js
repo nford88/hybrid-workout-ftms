@@ -17,9 +17,12 @@ import {
   deleteFromList,
   loadGearSettings,
   saveGearSettings,
+  loadRiderPhysicsSettings,
+  saveRiderPhysicsSettings,
 } from '../services/storage.js'
 import { preprocessRouteData, getGradeForDistance } from '../services/routeService.js'
 import { calculateRealisticGrade } from '../services/simPhysics.js'
+import { resolvePhysicsConstants, ZWIFT_CRR, ZWIFT_CW } from '../services/riderPhysics.js'
 import {
   GRAPH_CONFIG,
   calculateWorkoutMetrics,
@@ -82,6 +85,12 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     baselineGearSelect: document.getElementById('baseline-gear-select'),
     applyFtpButton: document.getElementById('apply-ftp-button'),
     powerCurveStatus: document.getElementById('power-curve-status'),
+
+    // Rider & bike physics settings elements
+    riderWeightInput: document.getElementById('rider-weight-input'),
+    bikeWeightInput: document.getElementById('bike-weight-input'),
+    tireTypeSelect: document.getElementById('tire-type-select'),
+    ridingPositionSelect: document.getElementById('riding-position-select'),
   }
 
   // ---- FTMS instance (getter to always reference window.ftms)
@@ -122,6 +131,10 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       virtualGearEnabled: true,
       currentGear: 5, // Baseline gear (34/17, calibration baseline)
     },
+
+    // SIM-mode Crr/Cw resolved from rider physics settings (riderPhysics.js);
+    // defaults match Zwift's own pinned constants until settings are loaded/applied.
+    simPhysics: { crr: ZWIFT_CRR, cw: ZWIFT_CW },
   }
 
   // ---- timers
@@ -517,16 +530,25 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       D.baselineGearSelect.value = savedBaselineGear
     }
 
-    // Apply saved settings to VirtualGear on boot
+    // Apply saved baseline gear on boot (harmless — doesn't touch calibration.method).
+    // Deliberately NOT calling setFTP() here: setFTP() always regenerates the
+    // FTP-based curve and flips calibration.method away from 'calibrated', which
+    // would silently discard the bench-measured CALIBRATION_V1 curve on every boot.
+    // setFTP() is still called from the Apply-button handler below, an explicit
+    // user action.
     if (window.ftms && window.ftms.virtualGear) {
-      const ftp = parseInt(D.ftpInput.value) || 250
       const baselineGear = parseInt(D.baselineGearSelect.value) || 3
-
-      window.ftms.virtualGear.setFTP(ftp)
       window.ftms.virtualGear.setBaselineGear(baselineGear)
-
       updatePowerCurveStatus()
     }
+
+    // Rider & bike physics settings
+    const savedPhysics = loadRiderPhysicsSettings()
+    D.riderWeightInput.value = savedPhysics.riderWeightKg ?? D.riderWeightInput.value
+    D.bikeWeightInput.value = savedPhysics.bikeWeightKg ?? D.bikeWeightInput.value
+    if (savedPhysics.tireType) D.tireTypeSelect.value = savedPhysics.tireType
+    if (savedPhysics.ridingPosition) D.ridingPositionSelect.value = savedPhysics.ridingPosition
+    H.state.simPhysics = resolvePhysicsConstants(savedPhysics)
 
     // Apply button event listener
     D.applyFtpButton.addEventListener('click', () => {
@@ -538,11 +560,31 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
         return
       }
 
+      const riderWeightKg = parseFloat(D.riderWeightInput.value)
+      const bikeWeightKg = parseFloat(D.bikeWeightInput.value)
+      if (!riderWeightKg || riderWeightKg < 30 || riderWeightKg > 200) {
+        H.utils.showError('Please enter a valid rider weight between 30-200kg')
+        return
+      }
+      if (Number.isNaN(bikeWeightKg) || bikeWeightKg < 0 || bikeWeightKg > 30) {
+        H.utils.showError('Please enter a valid bike weight between 0-30kg')
+        return
+      }
+
       if (window.ftms && window.ftms.virtualGear) {
         window.ftms.virtualGear.setFTP(ftp)
         window.ftms.virtualGear.setBaselineGear(baselineGear)
 
         saveGearSettings({ ftp, baselineGear })
+
+        const physicsSettings = {
+          riderWeightKg,
+          bikeWeightKg,
+          tireType: D.tireTypeSelect.value,
+          ridingPosition: D.ridingPositionSelect.value,
+        }
+        saveRiderPhysicsSettings(physicsSettings)
+        H.state.simPhysics = resolvePhysicsConstants(physicsSettings)
 
         updatePowerCurveStatus()
         H.utils.showError('Virtual gearing settings applied!', 'success')
@@ -788,8 +830,8 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
     const {
       windMS = 0.0,
-      crr = 0.003,
-      cw = 0.45,
+      crr = H.state.simPhysics.crr,
+      cw = H.state.simPhysics.cw,
       currentSpeed = 0,
       currentDistance = 0,
       forceUpdate = false,
@@ -870,8 +912,8 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
         toPct: targetPct,
         stepPct: 1,
         dwellMs: 1800,
-        crr: 0.003,
-        cwa: 0.45,
+        crr: H.state.simPhysics.crr,
+        cwa: H.state.simPhysics.cw,
         windMps: 0.0,
       })
     } catch (err) {
@@ -969,8 +1011,8 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     // This will be throttled by setSimGrade to prevent conflicts
     setSimGrade(gradePct, {
       windMS: 0.0,
-      crr: 0.003,
-      cw: 0.45,
+      crr: H.state.simPhysics.crr,
+      cw: H.state.simPhysics.cw,
       currentSpeed: currentSpeedKph,
       currentDistance: S.simDistanceTraveled || 0,
     })

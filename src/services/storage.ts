@@ -5,7 +5,13 @@
  * Each domain has explicit read/write functions; JSON handling is done internally.
  */
 
-import type { GarminRoute, WorkoutStep, SavedWorkoutEntry, GearSettings } from '../types.js'
+import type {
+  GarminRoute,
+  WorkoutStep,
+  SavedWorkoutEntry,
+  GearSettings,
+  RiderPhysicsSettings,
+} from '../types.js'
 
 const KEYS = {
   GARMIN_ROUTE: 'garminRoute',
@@ -14,6 +20,10 @@ const KEYS = {
   SAVED_WORKOUT_PREFIX: 'savedWorkout_',
   USER_FTP: 'userFTP',
   BASELINE_GEAR: 'baselineGear',
+  RIDER_WEIGHT_KG: 'riderWeightKg',
+  BIKE_WEIGHT_KG: 'bikeWeightKg',
+  TIRE_TYPE: 'tireType',
+  RIDING_POSITION: 'ridingPosition',
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -107,4 +117,27 @@ export function loadGearSettings(): GearSettings {
 export function saveGearSettings({ ftp, baselineGear }: GearSettings): void {
   writeJSON(KEYS.USER_FTP, ftp)
   writeJSON(KEYS.BASELINE_GEAR, baselineGear)
+}
+
+// ── Rider & bike physics settings ─────────────────────────────────────────────
+
+export function loadRiderPhysicsSettings(): RiderPhysicsSettings {
+  return {
+    riderWeightKg: readJSON<number | null>(KEYS.RIDER_WEIGHT_KG, null),
+    bikeWeightKg: readJSON<number | null>(KEYS.BIKE_WEIGHT_KG, null),
+    tireType: readJSON<string | null>(KEYS.TIRE_TYPE, null),
+    ridingPosition: readJSON<string | null>(KEYS.RIDING_POSITION, null),
+  }
+}
+
+export function saveRiderPhysicsSettings({
+  riderWeightKg,
+  bikeWeightKg,
+  tireType,
+  ridingPosition,
+}: RiderPhysicsSettings): void {
+  writeJSON(KEYS.RIDER_WEIGHT_KG, riderWeightKg)
+  writeJSON(KEYS.BIKE_WEIGHT_KG, bikeWeightKg)
+  writeJSON(KEYS.TIRE_TYPE, tireType)
+  writeJSON(KEYS.RIDING_POSITION, ridingPosition)
 }

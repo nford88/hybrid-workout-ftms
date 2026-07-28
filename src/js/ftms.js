@@ -238,7 +238,7 @@ class FTMSClient extends Emitter {
     const grade = Math.round(gradePct * 100) // 0.01% units -> s16
     const crrByte = Math.round(crr * 10000) // 1/10000 -> u8
     const cwaByte = Math.round(cwa * 100) // 1/100 -> u8
-    const wind = Math.round(windMps * 100) // 0.01 m/s -> s16
+    const wind = Math.round(windMps * 1000) // 0.001 m/s -> s16 (FTMS spec resolution)
 
     // bounds clamp
     const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
@@ -256,7 +256,7 @@ class FTMSClient extends Emitter {
     dv.setUint8(6, cwaClamped)
 
     this._log(
-      `WRITE FTMS SIM wind=${(windClamped / 100).toFixed(2)}m/s grade=${(gradeClamped / 100).toFixed(2)}% crr=${(crrClamped / 10000).toFixed(4)} cw=${(cwaClamped / 100).toFixed(2)}: ${hex(payload)} `
+      `WRITE FTMS SIM wind=${(windClamped / 1000).toFixed(3)}m/s grade=${(gradeClamped / 100).toFixed(2)}% crr=${(crrClamped / 10000).toFixed(4)} cw=${(cwaClamped / 100).toFixed(2)}: ${hex(payload)} `
     )
     await this._writeCpAndWaitAck(0x11, payload)
   }
