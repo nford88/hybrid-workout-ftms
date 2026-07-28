@@ -366,13 +366,14 @@ SwiftControl), [lord's Web Bluetooth gist](https://gist.github.com/lord/7a4e1fcc
 | L7 | Two concurrent BLE devices from one Chrome page | CONFIRMED (spec, Auuki); **re-confirmed on our own hardware pairing 2026-07-28** — see `virtual-shifting/experiments/01-dual-connection-smoke-test.md` (HW-V0: ~76s stable, zero drops) |
 | L8 | FTMS 0x11 field layout; 0x00 control persists; serialize on 0x80; ERG/SIM last-write-wins | CONFIRMED (FTMS v1.0 spec). **HW-V10, 2026-07-28** (`virtual-shifting/experiments/05-ftms-conformance-hw-v10.md`): on our KICKR, control persistence goes further than spec-required — Reset (0x01) does NOT revoke it either (spec deviation). ERG/SIM interleave accepted with no conflicts. Concurrent-write serialization untestable from one Web Bluetooth client — Chrome's own GATT layer blocks it before it reaches the trainer |
 | L9 | Trainer solves resistance from sim params + measured flywheel speed using standard road physics; mass is trainer-internal | CONFIRMED (ftmsemu; formula is convention, not spec) |
-| L10 | QZ hub-protocol recipe (handshake `RideOn 02 01`, init, 0.4 % incline first, ratio×10000 + `00 08 88 04`) drives trainer-native shifting | CONFIRMED in QZ source; UNKNOWN on this KICKR from this codebase (HW-V9) |
+| L10 | QZ hub-protocol recipe (handshake `RideOn 02 01` + 8 more init writes, 0.4 % incline first, ratio×10000×(42/14) + `00 08 88 04`) drives trainer-native shifting | CONFIRMED in QZ source, **byte-level decode completed 2026-07-28** (`virtual-shifting/PROTOCOLS.md` §2.2 — full 11-write handshake, one write of unknown command code `0x41` flagged as new UNKNOWN); the `00 08 88 04` bytes are a `HubRequest{DataId=520}` verification poll, not a distinct "apply" message (§2.2.1 — corrects the prior framing). U6 (42/14 normalization) and U7 (FTMS/hub coexistence) both **resolved from source** this session — see `virtual-shifting/HYPOTHESES.md` H21/H22. Still UNKNOWN on this KICKR specifically (HW-V9) |
 | L11 | Feb-2026 prototype failed because it sent controller-family, not hub-family, messages | INFERRED (high confidence) |
 | L12 | Zwift 0x11 cadence ≈ 1 Hz; KICKR-specific FTMS command-drop quirks | INFERRED / UNKNOWN (no primary source) |
-| L13 | Trainer's assumed rider mass value on KICKR Core (affects grade-solve accuracy) | UNKNOWN (HW-V8) |
+| L13 | Trainer's assumed rider mass value on KICKR Core (affects grade-solve accuracy) | **CONFIRMED 2026-07-28**: `m_t`=93.3kg regressed (R²=0.9999) vs actual 92kg (89kg rider + 3kg bike) — within 1.4%. **But this is a fixed trainer-side default, not a personalized value** — the Wahoo app's own rider-weight profile is 81kg, matching neither number, and FTMS has no protocol channel to transmit rider mass (confirmed by this same claim's own text below). See `virtual-shifting/experiments/06-hw-v7-v8-mass-regression.md`. Every rider gets this same fixed default regardless of actual weight; R3's trim factor is the only correction available |
 | L14 | Click v2 vendor-unlock requirement applies to the user's specific Click | **CONFIRMED 2026-07-28, likely**: repeated ~44–90s disconnects pre-workaround, 5+ min stable connection after pairing once in Zwift Companion. See `virtual-shifting/experiments/03-click-buttons-partial.md` |
 | L15 | Felt latency budget app-side FTMS shift ≈ 1–1.5 s on real trainers | CONFIRMED for other hardware (simcline); UNKNOWN for KICKR Core (HW-V7) |
 | L16 | The user's two Click units (Left/Right) form a relay pair — only one needs a BLE connection to receive both controllers' button events | **CONFIRMED 2026-07-28**: `virtual-shifting/experiments/04-click-mapping-and-relay-confirmed.md`. Simplifies §4.6's connection-management design — the controller side needs only one GATT slot, not two |
+| L17 | The shift-primitive bake-off (§5 HW-V12) — candidate (a) grade-offset additive works cleanly (no dead zone, monotonic, stable) but scores only 17/20 (arbitrary/non-speed-scaled step size); candidates (b)-(f) still untested | **PARTIAL 2026-07-28**: `virtual-shifting/experiments/08-hw-v12-bakeoff-partial.md` — 2% baseline 175.3W(harder)/135.1W(easier); 0% baseline 85.4W(harder)/58.9W(easier). Session ended early (rider fatigue); candidate (b)'s corrected target grades pre-computed for the next session using this session's own measured baseline gear ratio (found the design's illustrative default r_phys=2.40 does not match this rider's actual gear — real ≈1.85) |
 
 Conflicts surfaced during research (kept, not silently resolved):
 - Handshake status bytes after `RideOn` differ across sources (`01 02`/`01 01` captures vs
@@ -497,6 +498,14 @@ sin θ' ≈ (P_target / v_fly − Cw·v_fly² − m_t·g·Crr) / (m_t·g)      /
 G_send = 100 × tan(asin(clamp(sin θ', −0.35, 0.35)))
 ```
 
+- **Small-angle approximation, quantified (2026-07-28 deep dive)**: the `cos θ'≈1`
+  substitution above only affects the `Crr` term when solving; the final `G_send` is
+  still exact trig (`tan(asin(·))`). Algebraically the induced error reduces to
+  `sin θ' = sin θ_true − Crr·(1−cos θ_true)`, independent of mass/speed/Cw — numerically
+  negligible even at 20% grade (~0.007 percentage points, below the FTMS wire format's own
+  0.01%-resolution quantization floor). **No change needed**; full derivation, numbers,
+  and comparison against QZ's exact-trig forward calculation (`bike.cpp::
+  computeSlopeTargetPower`) in `virtual-shifting/HYPOTHESES.md` §F.
 - `m_t` is the mass the **trainer** assumes (UNKNOWN L13 → hardware experiment HW-V8;
   until measured, assume `m_t = m` and expose a single trim factor).
 - **Baseline identity**: when `r_gear = r_phys` and `m_t = m`, the equation collapses to
@@ -589,7 +598,15 @@ vendor challenges in v1 of this feature.
 - Order independence: controller events are buffered/no-op until the drivetrain exists;
   trainer commands never depend on controller state.
 
-### 4.6′ Plan A′ (optional, flag-gated): trainer-native Zwift-protocol shifting
+### 4.6′ Plan A′ — DROPPED (2026-07-28, user decision; kept for historical context only)
+
+**Out of scope.** This project's goal is an FTMS-only equivalent *feel*, not
+reverse-engineering/reimplementing Zwift's proprietary protocol (GOALS.md non-goals).
+The section below is preserved as-written from the original design session for
+historical reference — do not resume HW-V9 or build `services/zwiftHub.ts` unless this
+decision is explicitly revisited. §4.8 (Trainer Difficulty) and the personalized
+calibration pipeline (`experiments/09-outdoor-stream-physics-regression.md`) are this
+project's actual answer to "how do we get Zwift-like feel," in place of Plan A′.
 
 Not required for the deliverable feel, but the KICKR Core supports firmware-side shifting
 (L2) and QZ documents the exact recipe (L10). Behind a dev flag, on the **trainer's**
@@ -616,6 +633,123 @@ both devices (L5, L7).
 - Tests to add: drivetrain math (baseline identity, flat/descent behavior, coast guard,
   clamps), ZAP frame parser (byte fixtures from §2.3), command-queue coalescing/serialization
   (extend tests/mocks/ftms-mock.js), shift-during-ERG no-op.
+
+### 4.8 Trainer Difficulty (trim) — added 2026-07-28, user-driven scope clarification
+
+Matches real Zwift's "Trainer Difficulty" setting (0-100%, Zwift default 50%) exactly,
+not a simplified variant:
+
+```
+grade_to_trainer = drivetrain_G_send(gear-translated grade) × trim_fraction
+```
+
+Applied as the **last** step before the FTMS 0x11 write — after gear translation (§4.3),
+after route-grade smoothing (`calculateRealisticGrade`, simPhysics.ts). `trim_fraction`
+is a single user setting (0.0-1.0), independent of, and not to be confused with, the
+mass/Crr/Cw **calibration** trim factor (design §6 Risk R3) — that one corrects for the
+trainer's fixed internal mass assumption; this one is a felt-difficulty preference.
+Consider distinct setting names in the UI/storage layer to avoid the collision (e.g.
+`trainerDifficulty` vs `massCalibrationTrim`).
+
+**Critical behavioral requirement, confirmed against real Zwift's actual behavior
+(not assumed)**: route simulation — distance covered, reported speed, workout
+progress — is computed from the rider's **real measured power** against the **real,
+un-trimmed** route grade, via the existing SIM physics pipeline
+(`simPhysics.ts`/`H.sim.updateSimMode`) completely unchanged. Trainer Difficulty affects
+only what resistance the trainer presents to the rider's legs; it must never leak into
+distance/speed/route-progress math, or the route and the felt effort would silently
+drift apart from what a real Zwift rider expects.
+
+No new hardware unknowns — this is a pure software multiplier on an already-designed
+signal path, needs no HW-Vn experiment of its own.
+
+### 4.9 Personalized calibration (the actual "working curve" validation) — added 2026-07-28
+
+**This section is the current core deliverable** (superseding Plan A′'s former role as
+"the premium path"). The rider mass/Crr/Cw constants used in §4.3's model must be
+derivable from a specific rider's own real outdoor riding data, not permanently fixed at
+this project's own measured defaults (92kg/0.004/0.51). Validate on one rider's data
+first (this project's), then generalize.
+
+- **Tooling**: `experiments/intervals-icu-power-model-chart.js` — an intervals.icu
+  Custom Activity Chart script (built 2026-07-28, run twice against two real rides) that
+  fits mass/Crr/Cw from a ride's per-second power/speed/grade/altitude streams via three
+  methods (naive regression, flat-segment aero sweep, Chung virtual-elevation grid
+  search) — chosen because a naive whole-ride regression on binned data was tried first
+  and failed from grade/speed collinearity (`experiments/07`, `09` full writeup). Both
+  runs gave a plausible, mutually-consistent mass estimate (~98kg) from the Chung method
+  only; Crr/Cw did not yet reproduce across the two rides. The climb-only R² breakout
+  this validation actually needs (see "Success bar" below) has code in place but no run
+  yet — `experiments/09` has the full detail and is the source of truth, not this bullet.
+- **Success bar**: the fitted constants, forward-run through §4.3's steady-state
+  formula, should predict a rider's measured power at a given grade close enough that
+  gear choices "feel right" — not perfect, physically-exact reproduction (explicitly not
+  the goal — GOALS.md).
+- **Path to generalization** (clarified 2026-07-28, RISKS-ROADMAP.md open question 11):
+  the intended near-term mechanism is AI-assisted, not a new app feature — run a
+  calibration script against ~5 of a rider's real rides, copy each ride's
+  `calibrationJson` summary (mass/Crr/Cw/fit-quality), paste them into a chat, and have
+  them averaged into one settings file. That settings file still needs a landing spot in
+  the app (manual entry vs. settings import vs. a deeper integration is still undecided).
+- **First real validation result, 3 rides (2026-07-28) — currently negative, not a green
+  light.** Full detail in `experiments/09`, headline here: on **every one of 3 real
+  rides**, the fixed HW-V8 trainer constants (93.3kg/0.004/0.51) beat the rider's own
+  outdoor-fitted model on climb-only (`grade>2%`) R² **and** MAE, by 6-33W and widening
+  ride to ride. **This is the opposite of what this section's validation was hoping to
+  confirm.** Two real confounds were identified at the time but not yet ruled out: a
+  coarsened Crr/Cw search grid (cut to fix a sandbox memory limit) that may be too coarse
+  to resolve Cw at all, and a mismatch between Method C's fitting objective (includes an
+  acceleration term) and the evaluation metric used here (does not).
+- **Offline full-precision re-fit (2026-07-28, same day, `experiments/10`) — both
+  confounds above substantially disentangled; headline verdict unchanged, still
+  negative, but now much better understood.** Re-ran the fit on 3 real FIT files (no
+  downsampling, Method C as a continuous joint `scipy.optimize` over mass/Crr/Cw instead
+  of a discrete grid) instead of the intervals.icu sandbox. **Removing the grid did not
+  converge Cw** — it moved to a *wider* spread (0.050-0.436 across 3 rides) than the
+  coarse grid's suspicious identical-0.30, and 2 of 3 rides' mass optimum hit the search's
+  150kg physical bound. Verified via a profile-likelihood mass scan (RMSE keeps improving
+  well past 150kg) that this is a genuine unconstrained optimum, not a narrow-search-
+  window artifact — and traced the mechanism analytically: as mass→∞ in the Chung solve,
+  `sinθ → −Crr − a/g`, independent of power, so the fit can substitute measured
+  acceleration (which correlates with real slope) for power at implausible masses. This
+  is a real non-identifiability in single-ride Chung fitting, not a resolution problem.
+  **Climb-only breakout evaluated under both the steady-state formula AND an
+  acceleration-inclusive variant** (`P_accel = P_steady + m·a·v`, matching what Method C
+  itself optimizes) — the trainer constants beat the fitted model **on every ride, under
+  both formulas**, directly refuting the fit-objective/evaluation-metric mismatch as a
+  sufficient explanation on its own. One ride did show real improvement from full
+  precision alone (climb MAE 99.8W→65.9W vs. its sandboxed coarse-grid result), but the
+  trainer model still won outright on that ride too (53.5W MAE, the only positive climb
+  R² anywhere in the analysis). **Until a multi-ride joint fit or a mass-held-fixed
+  variant is tried (see `experiments/10`'s follow-ups), treat single-ride personalized
+  calibration as methodologically unable to beat the fixed defaults for this rider's
+  data** — not merely "unvalidated pending a better grid" as the earlier framing had it.
+  The "path to generalization" mechanism above is still the intended one *if* a future
+  fitting method resolves this; the fitted numbers this method currently produces are not
+  just unproven but actively unstable (mass hitting a physical search boundary on 2 of 3
+  rides), and should not be averaged into a settings file as-is.
+- **Same-day correction**: a coarse-grid companion run the user supplied afterward
+  confirmed all 3 FIT files above (not just one) are paired with a fresh coarse-grid
+  fit of the same rides. The headline verdict is unchanged (trainer constants still win
+  on climb-only accuracy on every ride), but the coarse grid's narrow, seed-centered
+  mass window turned out to produce more physically plausible masses on all 3 rides
+  than the continuous optimizer's wider bound did — and on the ride with the widest
+  divergence, the continuous optimizer's *lower* fitting-objective error corresponded to
+  a *worse* climb-power prediction. See `experiments/10`'s "Matched coarse-grid
+  comparison" section for the full ride-by-ride numbers.
+- **Same-day major update**: the user then supplied their actual known mass (89kg
+  rider + 8kg bike = 97kg), which the earlier analysis did not have (it had only used
+  97kg as an optimizer *seed*, still free to drift — which is why it drifted to 150kg
+  on 2 of 3 rides). Re-fitting with mass **locked** at 97kg and only Crr/Cw free
+  eliminated the mass-boundary degeneracy entirely, converged Crr to a tight
+  physically-sensible range (0.0152-0.0200), and **collapsed the climb-only MAE gap to
+  the trainer constants from 12-66W down to under 7W on every ride — with the fitted
+  model winning outright on one of the 3 rides**. Cw still did not converge
+  (0.050-0.259), consistent with the root cause being specifically in the mass
+  dimension. **This meaningfully upgrades the outlook: personalized calibration is no
+  longer a clear loss against the fixed defaults — it's now roughly competitive**,
+  though not yet a clear win (n=3, Cw still unresolved). See `experiments/10`'s
+  "Update (same day): fixed-mass refit" section for full numbers.
 
 ---
 

@@ -19,17 +19,26 @@
 
 ## One-paragraph summary
 
+**Scope note (2026-07-28, supersedes the "Plan A′" framing below): this project builds
+an FTMS-only equivalent of Zwift's virtual-shifting *feel*, not a reimplementation of
+Zwift's proprietary protocol** — hacking that protocol is explicitly out of scope (see
+GOALS.md non-goals). Perfect physical accuracy isn't the bar either, since it will never
+match every rider exactly; the bar is a curve **calibrated per-rider from their own real
+riding data** (see `VIRTUAL_SHIFTING_DESIGN.md` §4.9, `experiments/09-*`).
+
 Zwift-quality virtual shifting is **not** achieved by multiplying the SIM gradient (the
 repo's current model — it's dead at 0 % grade and inverted on descents). Zwift sends the
 trainer a **gear ratio** over a proprietary BLE service and the trainer firmware computes
-resistance locally. Our design: (1) a device-agnostic shift-input abstraction with a
-**Zwift Click over Web Bluetooth** adapter (proven feasible — unencrypted `RideOn`
-handshake, plain protobuf button frames); (2) a **virtual-speed drivetrain model** that
-solves the FTMS 0x11 grade so the trainer demands the power the rider would need in the
-virtual gear — physically correct everywhere, zero per-gear calibration; (3) an FTMS
-command queue (request control once, coalesce, serialize on ACK). A flag-gated "Plan A′"
-targets the KICKR Core's native Zwift-protocol shifting (supported since fw 1.3.17).
-No native bridge is needed — Web Bluetooth reaches both devices concurrently.
+resistance locally — useful context for *why* the old multiplier model is wrong, but not
+a path this project pursues (see scope note above). Our design: (1) a device-agnostic
+shift-input abstraction with a **Zwift Click over Web Bluetooth** adapter (proven
+feasible — unencrypted `RideOn` handshake, plain protobuf button frames); (2) a
+**virtual-speed drivetrain model** that solves the FTMS 0x11 grade so the trainer demands
+the power the rider would need in the virtual gear — physically correct everywhere, zero
+per-gear calibration, with mass/Crr/Cw calibratable per-rider (§4.9); (3) an FTMS command
+queue (request control once, coalesce, serialize on ACK); (4) a Zwift-matching **Trainer
+Difficulty** trim (§4.8). No native bridge is needed — Web Bluetooth reaches both devices
+concurrently.
 
 ## Session log
 
@@ -38,8 +47,15 @@ No native bridge is needed — Web Bluetooth reaches both devices concurrently.
   Web Bluetooth feasibility); design doc + this knowledge base written. Key discovery:
   the Feb-2026 prototype failed because it sent *controller-family* Zwift messages to the
   trainer instead of the *hub-family* gear command (see HYPOTHESES.md H7/H8).
-- **(next)** — Run VALIDATION-PLAN.md HW-V1…V5 with the physical Zwift Click; record
-  results in HYPOTHESES.md.
+- **2026-07-28 (later same day)** — Hardware validation sessions (HW-V0 through V12
+  partial); see `experiments/README.md` for the full index. **Scope correction this
+  session**: Plan A′ (Zwift hub-protocol reverse engineering, HW-V9) dropped as
+  explicitly out of scope — see GOALS.md non-goals and `VIRTUAL_SHIFTING_DESIGN.md`
+  §4.6′. Added Trainer Difficulty (§4.8) and elevated personalized per-rider calibration
+  via intervals.icu (§4.9) as the actual core deliverable in its place.
+- **(next)** — Resume HW-V12 (candidates (b)-(f), see
+  `experiments/08-hw-v12-bakeoff-partial.md`); run the intervals.icu calibration script
+  (`experiments/intervals-icu-power-model-chart.js`) against real ride data.
 
 ## Conventions
 

@@ -46,3 +46,10 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Claude Code local tooling (permissions/settings, not project source)
+.claude/
+
+# Generated plots from offline_fit_physics_analysis.py -- regenerate locally, never
+# committed (see docs/virtual-shifting/experiments/10-offline-fit-physics-analysis.md)
+docs/virtual-shifting/experiments/10-*.png

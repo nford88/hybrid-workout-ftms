@@ -102,31 +102,258 @@ watchdog); `0x19 08 <level>` = battery %; `0xFE` = disconnect warning family
 
 Same service/characteristic UUIDs as §1.2, but on the **trainer** (KICKR Core exposes
 them alongside FTMS). Messages are **unencrypted** protobuf. Source: makinolo "Zwift
-Trainer protocol" + qdomyos-zwift `ftmsbike.cpp` (working implementation).
+Trainer protocol" + qdomyos-zwift `ftmsbike.cpp` (working implementation) + **the full
+protobuf schema**, `src/devices/zwifthubbike/Zwift hub.proto` — **fetched and read in
+full 2026-07-28 deep-dive session** (164 lines total; the prior session had only read the
+first ~150 lines / the 3 core messages below — this supersedes that partial read).
 
-- **What Zwift sends on shift**: protobuf `HubCommand` (message 0x04) containing
-  `SimulationParam { Wind, InclineX100, CWa, Crr }` and
-  `PhysicalParam { GearRatioX10000, BikeWeightX100, RiderWeightX100 }`.
-  The trainer firmware computes resistance locally from ratio + grade + mass.
-  Zwift pins Wind=0, CWa=0.51, Crr=0.004.
-- **Riding data** (message 0x03): Power, Cadence, SpeedX100 (= **virtual** speed,
-  remapped through the gear ratio — differs from FTMS IBD), HR.
+### 2.0 Full `.proto` schema (CONFIRMED — complete file)
+
+```protobuf
+message SimulationParam {                  // command code 0x04, nested in HubCommand
+  optional sint32 Wind = 1;                // m/s * 100. In zwift there is no wind (0)
+  optional sint32 InclineX100 = 2;         // grade% * 100
+  optional uint32 CWa = 3;                 // CW*a * 10000. In zwift this is constant 0.51 (5100)
+  optional uint32 Crr = 4;                 // Crr * 100000. In zwift this is constant 0.004 (400)
+}
+message PhysicalParam {
+  optional uint32 GearRatioX10000 = 2;     // literally named "gear ratio ×10000" — confirms
+                                            // the 10000× scale is Zwift's own protocol
+                                            // convention, not a QZ invention
+  optional uint32 BikeWeightx100 = 4;
+  optional uint32 RiderWeightx100 = 5;
+}
+message HubCommand {                       // command code 0x04
+  optional uint32 PowerTarget = 3;
+  optional SimulationParam Simulation = 4;
+  optional PhysicalParam Physical = 5;
+}
+message HubRequest {                       // command code 0x00 — NEW, not previously documented
+  optional uint32 DataId = 1;
+  // proto comment: "sent always following the change of the gear ratio probably to
+  // verify it was received properly." DataId=0 → general info; DataId=1-7 →
+  // DeviceInformationContent field N; DataId=520 → gear ratio; 512-534 unidentified.
+}
+message HubRidingData {                    // command code 0x03 — 2 fields NEW vs prior read
+  optional uint32 Power = 1;
+  optional uint32 Cadence = 2;
+  optional uint32 SpeedX100 = 3;           // virtual speed, remapped through gear ratio
+  optional uint32 HR = 4;
+  optional uint32 Unknown1 = 5;            // observed values: 0 / 2864 / 4060 / 4636 / 6803
+  optional uint32 Unknown2 = 6;            // observed values: 25714 / 30091 (const/session)
+}
+```
+
+The same file also defines the Click/Play/Ride **controller**-side messages already
+documented in §1 (`PlayKeyPadStatus` cmd 0x07, `PlayCommand` cmd 0x12 haptics, `Idle` cmd
+0x19, `RideKeyPadStatus` cmd 0x23, `ClickKeyPadStatus` cmd 0x37, `DeviceInformation` cmd
+0x3c) — confirms both protocol families are one schema, not two. **No dedicated
+"gear-apply-ack" message exists anywhere in the file** — §2.2.1 shows the `00 08 88 04`
+apply bytes decode as a plain `HubRequest{DataId=520}`, reusing this message, not a new
+type.
+
+### 2.1 What Zwift sends on shift, riding data, gear table — unchanged, still CONFIRMED
+
+- protobuf `HubCommand` (message 0x04) containing `SimulationParam { Wind, InclineX100,
+  CWa, Crr }` and `PhysicalParam { GearRatioX10000, BikeWeightx100, RiderWeightx100 }` —
+  **confirmed real fields carrying actual rider/bike mass in kg×100**, not an
+  inferred/guessed mechanism. The trainer firmware computes resistance locally from ratio
+  + grade + mass — but exactly how the firmware uses the transmitted mass (vs. its own
+  internal FTMS-path default, measured as ~93.3kg on our unit in HW-V8) is still UNKNOWN
+  on our KICKR until HW-V9 specifically varies `RiderWeightx100` and checks whether
+  resistance responds. Zwift pins Wind=0, CWa=0.51, Crr=0.004.
+- **Riding data** (message 0x03, `HubRidingData`): Power, Cadence, SpeedX100 (= **virtual**
+  speed, remapped through the gear ratio — differs from FTMS IBD), HR, plus two fields
+  with unconfirmed purpose (`Unknown1`/`Unknown2`, §2.0).
 - **Zwift's 24 gear ratios** (as varint = ratio×10000, from QZ
-  `characteristicwriteprocessor0003.cpp:60-125`):
+  `characteristicwriteprocessor0003.cpp:60-125` — cross-confirmed again this session at
+  `:63-87`, e.g. gear 12's bytes `C0 BB 01` decode to `GearRatioX10000=24000`, matching
+  the same value independently observed in the handshake's `init2`/`init5` writes, §2.2):
   0.75, 0.87, 0.99, 1.11, 1.23, 1.38, 1.53, 1.68, 1.86, 2.04, 2.22, 2.40, 2.61, 2.82,
   3.03, 3.24, 3.49, 3.74, 3.99, 4.24, 4.54, 4.84, 5.14, 5.49.
-- **QZ recipe to drive it** (`ftmsbike.cpp`; UNKNOWN on our KICKR until HW-V9):
-  1. Handshake to trainer's SYNC RX: `RideOn 02 01` (hub variant), then
-     `zwiftPlayInit()` init writes (ftmsbike.cpp:203-240).
-  2. Send inclination as protobuf `SimulationParam` (`sendZwiftPlayInclination()`,
-     :411-427) — a **0.4 % inclination must precede the first gear command** (:560-565).
-  3. On shift: gear command with `gear_value = 10000 × (ratio/original_ratio) × (42/14)`
-     followed by "gearApply" bytes `00 08 88 04` (:559-612).
-     (Whether the 42/14 normalization is Hub-specific or universal: UNKNOWN — test both.)
-  4. **Suppress FTMS control-point writes while in this mode** (:89-105).
 - ⚠️ The Feb-2026 prototype failed because it sent **controller-family** messages
   (`SET_GEAR_TEST_DATA` 0xFF04, Data-Object IDs 529/532/547) to the trainer — the wrong
-  message family. The hub-family command above was never tried (INFERRED, high confidence).
+  message family. The hub-family command below was never tried (INFERRED, high confidence).
+
+### 2.2 QZ's exact wire construction (byte-level — supersedes the prior line-range-only citations)
+
+**Handshake — `ftmsbike.cpp:203-243`, the FULL 11-write sequence** (prior docs only cited
+`RideOn 02 01`; the actual init sequence is longer and was not previously decoded byte-by-byte):
+
+```
+rideOn = 52 69 64 65 4f 6e 02 01   // ASCII "RideOn" + 02 01
+init1  = 41 08 05                  // command code 0x41 — NOT in the documented proto's
+                                    // command set (0x00/0x03/0x04/0x07/0x12/0x19/0x23/0x37/0x3c).
+                                    // UNKNOWN — flagged, not resolved this pass.
+init2  = 04 2a 04 10 c0 bb 01      // HubCommand{Physical{GearRatioX10000=24000}} (ratio 2.4)
+init3  = 00 08 00                  // HubRequest{DataId=0} (general info)
+       (init1 repeated)
+init4  = 00 08 88 04               // HubRequest{DataId=520} — IDENTICAL bytes to the
+                                    // "gearApply" write below (see §2.2.1)
+init5  = 04 2a 0a 10 c0 bb 01 20 bf 06 28 b4 42
+                                    // HubCommand{Physical{GearRatioX10000=24000,
+                                    //   BikeWeightx100=831, RiderWeightx100=8500}}
+init6  = 04 22 0b 08 00 10 da 02 18 ec 27 20 90 03
+                                    // HubCommand{Simulation{Wind=0, InclineX100=173
+                                    //   (zigzag→1.73%), CWa=5100, Crr=400}}
+       (init2, init4 repeated)
+init7  = 04 22 03 10 a9 01         // HubCommand{Simulation{InclineX100=-85 zigzag (-0.85%)}}
+       (init2, init4 repeated)
+init8  = 04 22 02 10 00            // HubCommand{Simulation{InclineX100=0}}
+```
+Decode method: byte 0 = command code (`0x00`=`HubRequest`, `0x04`=`HubCommand`); remaining
+bytes are standard protobuf wire format (tag = `field<<3 | wiretype`; sint32 fields
+zigzag-encoded). **Self-check**: `init6`'s `CWa=5100`/`Crr=400` decode to exactly the
+proto's documented Zwift constants `0.51`/`0.004` — confirms the byte-level decode above is
+correct, not guessed.
+
+#### 2.2.1 CORRECTION: the `00 08 88 04` "gearApply" bytes are a `HubRequest{DataId=520}` verification poll, not a distinct apply message
+
+Prior documentation described these as "'gearApply' bytes," implying a distinct
+apply/commit message. Decoded byte-by-byte (CONFIRMED, `ftmsbike.cpp:611` — identical to
+`init4` above):
+- `0x00` = `HubRequest` command code.
+- `0x08` = tag `(1<<3)|0` → field 1, wire type 0 (varint) → `DataId`.
+- `88 04` = varint continuation: `0x88`→low7=`0x08` (continue), `0x04`→low7=`0x04` (stop)
+  ⇒ value = `0x08 | (0x04<<7)` = `8 + 512` = **520**.
+
+So this is literally `HubRequest{DataId=520}` — a request for the current gear-ratio state
+(per the proto's own comment on `HubRequest`, §2.0), sent by QZ after every gear command as
+a **verification poll**, not a commit/apply command. QZ's own local variable name
+`gearApply` (`ftmsbike.cpp:611`) is a misnomer relative to what the bytes actually do. This
+doesn't change the *practical* recipe (still send it after the gear command) but corrects
+the conceptual model: there is no separate "apply" step in the protocol — the gear ratio in
+`HubCommand.Physical.GearRatioX10000` takes effect as soon as it's received; the poll only
+checks that it landed.
+
+**Inclination send** (`sendZwiftPlayInclination()`, `ftmsbike.cpp:411-445`) — **no raw
+protobuf is built in this function on desktop/Linux Qt builds**: it delegates to
+platform-native helpers (iOS Objective-C++ `lockscreen::zwift_hub_inclinationCommand`;
+Android JNI `ZwiftHubBike.inclinationCommand`). The plain-Qt branch (`:438-441`) is an
+unimplemented stub (`qDebug() << "implement zwift hub protobuf!"`). **The byte-level
+inclination-send wire format is therefore not visible in this file** — it lives in
+per-platform native code outside this pass's scope. (`init6`/`init7`/`init8` above confirm
+inclination values arrive as `HubCommand.Simulation.InclineX100`, so the target
+message/field is confirmed even though the exact encoding call site wasn't found.)
+
+**Gear command + apply** (`ftmsbike.cpp:559-613`, matches the prior `:559-612` citation):
+```cpp
+if (zwiftPlayService && gears_zwift_ratio && lastGearValue != gears()) {
+    if (!gearInclinationSent) sendZwiftPlayInclination(0.4);   // the 0.4% quirk, confirmed
+    uint32_t gear_value = static_cast<uint32_t>(
+        10000.0 * (current_ratio / original_ratio) * (42.0 / 14.0));
+    writeCharacteristicZwiftPlay(proto, ..., "gear", ...);       // HubCommand.Physical.GearRatioX10000
+    uint8_t gearApply[] = {0x00, 0x08, 0x88, 0x04};              // HubRequest{DataId=520} — §2.2.1
+    writeCharacteristicZwiftPlay(gearApply, sizeof(gearApply), "gearApply", ...);
+}
+```
+
+### 2.3 U7 — RESOLVED: hub-protocol and FTMS control are strictly mutually exclusive, gated by one flag pair
+
+**CONFIRMED** (`ftmsbike.cpp:86-105`, read in full this session). Every FTMS caller
+(`forcePower`, `forceResistance`, `forceInclination`, `init()`, …) goes through one shared
+function:
+```cpp
+bool ftmsbike::writeCharacteristic(uint8_t *data, uint8_t data_len, ...) {
+    bool gears_zwift_ratio = settings.value(QZSettings::gears_zwift_ratio, ...).toBool();
+    if (!gattFTMSService) { ...; return false; }
+    if (zwiftPlayService && gears_zwift_ratio) {
+        qDebug() << "zwiftPlayService is present!";
+        return false;                      // FTMS write dropped, not queued, not delayed
+    }
+    return enqueueWrite(gattFTMSService, gattWriteCharControlPointId, data, data_len, ...);
+}
+```
+with the mirror-image guard on the hub side (`ftmsbike.cpp:72-84`):
+```cpp
+void ftmsbike::writeCharacteristicZwiftPlay(uint8_t *data, uint8_t data_len, ...) {
+    bool gears_zwift_ratio = settings.value(QZSettings::gears_zwift_ratio, ...).toBool();
+    if (!zwiftPlayService || !gears_zwift_ratio) { ...; return; }   // dropped if not in hub mode
+    enqueueWrite(zwiftPlayService, zwiftPlayWriteChar, ...);
+}
+```
+**Definitive answer**: it is a single runtime condition — `zwiftPlayService != nullptr`
+(a Zwift service was discovered on the connected trainer) **AND** the persisted setting
+`gears_zwift_ratio` is true. When both hold, the *same* `writeCharacteristic()` every FTMS
+command already goes through returns `false` immediately, before `enqueueWrite` is ever
+called — there is no structurally separate FTMS code path, no queueing-then-discard, just
+an early-return guard in the one shared write function. The exclusion is therefore a **mode
+switch, not a coexistence/priority scheme** — Plan A′'s integration shape should be "mode
+switch," confirming `VIRTUAL_SHIFTING_DESIGN.md` §4.6′'s existing assumption ("suppress
+FTMS CP writes while active") was already correct.
+
+### 2.4 U6 — RESOLVED: the `×(42/14)` normalization is QZ's own generic default-gearing constant, not Zwift/Hub-specific
+
+**CONFIRMED**: a repo-wide `gh api search/code` for `42.0/14.0` returns **only**
+`ftmsbike.cpp:574` — no hit in `virtualbike.cpp`, `characteristicwriteprocessor0003.cpp`,
+or anywhere else. The constant's actual source is `src/qzsettings.h:2464-2468`:
+```cpp
+static constexpr int default_gear_crankset_size = 42;   // front chainring teeth
+static constexpr int default_gear_cog_size = 14;        // rear cog teeth
+```
+— QZ's app-wide default reference-bike gearing, used to compute `original_ratio` for
+**any** device with custom gearing, not just the Hub path. `ftmsbike.cpp:574` hardcodes
+that same 42/14 ratio a **second time** as a fixed multiplier, independent of whatever the
+user actually configured. Net effect: when the user hasn't customized crankset/cog (still
+at the 42/14 default), `original_ratio` also equals 42/14, so `(current_ratio/
+original_ratio) × (42/14)` **cancels to just `current_ratio`** — the multiplier exists to
+renormalize back to QZ's own default reference ratio regardless of the user's
+`original_ratio` setting, not to encode anything intrinsic to Zwift's protocol or hardware.
+
+**Provenance** (`gh api repos/cagnulein/qdomyos-zwift/commits?path=...`): the `42.0/14.0`
+line was introduced in PR **#2757 "Zwift hub gear custom"** (commit `109dc90`, merged
+2024-11-13), replacing an earlier hardcoded 24-entry switch/case of raw gear-ratio byte
+literals. `default_gear_crankset_size`/`default_gear_cog_size` themselves predate that by
+~2 weeks, from PR **#2682 "Wahoo Custom gearing ranges/ratios"** (commit `281590c`,
+2024-10-31) — built for **generic** Wahoo custom-gearing support, unrelated in origin to
+the Zwift Hub. #2757 later reused those same-named/same-valued settings as a literal in
+the Hub gear formula.
+
+**Conclusion: not Hub-specific, and not confirmed as a "universal Zwift convention"
+either — it is a QZ-internal constant, cross-feature-reused.** The ultimate 42T/14T
+provenance (a specific reference bicycle? Zwift's own internal default?) remains UNKNOWN
+— neither PR's commit history explains why 42/14 specifically, only that it was already
+QZ's own default before the Hub feature reused it.
+
+### 2.5 QZ's Zwift-Hub emulation (reverse path) — `src/virtualdevices/virtualbike.cpp`, read in full (1795 lines)
+
+Previously noted only as "the mirror image of what we want," never read in detail. QZ can
+act as a **fake Zwift Hub/Play GATT peripheral** toward a real Zwift game client or
+Click/Play controller (gated by `QZSettings::zwift_play_emulator`):
+
+- Handshake/dispatch (`virtualbike.cpp:988-1129`): pattern-matches incoming byte prefixes
+  against 8 known captured request shapes and replies with pre-recorded, partially
+  templated response frames — a hand-reverse-engineered emulator, not a generic protobuf
+  codec.
+- **Incoming incline from a real Zwift client** (`virtualbike.cpp:1044-1072`): decodes the
+  sint incline, then **repacks it as a synthetic FTMS Control Point frame**
+  `11 69 01 <slope_lo> <slope_hi> 32 28` and injects it via the same
+  `ftmsCharacteristicChanged` path a real FTMS session would use — i.e. it reuses the
+  normal FTMS→trainer forwarding machinery rather than a separate code path.
+- **Incoming gear command from a real Zwift client** (`virtualbike.cpp:1074-1097` →
+  `characteristicwriteprocessor0003.cpp:60-118`): **does not invert the `10000×(ratio/
+  original)×(42/14)` formula analytically.** It matches the raw incoming bytes against a
+  **hardcoded lookup table of 24 exact byte pairs/triples**, one per gear 1–24 (e.g. gear 1
+  = `CC 3A`, gear 24 = `F3 AC 03`), captured empirically from real Zwift traffic, then
+  calls `bike::gearUp()`/`gearDown()` the right number of times to reach the target gear.
+  **This means QZ itself does not treat the 42/14-normalized gear-ratio encoding as
+  analytically round-trippable** — its own reverse-direction decoder is a lookup table,
+  not the inverse formula, soft corroborating evidence that the encoding is a fixed,
+  closed, 24-value protocol in practice rather than a continuously-parameterized one.
+- **Incoming power/ERG command** (`virtualbike.cpp:1099-1128`): decodes a varint power
+  value, injects a synthetic FTMS `0x05` frame the same way.
+
+### 2.6 Newly-flagged physics-constant mismatch inside QZ itself
+
+`bike.cpp`'s own `computeSlopeTargetPower()` (RESEARCH.md Track 2, resistance strategy
+(d)) hardcodes `CdA=0.4` (`airDensity×dragCoefficient×frontalArea` = 1.204×0.4×1.0,
+`bike.cpp:624-637`) and defaults `Crr=0.005` (`QZSettings::rolling_resistance` default) —
+**both differ from the real Zwift-Hub-protocol constants confirmed in §2.0's proto file**
+(`CWa=0.51`, `Crr=0.004`). This is a real, citable internal inconsistency inside QZ between
+its own ERG-driven physics approximation and the constants Zwift's actual protocol
+transmits — not a flaw in our project, but worth carrying into our own design: even the
+reference implementation doesn't hold its physics constants consistent across its own
+resistance strategies.
 
 ---
 
@@ -162,7 +389,12 @@ circumference — 0x13 is Spin Down; wheel circumference is **0x12**.
 | 6 | Cw | u8 | 0.01 kg/m (≡ lumped ½ρ·Cd·A) |
 
 No supported-range characteristic exists for these; out-of-range ⇒ result 0x03.
-Zwift observed sending Crr byte 51 (0.0051), Cw byte 41 (0.41).
+Zwift observed sending Crr byte 51 (0.0051), Cw byte 41 (0.41) over **plain FTMS 0x11**
+(ftmsemu.github.io observation — presumably Zwift's fallback for trainers without hub-
+protocol support). **Do not confuse with §2's hub-protocol constants (Crr=0.004,
+CWa=0.51)** — confirmed 2026-07-28 straight from QZ's own protobuf schema
+(`src/devices/zwifthubbike/Zwift hub.proto`, inline comments). Two different protocols,
+two different observed constants — not a documentation error, just easy to conflate.
 
 ### 3.3 Control rules (the parts that change our client design)
 
@@ -198,17 +430,69 @@ UNKNOWN → HW-V8.
 
 ---
 
-## 3.5 Unexplored: Wahoo proprietary control point (A026-family)
+## 3.5 Wahoo proprietary control point (A026-family)
 
 Wahoo trainers expose a proprietary CPS-extension control point (characteristics in the
-`a026….` UUID family) predating good FTMS support. Two projects implement virtual
-shifting over it by re-sending a **wheel circumference** per shift:
-[Berg0162/Kickr-Virtual-Shifting](https://github.com/Berg0162/Kickr-Virtual-Shifting)
-and QZ's `wahookickrsnapbike.cpp:332-388`. This is a possible third path on the KICKR
-Core that this project has **never evaluated** (the Feb-2026 scanner special-cased
-`a026` services but no commands were tried — `zwift-virtual-shifting.html:938`).
-Status: UNKNOWN (HYPOTHESES U9); low priority — FTMS grade-solve and the Zwift hub
-protocol likely dominate. Recorded so it isn't re-discovered from scratch.
+`a026….` UUID family) predating good FTMS support. This is a possible third path on the
+KICKR Core that this project has **never evaluated on our own hardware** (the Feb-2026
+scanner special-cased `a026` services but no commands were tried —
+`zwift-virtual-shifting.html:938`). Status on our hardware: still UNKNOWN (HYPOTHESES U9);
+low priority — FTMS grade-solve and the Zwift hub protocol likely dominate. The QZ-side
+mechanism itself, however, was fully read this session (2026-07-28 deep dive) and is now
+CONFIRMED in detail:
+
+- QZ's `src/devices/wahookickrsnapbike/wahookickrsnapbike.cpp` (1056 lines) drives a
+  **Wahoo-proprietary Fitness Machine Control Point extension** — distinct decimal opcodes
+  `_setErgMode=66, _setSimMode=67, _setSimGrade=70, _setWheelCircumference=72`
+  (`wahookickrsnapbike.h:56-62`), **not** the standard FTMS `0x2AD9` opcode space
+  (`ftmsbike.cpp` uses `0x11`/`0x05` on that separate characteristic) — the two paths
+  write to different GATT objects entirely.
+- `setWheelCircumference(double millimeters)` (`wahookickrsnapbike.cpp:220-227`): encodes
+  `millimeters×10` (tenths of mm) as little-endian uint16, prefixed with opcode 72 (0x48).
+  Default circumference is **2070 mm** ("700×18C" tire convention,
+  `QZSettings::default_gear_circumference = 2070.0`, `qzsettings.h:2473-2474`) — **not**
+  the more common 2105mm/2096mm ISO 700×23C/700×25C conventions.
+- **Per-shift behavior is branched by device flag, correcting the prior framing that this
+  is a uniform "wheel-circumference-per-shift" trick**: `wahookickrsnapbike.cpp:332-341`
+  runs on every gear change, but for the literal **KICKR SNAP** hardware this same class
+  also supports, it instead re-sends **grade** (`inclinationChanged`), not wheel
+  circumference; the wheel-circumference rewrite applies only to the *other* Wahoo bikes
+  this shared class handles (gated by `KICKR_BIKE`/`KICKR_SNAP` runtime flags). The
+  class/file name ("snapbike") is misleading — it's a shared generic-Wahoo backend, not
+  SNAP-specific.
+- The underlying formula, `wheelCircumference::gearsToWheelDiameter()`
+  (`src/wheelcircumference.h:29-38`): `return (gear_circumference / original_ratio) *
+  current_ratio`, where `original_ratio = gear_crankset_size/gear_cog_size` (default
+  42/14 = 3.0, the same reference constant as §2.4's `original_ratio`) and
+  `current_ratio` comes from a configurable 12-gear crankset/cog table
+  (`wheelcircumference.h:63-65`). It computes a **synthetic effective wheel
+  circumference** that scales linearly with the selected gear's ratio relative to the
+  42/14 reference — structurally a *virtual-circumference* trick, analogous in spirit to
+  our own virtual-speed model but implemented by rewriting the trainer's own wheel-size
+  parameter rather than computing a target grade/power. It is the **only caller** of
+  `gearsToWheelDiameter` in the whole repo (confirmed via `gh api search/code`).
+- **Comparison to our `v_virt = (cadence/60) × r_gear × wheel_circumference` convention**
+  (DESIGN §4.3): `wheelcircumference.h` doesn't compute `v_virt` in software at all — it
+  has no cadence input. Instead it pushes a synthetic *circumference* value to the
+  trainer's own onboard wheel-circumference control so the trainer's firmware performs
+  `speed = wheel_rps × effective_circumference` internally. The `r_gear` term in our
+  target convention corresponds to `current_ratio/original_ratio` here, and our
+  "wheel_circumference" term corresponds to the base `gear_circumference` setting (2070mm
+  default) — same overall multiplicative structure, but pushed to hardware as an absolute
+  value rather than computed in software.
+- **Correction to the second-project attribution**: this doc previously cited
+  [Berg0162/Kickr-Virtual-Shifting](https://github.com/Berg0162/Kickr-Virtual-Shifting) as
+  a second implementation of the wheel-circumference trick. A direct read of that repo's
+  physics-relevant files this session (`Utilities.cpp`, `FitnessMachine.cpp`,
+  `CyclingPower.cpp` — see RESEARCH.md Track 2 cross-validation) found **no** reference to
+  a Wahoo-proprietary control point or wheel-circumference rewriting: it applies a
+  gradient-multiplier ("geared grade") model and forwards the result via **standard** FTMS
+  `SetIndoorBikeSimulationParameters` or a CPS resistance update, structurally the same
+  category as our own now-superseded `VirtualGear.applyToGradient`. **Treat the
+  wheel-circumference attribution to that repo as unconfirmed/likely mistaken** pending a
+  targeted read of any Wahoo-specific source file in that repo (none was found in the
+  files checked) — QZ's `wahookickrsnapbike.cpp` remains the one CONFIRMED example of the
+  technique.
 
 ## 4. Web Bluetooth constraints (Chrome)
 

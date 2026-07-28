@@ -11,6 +11,18 @@ and requires a fragile calibration ritual.
 **Goal: seamless virtual shifting, comparable to Zwift's, controllable from a Zwift
 Click (and other inputs), implemented browser-first over Web Bluetooth.**
 
+**Scope clarification (2026-07-28, user-driven, supersedes earlier framing below where
+they conflict):** this is explicitly an FTMS-only reimplementation of the *effect* of
+Zwift's virtual shifting, not a reverse-engineering of Zwift's proprietary protocol —
+hacking Zwift's own wire format is out of scope (see "Non-goals"). Perfect physical
+accuracy is also explicitly not the bar — the model will never exactly match every
+rider's real-world power curve (it varies by weight, size, position). The bar is a
+**validated, per-rider-calibratable curve**: a rider who shifts into "their 10%-grade
+gear" indoors should feel roughly the power they'd produce on a real 10% climb, given
+their own real riding data as the calibration source (see "Personalized calibration"
+below). Once validated against one rider's data, the same calibration method must
+generalize to any rider.
+
 ## Requirements
 
 1. **Shift input abstraction** — device-agnostic event model; adapters:
@@ -30,6 +42,23 @@ Click (and other inputs), implemented browser-first over Web Bluetooth.**
 6. **State persistence** — gear index, gear table choice, rider mass, physical baseline
    ratio, controller identity.
 7. **Testable** — pure-function drivetrain math and frame parsers with byte fixtures.
+8. **Trainer Difficulty (trim)** — a user-facing 0-100% slider matching Zwift's real
+   feature of the same name: scales the grade sent to the trainer
+   (`grade_to_trainer = post-gear-translation grade × trim_fraction`) so climbs feel
+   easier at lower settings. **Matches real Zwift's actual behavior, not a simplified
+   version**: route progress (distance/speed) is computed from the rider's real measured
+   power against the **real, un-trimmed** grade via the existing SIM physics
+   (`simPhysics.ts`) — trim only affects felt resistance, never the route simulation.
+   Applied *after* the drivetrain gear-translation step (§4.3), as its own independent
+   multiplier — do not conflate with the mass/Crr/Cw **calibration** trim factor (R3),
+   which is a per-rider correction, not a difficulty setting. See
+   `VIRTUAL_SHIFTING_DESIGN.md` §4.8.
+9. **Personalized calibration** — the drivetrain model's physics constants (rider mass,
+   Crr, Cw) must be derivable from a rider's own real outdoor riding data (via
+   intervals.icu or equivalent), not just the project's own hardcoded defaults
+   (92kg/0.004/0.51). Validate the calibration method against one rider's data first
+   (this project's own), then generalize so any user can produce their own working
+   curve. See `experiments/09-outdoor-stream-physics-regression.md` for the tooling.
 
 ## Non-goals (for v1)
 
@@ -43,12 +72,12 @@ Click (and other inputs), implemented browser-first over Web Bluetooth.**
 - Native/WebSocket bridge (**explicitly not needed** — Web Bluetooth reaches the Click).
 - Encrypted ZAP (ECDH/HKDF/AES-CCM) — plaintext mode works on all current firmware.
 - ANT+ anything (Zwift virtual shifting itself is BLE/WiFi/DirectConnect only).
-
-## Stretch goal (flag-gated "Plan A′")
-
-Trainer-native shifting via the KICKR Core's Zwift hub protocol (firmware-side
-resistance computation = Zwift-identical instant feel). Depends on hardware experiment
-HW-V9 (see VALIDATION-PLAN.md).
+- **Reverse-engineering/reimplementing Zwift's proprietary hub protocol ("Plan A′",
+  HW-V9) — explicitly out of scope (2026-07-28, user decision).** The goal is an
+  FTMS-only equivalent *feel*, not Zwift-protocol compatibility. Previously scoped as an
+  optional flag-gated stretch goal (see history in `RISKS-ROADMAP.md`); now formally
+  dropped rather than merely deprioritized. Do not spend further session time on
+  HW-V9 unless this decision is explicitly revisited.
 
 ## Hardware inventory
 
@@ -68,3 +97,9 @@ HW-V9 (see VALIDATION-PLAN.md).
 - Keyboard and Click can be used interchangeably mid-workout.
 - Trainer + Click stay concurrently connected for a full workout (Chrome desktop; then
   Android).
+- Trainer Difficulty slider changes felt resistance without changing route
+  speed/distance for a given real power output (matches real Zwift behavior).
+- A rider's own real ride data (e.g. intervals.icu history) can be used to derive
+  mass/Crr/Cw values that make indoor gear choices at a given grade feel like that
+  rider's own real-world effort at that grade — validated on at least one rider before
+  considered generalizable.
