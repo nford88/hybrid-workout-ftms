@@ -1031,6 +1031,21 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       data.speedKph >= 0 &&
       data.speedKph <= 80
     if (isValidSpeed) H.state.lastSpeedKph = data.speedKph
+    // Integrate distance for EVERY step type, continuously.
+    //
+    // ERG steps used to derive distance as `speedAtTheMomentTheStepEnded x duration`, which
+    // is only right if speed never varied. The 2026-07-29 ride proved the failure: the rider
+    // stopped pedalling as the final ERG step ended, so the instantaneous speed was 0 and a
+    // genuinely-ridden 2.20 km (per the Garmin head unit) was recorded as 0.00 km.
+    if (isValidSpeed) {
+      const W = H.state.workout
+      const nowMs = Date.now()
+      if (W.lastDistanceTs) {
+        const dt = Math.max(0, Math.min(10, (nowMs - W.lastDistanceTs) / 1000))
+        W.stepIntegratedDistance = (W.stepIntegratedDistance || 0) + (data.speedKph / 3.6) * dt
+      }
+      W.lastDistanceTs = nowMs
+    }
 
     if (isValidSpeed) {
       // Update SIM mode if active - but throttle to prevent conflicts
@@ -1144,6 +1159,8 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     const currentStep = plan[W.currentStepIndex]
     Dom.workoutProgressText.textContent = `Step ${W.currentStepIndex + 1}/${plan.length}: ${currentStep.type.toUpperCase()}`
     W.stepStartTime = Date.now()
+    H.state.workout.stepIntegratedDistance = 0
+    H.state.workout.lastDistanceTs = null
 
     console.log(
       `--- STEP ${W.currentStepIndex + 1}/${plan.length}: ${currentStep.type.toUpperCase()} ---`

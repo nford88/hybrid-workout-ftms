@@ -47,6 +47,10 @@ export interface WorkoutState {
   targetGrade?: number
   lastGradeUpdate?: number
   lastGradeDistance?: number
+  /** Distance integrated continuously for the current step, metres. */
+  stepIntegratedDistance?: number
+  /** Timestamp of the last distance integration tick. */
+  lastDistanceTs?: number | null
 }
 
 // ─── Summaries ────────────────────────────────────────────────────────────────

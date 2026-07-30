@@ -44,10 +44,15 @@ export function buildStepSummary(
 ): StepSummary {
   const W = workoutState
   const durationSec = (now - W.stepStartTime) / 1000
+  // ERG distance prefers the continuously-integrated figure. The old
+  // `calculateErgDistance` extrapolates the FINAL instantaneous speed across the whole
+  // step, which recorded 0.00 km for a genuinely-ridden 2.20 km on 2026-07-29 simply
+  // because the rider stopped pedalling as the step ended. Kept as a fallback for steps
+  // that began before the integrator existed.
   const rawDistance =
     step.type === 'sim'
       ? W.stepSimDistance || 0
-      : calculateErgDistance(W.stepStartTime, speedKph, now)
+      : (W.stepIntegratedDistance ?? calculateErgDistance(W.stepStartTime, speedKph, now))
   const distance = Math.max(0, rawDistance)
 
   return {
