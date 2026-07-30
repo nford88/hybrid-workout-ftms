@@ -32,17 +32,67 @@ Statuses: **CONFIRMED** unless marked otherwise. Full source list in RESEARCH.md
 | `00000003-19ca-4651-86e5-fa29dcdd09d1` | SYNC RX — client→device (handshake, commands) | Write, Write-NR |
 | `00000004-19ca-4651-86e5-fa29dcdd09d1` | SYNC TX — device→client (handshake response) | Indicate, Read |
 | `00000006-19ca-…` | unknown/unused (possibly DFU) | mixed |
+| `00000100-19ca-4651-86e5-fa29dcdd09d1` | unlock? (BikeControl names `0100`/`0101` as the unlock pair) | Write-NR, Write, Notify |
+| `00000101-19ca-4651-86e5-fa29dcdd09d1` | unlock? (as above) | Write-NR, Write, Notify |
+| `00000102-19ca-4651-86e5-fa29dcdd09d1` | undocumented anywhere; no source names it | Write-NR, Notify |
 
 Setup order (per BikeControl): subscribe notifications on `…0002`, indications on
 `…0004`, **then** write the handshake to `…0003`.
 
+#### Click V2 attribute table — CONFIRMED 2026-07-29
+
+Read off Zwift **Companion**'s own discovery in `captures/20260729-1448-zwift-app-click-session.btsnoop`
+(`experiments/15`). Unit `f4:c4:59:81:d9:a1`, hw rev `B.0`, **fw `1.2.0`**, serial
+`0A-34C45981D9A1`, manufacturer `Zwift Inc`. The Zwift service here is the **16-bit
+`0xFC82`** form (handles `0x0019–0x002d`), i.e. post-Jan-2025 firmware, and the `19ca`
+characteristics live inside it.
+
+| Value handle | CCCD | User Desc | Properties | UUID |
+|---|---|---|---|---|
+| 0x001b | 0x001c | — | Notify | `…0002` ASYNC |
+| 0x001e | — | — | Write-NR | `…0003` SYNC RX |
+| 0x0020 | 0x0021 | — | Read + Indicate | `…0004` SYNC TX |
+| 0x0023 | 0x0024 | 0x0025 | Write-NR + Write + Notify | `…0100` |
+| 0x0027 | 0x0028 | 0x0029 | Write-NR + Write + Notify | `…0101` |
+| 0x002b | 0x002c | 0x002d | Write-NR + Notify | `…0102` |
+| 0x0030 | 0x0031 | — | Read + Notify | `2A19` Battery Level (**exactly one**, not three) |
+
+**What Companion did with them**: subscribed to all six CCCDs (notify on `0002`/`0100`/
+`0101`/`0102`/`2A19`, **indicate** on `0004`), read `0004` and got a **zero-length** response,
+and wrote **no payload to any characteristic** before the link timed out. So the unlock write
+is still uncaptured — and note the peer was **Companion with no game session running**, which
+is plausibly a configuration that has nothing to unlock. `experiments/15` §6.0 is the design
+that should capture it: Companion in **bridge** mode with the real game on a laptop, which
+keeps the BLE on the phone where we can capture it.
+
+The three `2901` User Description descriptors on `0100`/`0101`/`0102` are unread by anyone,
+Companion included. They are free to read from Web Bluetooth and may name the characteristics.
+
 ### 1.3 Handshake
 
 - Magic: `RideOn` = `52 69 64 65 4F 6E`.
-- **Unencrypted mode (use this)**: write the bare 6 bytes to SYNC RX. Device replies on
-  SYNC TX: `RideOn` + 2 status bytes — observed `01 03` (Click v1), `01 04` (Play),
-  `02 03` (Click v2). The 2 bytes are effectively don't-care on send; don't validate
-  strictly on receive. After this, ASYNC frames are **plain protobuf**.
+- **Unencrypted mode (use this)**: write the bare 6 bytes to SYNC RX. After this, ASYNC
+  frames are **plain protobuf**.
+- ⚠️ **CORRECTED 2026-07-29 by capturing real Zwift — write 8 bytes, not 6.** Zwift sends
+  **`RideOn 02 03`** = `52 69 64 65 4F 6E 02 03`, to Click V2 fw 1.2.0 **and** to the KICKR
+  Core, and the replies differ by device:
+  - **Click V2** indicates **`RideOn 02 03`** back on SYNC TX — identical to what was sent.
+  - **KICKR Core** indicates **`RideOn 02 02`** — *not* a mirror. This matches the Feb-2026
+    prototype log (`src/dev/zwift-virtual-shifting.html:318-331`, H3's evidence
+    `52 69 64 65 4F 6E 02 02`), independently confirming that old observation.
+  - Evidence: `experiments/16-bridged-zwift-session-capture.md` §2, raw ATT PDUs on three
+    separate links in `captures/20260729-163837-bridge-ride.btsnoop`.
+  - **The previous entry here was an artefact of our own client.** It said the Ride family
+    "echoes a bare 6-byte `RideOn`, no status bytes" and dismissed the "+2 status bytes"
+    reading as Play-era. We only ever *sent* 6 bytes, so we only ever got 6 back. The
+    community-reported `02 03` variant is exactly what Zwift uses. Superseded, but the
+    observation itself (bare in ⇒ bare out) still stands as a device behaviour.
+  - **Ride/Play, for reference**: makinolo's Ride writeup says *"Device replies via indication
+    characteristic: `RideOn`"*; the Play writeup gives `RideOn 00 09` *"or sometimes 01 03"*;
+    community reports also list `01 03`/`01 04`/`02 03`.
+- **Why plaintext works at all**: Zwift *removed* the encryption. makinolo, 2024-07:
+  *"Zwift got rid of the Bluetooth communication encryption they were using for the Play and
+  the Click."* Not luck — designed current behaviour. See `experiments/13` §3.
 - Encrypted mode (not needed): `RideOn` + 2 bytes + 64-byte uncompressed P-256 public
   key → ECDH secp256r1 → HKDF-SHA256 (salt = devicePub‖clientPub, 36 bytes = 32-byte
   AES key + 4-byte IV base) → AES-256-**CCM**, nonce = IV base ‖ 32-bit counter, 4-byte
@@ -66,6 +116,27 @@ Frames repeat while held — emit on release→press edge; QZ auto-repeats every
 
 **Click v2 / Ride / Play fw2 — type `0x23`** (keypad status): field 1 (tag `0x08`) =
 32-bit **active-low** button bitmap varint; all-released = `23 08 FF FF FF FF 0F`.
+
+#### Our units' complete map — CONFIRMED 2026-07-29, every button pressed and labelled
+
+`experiments/16` Phase 1. This **supersedes the community table** wherever they disagree, and
+**corrects `H18`/`04`**, which had the "+" paddle on `0x20`.
+
+| Bit | Frame (`23 08 …`) | Our button | Community table | |
+|---|---|---|---|---|
+| `0x0001` | `fe ff ff ff 0f` | D-pad Left | LEFT | ✅ |
+| `0x0002` | `fd ff ff ff 0f` | D-pad Up | UP | ✅ |
+| `0x0004` | `fb ff ff ff 0f` | D-pad Right | RIGHT | ✅ |
+| `0x0008` | `f7 ff ff ff 0f` | D-pad Down | DOWN | ✅ |
+| `0x0010` | `ef ff ff ff 0f` | A | A | ✅ |
+| `0x0020` | `df ff ff ff 0f` | **B** | B | ✅ — and **NOT** the "+" paddle, as `04` recorded |
+| `0x0040` | `bf ff ff ff 0f` | Y | Y | ✅ |
+| `0x0080` | `ff fe ff ff 0f` | **Z** | *(absent — table has no 0x80)* | ❌ |
+| `0x0100` | `ff fd ff ff 0f` | **Left "−" paddle** | Z | ❌ |
+| `0x1000` | `ff df ff ff 0f` | **Right "+" paddle** | ONOFF_L | ❌ |
+
+The four face buttons run contiguously `0x10/0x20/0x40/0x80`; **both paddles sit outside that
+run**. `src/dev/protocols/zapFrame.js` exports this as `OUR_CLICK_BUTTONS`.
 Bit masks: LEFT 0x1, UP 0x2, RIGHT 0x4, DOWN 0x8, A 0x10, B 0x20, Y 0x40, Z 0x100,
 **SHFT_UP_L 0x200, SHFT_DN_L 0x400**, POWERUP_L 0x800, ONOFF_L 0x1000,
 **SHFT_UP_R 0x2000, SHFT_DN_R 0x4000**, POWERUP_R 0x10000, ONOFF_R 0x20000.
@@ -76,9 +147,26 @@ initial status snapshot.
 2 Y/Up, 3 Z/Left, 4 A/Right, 5 B/Down, 6 On/Off, 7 Shift(shoulder), 8 joystick L/R
 (zigzag), 9 brake (zigzag).
 
-**Status frames**: `0x15` = idle keepalive (~1 Hz, device→client — use as liveness
-watchdog); `0x19 08 <level>` = battery %; `0xFE` = disconnect warning family
-(Click v2: `FF 05 00 EA 05` / `FF 05 00 FA 05` before its unlock-timeout disconnect).
+**Status frames**: `0x15` = idle keepalive (**~1 Hz, device→client, and sent every second
+even while buttons are pressed** — makinolo Play writeup; three independent sources agree
+no *client*-side keepalive exists, so treat the 1 Hz inbound frame as a contract and base
+the liveness watchdog on it); `0x19 08 <level>` = battery %; `0x3c` = control-point /
+device-information response (an info-query reply *"starts with `3c 08 00…`"*, makinolo Ride).
+
+**`0xFF` family — grammar decoded 2026-07-29** (`experiments/13`). Framing is
+`FF <subtype> 00` + protobuf, matching §1.5's client-side `FF 04 00`. Decoded from our own
+captures:
+
+| Frame | Decode |
+|---|---|
+| `FF 05 00` + pb | device status: BD address as ASCII (`34C4593D51A6` ≈ our Click's `F4:C4:59:3D:51:A6`), battery %/mV pairs, and a candidate countdown (`496`) |
+| `FF 03 00` + pb | **33-byte compressed P-256 public key** (`0x03` prefix), a `02 03 00 00` version-shaped field, and a 40-byte (32+8) blob. Arrives **unsolicited** on ASYNC |
+
+⚠️ **`FF 03` is NOT the §1.3 encryption handshake.** That uses a **64-byte uncompressed**
+key on SYNC RX/TX after `RideOn 01 02`; this is a 33-byte *compressed* key, unsolicited, on
+ASYNC. Different mechanism. **makinolo documents no `0xFF` family at all**, so this is
+under-documented externally — likely the Click-v2 vendor unlock (H16). Full comparison and
+reasoning: `experiments/13`.
 
 ### 1.5 Client→device commands (SYNC RX)
 
@@ -93,6 +181,16 @@ watchdog); `0x19 08 <level>` = battery %; `0xFE` = disconnect warning family
 - **Click v2**: disconnects ~60 s after connect unless it completed a proprietary
   vendor unlock (0xFF-family challenge) with the real Zwift app within ~24 h.
   Workaround: pair once with real Zwift, then use third-party clients.
+  - **Measured 2026-07-29**: **73.5 s** on a Zwift **Companion** connection (HCI reason
+    `0x08`, supervision timer expired) after 70 s with no ZAP traffic, followed by 12 failed
+    reconnects — consistent with the device sleeping. `experiments/15`.
+  - ⚠️ **The *cause* is not settled.** A competing explanation is a plain **idle timeout**
+    (H28) rather than an authorisation timeout: the variable that tracks every observation we
+    have, including `03`'s 5-minute post-sync hold, is *whether traffic was flowing* rather
+    than *who the client was*. That capture cannot discriminate the two, because Companion is
+    not the app BikeControl says performs the unlock. Two tests settle it — `experiments/15`
+    §6.1 (unauthorised, browser-only, 10 min) and §6.0 P4 (authorised, via Companion bridged
+    to the game). Do not build a keep-awake design on either reading until then.
 - Powers off ~1 min when unconnected; button press wakes it (short advertising window)
   — UX must say "press a button, then Connect".
 
