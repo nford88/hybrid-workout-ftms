@@ -3,6 +3,8 @@ import {
   parseZapFrame,
   decodeVarint,
   createShiftEdgeDetector,
+  OUR_CLICK_BUTTONS,
+  V2_BUTTON_MASK,
 } from '../../src/dev/protocols/zapFrame'
 
 // Fixtures below are third-party-sourced (ajchellew/zwiftplay, qdomyos-zwift,
@@ -59,10 +61,47 @@ describe('parseZapFrame — v2/Ride bitmap (type 0x23)', () => {
   // Fixtures below are from our own hardware (docs/virtual-shifting/experiments/
   // 04-click-mapping-and-relay-confirmed.md, 2026-07-28) — NOT the community-guessed
   // SHFT_UP_R/SHFT_DN_L bits, which turned out wrong for this Click's paddles.
-  test('Right "+" paddle pressed (bit 0x20, confirmed 4x independently)', () => {
-    const result = parseZapFrame([0x23, 0x08, 0xdf, 0xff, 0xff, 0xff, 0x0f])
+  // CORRECTED 2026-07-29 (experiments/16 Phase 1): every button was pressed and labelled
+  // in one session. The "+" paddle is 0x1000; 0x20 is the B face button. The old fixture
+  // asserted 0x20 == "+", so shiftUp fired on B and never on the paddle.
+  test('Right "+" paddle pressed (bit 0x1000)', () => {
+    const result = parseZapFrame([0x23, 0x08, 0xff, 0xdf, 0xff, 0xff, 0x0f])
+    expect(result.bitmap).toBe(0xffffefff)
     expect(result.shiftUp).toBe(true)
     expect(result.shiftDown).toBe(false)
+  })
+
+  test('B face button (0x20) is NOT a shift — the bug this replaced', () => {
+    const result = parseZapFrame([0x23, 0x08, 0xdf, 0xff, 0xff, 0xff, 0x0f])
+    expect(result.bitmap).toBe(0xffffffdf)
+    expect(result.shiftUp).toBe(false)
+    expect(result.shiftDown).toBe(false)
+  })
+
+  test('every button in the confirmed 2026-07-29 map decodes to its own bit', () => {
+    const expected = [
+      ['D-pad LEFT', [0xfe, 0xff, 0xff, 0xff, 0x0f], 0x1],
+      ['D-pad UP', [0xfd, 0xff, 0xff, 0xff, 0x0f], 0x2],
+      ['D-pad RIGHT', [0xfb, 0xff, 0xff, 0xff, 0x0f], 0x4],
+      ['D-pad DOWN', [0xf7, 0xff, 0xff, 0xff, 0x0f], 0x8],
+      ['A', [0xef, 0xff, 0xff, 0xff, 0x0f], 0x10],
+      ['B', [0xdf, 0xff, 0xff, 0xff, 0x0f], 0x20],
+      ['Y', [0xbf, 0xff, 0xff, 0xff, 0x0f], 0x40],
+      ['Z', [0xff, 0xfe, 0xff, 0xff, 0x0f], 0x80],
+      ['Left "−"', [0xff, 0xfd, 0xff, 0xff, 0x0f], 0x100],
+      ['Right "+"', [0xff, 0xdf, 0xff, 0xff, 0x0f], 0x1000],
+    ]
+    for (const [name, tail, bit] of expected) {
+      const { bitmap } = parseZapFrame([0x23, 0x08, ...tail])
+      // active-low: exactly the one bit is cleared
+      expect(`${name}:${(~bitmap >>> 0) & 0x3ffff}`).toBe(`${name}:${bit}`)
+    }
+  })
+
+  test("Z is 0x80 on our hardware, not the community table's 0x100", () => {
+    expect(OUR_CLICK_BUTTONS.Z).toBe(0x80)
+    expect(V2_BUTTON_MASK.Z).toBe(0x100)
+    expect(OUR_CLICK_BUTTONS.LEFT_MINUS).toBe(V2_BUTTON_MASK.Z)
   })
 
   test('Left "−" paddle pressed (bit 0x100)', () => {

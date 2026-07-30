@@ -19,12 +19,34 @@ export const ZAP_FRAME_TYPE = {
 // relay-confirmed.md, 2026-07-28): a Click "Left"/"Right" pair, where only ONE physical
 // unit needs a BLE connection — its sibling's button presses arrive on the same
 // connection (relay-confirmed; see the experiment file). The D-pad/face-button bits
-// below match the borrowed V2_BUTTON_MASK table exactly, but the two dedicated shift
-// paddles do NOT match their borrowed "SHFT_UP_R"/"SHFT_DN_L" names — don't use those
-// for the paddles, use these instead.
+// below match the borrowed V2_BUTTON_MASK table, and so do A/B/Y — but Z does NOT
+// (ours is 0x80, the table says 0x100), and NEITHER shift paddle matches its borrowed
+// "SHFT_UP_R"/"SHFT_DN_L" name. Use OUR_CLICK_BUTTONS, not the borrowed table.
+// Full press-by-press mapping: docs/virtual-shifting/experiments/16 Phase 1 (2026-07-29).
 export const OUR_CLICK_PADDLES = {
-  RIGHT_PLUS: 0x20, // NOT V2_BUTTON_MASK.SHFT_UP_R (0x2000) — confirmed 4x independently
-  LEFT_MINUS: 0x100, // NOT V2_BUTTON_MASK.SHFT_DN_L (0x400)
+  // CORRECTED 2026-07-29 (experiments/16, Phase 1): the "+" paddle is 0x1000, NOT 0x20.
+  // 0x20 is the B face button. The previous value made shiftUp fire on B and never on the
+  // actual paddle — the bench log for that session shows "up: 0" across hundreds of frames
+  // while shiftDown worked, which is the symptom this fixes.
+  RIGHT_PLUS: 0x1000, // was 0x20; NOT V2_BUTTON_MASK.SHFT_UP_R (0x2000) either
+  LEFT_MINUS: 0x100, // unchanged — re-confirmed twice on 2026-07-29
+}
+
+// The complete mapping for OUR units, every bit pressed and labelled in one session
+// (experiments/16, Phase 1, 2026-07-29). This supersedes the borrowed V2_BUTTON_MASK
+// wherever the two disagree: the face buttons run contiguously 0x10/0x20/0x40/0x80, and
+// BOTH paddles sit outside that run.
+export const OUR_CLICK_BUTTONS = {
+  DPAD_LEFT: 0x1,
+  DPAD_UP: 0x2,
+  DPAD_RIGHT: 0x4,
+  DPAD_DOWN: 0x8,
+  A: 0x10,
+  B: 0x20,
+  Y: 0x40,
+  Z: 0x80, // the community table has no 0x80 at all and puts Z at 0x100
+  LEFT_MINUS: 0x100, // community calls this Z
+  RIGHT_PLUS: 0x1000, // community calls this ONOFF_L
 }
 
 // v2/Ride/Play-fw2 active-low bitmap field masks (PROTOCOLS.md §1.4) — community-sourced,
