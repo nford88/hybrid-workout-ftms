@@ -846,10 +846,16 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       Date.now()
     )
 
-    // Apply virtual gearing multiplier if enabled
+    // Apply virtual shifting. The virtual-SPEED drivetrain model (VIRTUAL_SHIFTING_DESIGN
+    // §4.3, src/services/virtualDrivetrain.ts) replaces the old gradient multiplier, which
+    // was dead at 0% grade, inverted on descents, and needed per-gear calibration.
     let finalGrade = realisticGrade
-    if (H.state.workout.virtualGearEnabled && window.ftms && window.ftms.virtualGear) {
-      finalGrade = window.ftms.virtualGear.applyToGradient(realisticGrade)
+    if (H.state.workout.virtualGearEnabled && window.virtualDrivetrain) {
+      window.virtualDrivetrain.updateTelemetry({
+        cadenceRpm: H.state.lastCadenceRpm || 0,
+        speedKph: H.state.lastSpeedKph || 0,
+      })
+      finalGrade = window.virtualDrivetrain.sendGradeFor(realisticGrade)
     }
 
     // More conservative throttling for smoother experience (skip if force update)
@@ -869,6 +875,14 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
     setSimGrade.__lastGrade = finalGrade
 
+    // Remember the ROUTE grade we are currently on.
+    //
+    // `W.currentGrade` was initialised to 0, reset to 0, and never written — so every caller
+    // that re-sends "the current grade" (a virtual-gear shift, forceSimGradeUpdate) was
+    // actually sending 0%, briefly telling the trainer the road was flat. Storing the raw
+    // route grade here is what makes a shift recompute against the hill you are really on.
+    H.state.workout.currentGrade = rawGradePct
+
     try {
       await H.ftms.setSim({
         gradePct: finalGrade,
@@ -878,11 +892,16 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       })
 
       // Log with gear info if enabled
-      if (H.state.workout.virtualGearEnabled && window.ftms && window.ftms.virtualGear) {
-        const gear = window.ftms.virtualGear.getCurrentGear()
-        const multiplier = window.ftms.virtualGear.getMultiplier()
+      if (H.state.workout.virtualGearEnabled && window.virtualDrivetrain) {
+        const g = window.virtualDrivetrain.getVirtualGear()
+        const w = g.last ? `${g.last.targetPowerW.toFixed(0)}W` : '—'
+        const flags = [g.last?.coasting ? 'COASTING' : '', g.last?.clamped ? 'CLAMPED' : '']
+          .filter(Boolean)
+          .join(' ')
         console.log(
-          `[SIM] Raw: ${rawGradePct.toFixed(1)}% -> Realistic: ${realisticGrade.toFixed(1)}% -> Gear ${gear.index + 1} (${multiplier.toFixed(2)}x): ${finalGrade.toFixed(1)}% | speed=${currentSpeed.toFixed(1)}kph`
+          `[SIM] Raw: ${rawGradePct.toFixed(1)}% -> Realistic: ${realisticGrade.toFixed(1)}% -> ` +
+            `Gear ${g.gearIndex + 1}/24 (ratio ${g.gearRatio.toFixed(2)}, phys ${g.physicalRatio.toFixed(2)}) ` +
+            `target ${w}: send ${finalGrade.toFixed(2)}% | speed=${currentSpeed.toFixed(1)}kph ${flags}`
         )
       } else {
         console.log(
@@ -942,7 +961,19 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
     if (Number.isFinite(currentSpeedKph)) {
       const dtSec = Math.max(0, (now - S.lastSimUpdateTs) / 1000)
-      const mps = (currentSpeedKph * 1000) / 3600
+
+      // Distance comes from the VIRTUAL speed when virtual shifting is active.
+      //
+      // The trainer derives its reported speed from the grade we send it, and we send a
+      // steeper grade to manufacture the resistance of a harder gear — so integrating
+      // trainer speed makes a harder gear cover LESS ground, which is physically backwards.
+      // A harder gear at the same cadence means you are going faster. Falls back to trainer
+      // speed while coasting or when virtual shifting is off.
+      let mps = (currentSpeedKph * 1000) / 3600
+      if (S.virtualGearEnabled && window.virtualDrivetrain) {
+        const virtualMps = window.virtualDrivetrain.virtualSpeedKph()
+        if (virtualMps !== null) mps = (virtualMps * 1000) / 3600
+      }
       const distanceIncrement = mps * dtSec
 
       // Always update total step distance (for recording purposes)
@@ -1031,6 +1062,14 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       data.speedKph >= 0 &&
       data.speedKph <= 80
     if (isValidSpeed) H.state.lastSpeedKph = data.speedKph
+
+    // Cadence is an INPUT to the virtual-shifting drivetrain model (v_virt = cadence x ratio
+    // x circumference), not just a display value. Without it the model sees 0 rpm, trips its
+    // coasting guard on every update, and silently passes the raw grade straight through.
+    if (data.cadenceRpm !== null && data.cadenceRpm !== undefined && data.cadenceRpm >= 0) {
+      H.state.lastCadenceRpm = data.cadenceRpm
+    }
+
     // Integrate distance for EVERY step type, continuously.
     //
     // ERG steps used to derive distance as `speedAtTheMomentTheStepEnded x duration`, which
