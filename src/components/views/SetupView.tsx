@@ -3,6 +3,7 @@ import WorkoutBuilder from '../workout/WorkoutBuilder'
 import WorkoutPlan from '../workout/WorkoutPlan'
 import SavedWorkouts from '../workout/SavedWorkouts'
 import VirtualGearSettings from '../virtual/VirtualGearSettings'
+import ClickSettings from '../click/ClickSettings'
 
 export default function SetupView() {
   return (
@@ -17,6 +18,7 @@ export default function SetupView() {
         </button>
         <SavedWorkouts />
         <VirtualGearSettings />
+        <ClickSettings />
         <WorkoutPlan />
       </div>
     </div>

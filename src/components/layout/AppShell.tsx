@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import SetupView from '../views/SetupView'
 import ActiveView from '../views/ActiveView'
 import ConnectionPanel from '../trainer/ConnectionPanel'
+import { useKeyboardActions } from '../../hooks/useKeyboardActions'
 
 // main.js dispatches these events when workout starts/ends
 const WORKOUT_STARTED = 'workoutStarted'
@@ -13,6 +14,10 @@ interface Props {
 
 export default function AppShell({ buildVersion }: Props) {
   const [isActive, setIsActive] = useState(false)
+
+  // Keyboard shortcuts for every Click action, so the app is fully usable — and the
+  // shift path testable — with no hardware attached.
+  useKeyboardActions()
 
   useEffect(() => {
     const onStart = () => setIsActive(true)

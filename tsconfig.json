@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -13,8 +17,18 @@
     "jsx": "react-jsx",
     "strict": true,
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "types": [
+      "web-bluetooth",
+      "vite/client"
+    ]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "src/js", "src/dev"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/js",
+    "src/dev"
+  ]
 }

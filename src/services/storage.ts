@@ -12,6 +12,10 @@ import type {
   GearSettings,
   RiderPhysicsSettings,
 } from '../types.js'
+import type { ClickBindings, KeyBindings } from './clickBindings.js'
+import { normaliseClickBindings, normaliseKeyBindings } from './clickBindings.js'
+import type { DrivetrainConfig } from './virtualDrivetrain.js'
+import { DEFAULT_DRIVETRAIN } from './virtualDrivetrain.js'
 
 const KEYS = {
   GARMIN_ROUTE: 'garminRoute',
@@ -24,6 +28,9 @@ const KEYS = {
   BIKE_WEIGHT_KG: 'bikeWeightKg',
   TIRE_TYPE: 'tireType',
   RIDING_POSITION: 'ridingPosition',
+  CLICK_BINDINGS: 'clickBindings',
+  KEY_BINDINGS: 'keyBindings',
+  DRIVETRAIN: 'drivetrainConfig',
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -140,4 +147,47 @@ export function saveRiderPhysicsSettings({
   writeJSON(KEYS.BIKE_WEIGHT_KG, bikeWeightKg)
   writeJSON(KEYS.TIRE_TYPE, tireType)
   writeJSON(KEYS.RIDING_POSITION, ridingPosition)
+}
+
+// ── Zwift Click button + keyboard bindings ───────────────────────────────────
+//
+// Read back through normalise*() rather than trusted as-is: these outlive the code that
+// wrote them, so a button or action removed in a later version must not resurrect itself,
+// and a newly-added one must pick up its default instead of being silently unbound.
+
+export function loadClickBindings(): ClickBindings {
+  return normaliseClickBindings(readJSON<unknown>(KEYS.CLICK_BINDINGS, null))
+}
+
+export function saveClickBindings(bindings: ClickBindings): void {
+  writeJSON(KEYS.CLICK_BINDINGS, bindings)
+}
+
+export function loadKeyBindings(): KeyBindings {
+  return normaliseKeyBindings(readJSON<unknown>(KEYS.KEY_BINDINGS, null))
+}
+
+export function saveKeyBindings(bindings: KeyBindings): void {
+  writeJSON(KEYS.KEY_BINDINGS, bindings)
+}
+
+// ── Physical drivetrain (chainring / cog) ────────────────────────────────────
+
+export function loadDrivetrain(): DrivetrainConfig {
+  const stored = readJSON<Partial<DrivetrainConfig> | null>(KEYS.DRIVETRAIN, null)
+  const chainringTeeth = Number(stored?.chainringTeeth)
+  const cogTeeth = Number(stored?.cogTeeth)
+  // Teeth counts outside these bounds are a typo or corrupted storage, not a drivetrain —
+  // and a zero cog would divide by zero in the ratio.
+  return {
+    chainringTeeth:
+      chainringTeeth >= 20 && chainringTeeth <= 60
+        ? chainringTeeth
+        : DEFAULT_DRIVETRAIN.chainringTeeth,
+    cogTeeth: cogTeeth >= 9 && cogTeeth <= 40 ? cogTeeth : DEFAULT_DRIVETRAIN.cogTeeth,
+  }
+}
+
+export function saveDrivetrain(config: DrivetrainConfig): void {
+  writeJSON(KEYS.DRIVETRAIN, config)
 }
