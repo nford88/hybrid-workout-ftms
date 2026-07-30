@@ -143,7 +143,26 @@
             <pre id="click-gatt" class="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48"></pre>
           </details>
 
+          <!-- H29 test rig: the drop-survival measurement. Both physical Click units
+               advertise as "Zwift Click", so the serial read is not optional — without it
+               a survival number cannot be attributed to a unit. -->
+          <div class="border-t pt-2 space-y-1 text-sm">
+            <div>Serial (2A25): <span id="click-serial" class="font-mono">—</span></div>
+            <div>
+              Link uptime: <span id="click-uptime" class="font-mono font-semibold">—</span>
+              <span id="click-lastdrop" class="text-gray-600"></span>
+            </div>
+          </div>
+
           <div class="border-t pt-2 space-y-2">
+            <div class="flex gap-1 items-center text-sm">
+              <label>Handshake
+                <select id="click-rideon-variant" class="border rounded px-1 font-mono">
+                  <option value="0203" selected>RideOn 02 03 (what Zwift sends)</option>
+                  <option value="bare">RideOn (bare 6 bytes)</option>
+                </select>
+              </label>
+            </div>
             <div class="flex gap-2 flex-wrap">
               <button id="click-rideon" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">
                 Write RideOn handshake
@@ -151,11 +170,33 @@
               <button id="click-haptic" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">
                 Send haptic ack
               </button>
+              <button
+                id="click-identify"
+                title="Writes 00 08 00 to SYNC RX. Do NOT use during a survival arm — it is an extra write."
+                class="bg-gray-700 text-white px-2 py-1 rounded text-sm"
+              >
+                Identify unit (writes 00 08 00)
+              </button>
             </div>
             <div class="flex gap-1 items-center text-sm">
               <label>Raw hex to SYNC RX <input id="click-raw-hex" placeholder="52 69 64 65 4f 6e" class="border rounded px-1 flex-1 font-mono" /></label>
               <button id="click-raw-send" class="bg-gray-700 text-white px-2 py-1 rounded text-sm">Send</button>
             </div>
+            <!-- Button discovery: every bit that fires, not just the two paddles the
+                 shift detector watches. Our units already disagree with the community
+                 table on both paddles (H18), so the honest tool is one that names the BIT
+                 and lets the operator record which physical button produced it. -->
+            <div class="border-t pt-2">
+              <div class="flex items-center gap-2 text-sm">
+                <span class="font-semibold">All buttons seen</span>
+                <button id="click-buttons-reset" class="bg-gray-500 text-white px-2 py-0.5 rounded text-xs">
+                  Reset
+                </button>
+                <span id="click-buttons-live" class="font-mono text-xs text-blue-700"></span>
+              </div>
+              <pre id="click-buttons-table" class="text-xs bg-gray-50 p-2 rounded mt-1 max-h-40 overflow-auto">press a button…</pre>
+            </div>
+
             <div class="text-sm font-mono">
               Shift events — up: <span id="shift-up-count">0</span>, down:
               <span id="shift-down-count">0</span>
@@ -259,6 +300,30 @@
         for (let i = 0; i < clean.length; i += 2) bytes.push(parseInt(clean.slice(i, i + 2), 16))
         return new Uint8Array(bytes)
       }
+
+      // An empty or odd-length hex box used to sail straight through to the device: an empty
+      // input produced a legal ZERO-BYTE write that logged as `write` with a blank payload,
+      // which reads exactly like a successful send. That cost a bench run — an `ff 04 00`
+      // test was recorded as done when nothing had been transmitted. Refuse and say so.
+      function parseHexOrExplain(str, label) {
+        const raw = String(str || '')
+        const digits = raw.trim().replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '')
+        if (!digits.length) {
+          log(label, 'write-error', undefined, '', {
+            error: 'nothing to send — the hex box is empty',
+            input: raw,
+          })
+          return null
+        }
+        if (digits.length % 2 !== 0) {
+          log(label, 'write-error', undefined, digits, {
+            error: `odd number of hex digits (${digits.length}) — a byte is incomplete`,
+            input: raw,
+          })
+          return null
+        }
+        return parseHexInput(raw)
+      }
       function bufToHex(dataView) {
         return toHex(new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength))
       }
@@ -289,6 +354,26 @@
       }
 
       // ── GATT dump + auto-subscribe ────────────────────────────────────────
+      // BluetoothCharacteristicProperties is a WebIDL platform object: its attributes live
+      // on the prototype, not as own enumerable properties, so Object.entries() returns []
+      // and the GATT tree printed an empty property list for every characteristic. Name
+      // them explicitly instead.
+      const CHAR_PROPERTY_NAMES = [
+        'broadcast',
+        'read',
+        'writeWithoutResponse',
+        'write',
+        'notify',
+        'indicate',
+        'authenticatedSignedWrites',
+        'reliableWrite',
+        'writableAuxiliaries',
+      ]
+
+      function describeProperties(ch) {
+        return CHAR_PROPERTY_NAMES.filter((name) => ch.properties[name]).join(',')
+      }
+
       async function dumpAndSubscribe(server, label, gattPre, charStore) {
         const lines = []
         const services = await server.getPrimaryServices()
@@ -296,10 +381,7 @@
           lines.push(`Service ${nameFor(service.uuid)} (${service.uuid})`)
           const chars = await service.getCharacteristics()
           for (const ch of chars) {
-            const props = Object.entries(ch.properties)
-              .filter(([, v]) => v)
-              .map(([k]) => k)
-              .join(',')
+            const props = describeProperties(ch)
             lines.push(`  Char ${nameFor(ch.uuid)} (${ch.uuid}) [${props}]`)
             charStore[ch.uuid] = ch
             if (ch.properties.notify || ch.properties.indicate) {
@@ -313,9 +395,12 @@
                     const hex = bufToHex(evt.target.value)
                     let decoded
                     if (ch.uuid === ZWIFT_CHAR.ASYNC || ch.uuid === ZWIFT_CHAR.SYNC_TX) {
-                      decoded = parseZapFrame(new Uint8Array(evt.target.value.buffer))
+                      const raw = new Uint8Array(evt.target.value.buffer)
+                      if (label === 'controller') sniffSerial(raw)
+                      decoded = parseZapFrame(raw)
                       if (decoded.type === 'click-v1-buttons' || decoded.type === 'v2-buttons') {
                         feedShiftDetector(decoded)
+                        if (label === 'controller') feedButtonDiscovery(decoded.bitmap)
                       }
                     }
                     log(label, ch.properties.indicate ? 'indicate' : 'notify', ch.uuid, hex, decoded)
@@ -328,6 +413,71 @@
           }
         }
         gattPre.textContent = lines.join('\n')
+      }
+
+      // ── all-button discovery ───────────────────────────────────────────────
+      // The bitmap is ACTIVE-LOW: a cleared bit means pressed. We edge-detect on the
+      // transition (not-cleared -> cleared) so a button held across ~10 frames/second
+      // counts once. Names come from the community table and are shown as a HINT only —
+      // experiments/04 already found both paddles disagree with it on our hardware, so
+      // the bit value is the fact and the name is a guess.
+      const V2_BUTTON_NAMES = {
+        0x1: 'LEFT', 0x2: 'UP', 0x4: 'RIGHT', 0x8: 'DOWN',
+        0x10: 'A', 0x20: 'B  [= our RIGHT "+"]', 0x40: 'Y',
+        0x100: 'Z  [= our LEFT "−"]', 0x200: 'SHFT_UP_L', 0x400: 'SHFT_DN_L',
+        0x800: 'POWERUP_L', 0x1000: 'ONOFF_L', 0x2000: 'SHFT_UP_R', 0x4000: 'SHFT_DN_R',
+        0x10000: 'POWERUP_R', 0x20000: 'ONOFF_R',
+      }
+      const buttonSeen = new Map() // bit -> {count, firstTs, lastTs}
+      let prevBitmap = null
+
+      function renderButtonTable() {
+        const el = document.getElementById('click-buttons-table')
+        if (!buttonSeen.size) {
+          el.textContent = 'press a button…'
+          return
+        }
+        const rows = [...buttonSeen.entries()].sort((a, b) => a[0] - b[0]).map(([bit, m]) => {
+          const name = V2_BUTTON_NAMES[bit] || '*** UNKNOWN BIT — new finding ***'
+          return `0x${bit.toString(16).padStart(5, '0')}  ${String(m.count).padStart(3)}x  ${name}`
+        })
+        el.textContent = `bit      presses  community name (hint only)\n${rows.join('\n')}`
+      }
+
+      function feedButtonDiscovery(bitmap) {
+        if (typeof bitmap !== 'number') return
+        // Only the low 18 bits are defined; ignore the varint's high padding bits.
+        const pressedNow = (~bitmap >>> 0) & 0x3ffff
+        const pressedBefore = prevBitmap === null ? 0 : (~prevBitmap >>> 0) & 0x3ffff
+        prevBitmap = bitmap
+        const rising = pressedNow & ~pressedBefore
+        for (let i = 0; i < 18; i += 1) {
+          const bit = 1 << i
+          if (!(rising & bit)) continue
+          const entry = buttonSeen.get(bit) || { count: 0 }
+          entry.count += 1
+          buttonSeen.set(bit, entry)
+          log('controller', 'button', undefined, undefined, {
+            bit: `0x${bit.toString(16)}`,
+            communityName: V2_BUTTON_NAMES[bit] || 'UNKNOWN',
+            pressNumber: entry.count,
+          })
+        }
+        const live = [...Array(18).keys()]
+          .map((i) => 1 << i)
+          .filter((b) => pressedNow & b)
+          .map((b) => `0x${b.toString(16)}`)
+        document.getElementById('click-buttons-live').textContent = live.length
+          ? `held: ${live.join(' ')}`
+          : ''
+        if (rising) renderButtonTable()
+      }
+
+      document.getElementById('click-buttons-reset').onclick = () => {
+        buttonSeen.clear()
+        prevBitmap = null
+        renderButtonTable()
+        log('controller', 'note', undefined, undefined, { note: 'button discovery reset' })
       }
 
       // ── shift edge detector wiring ─────────────────────────────────────────
@@ -491,6 +641,10 @@
         device.addEventListener('gattserverdisconnected', () => {
           document.getElementById(statusElId).textContent = 'disconnected (gattserverdisconnected)'
           log(label, 'system', undefined, undefined, { event: 'gattserverdisconnected' })
+          // Web Bluetooth gives no reason code here — only a capture can say whether the
+          // peer went away or we did (experiments/15 §4). The elapsed time is the one
+          // thing the page CAN measure, so it always does.
+          if (label === 'controller') stopClickUptime()
         })
       }
 
@@ -572,14 +726,101 @@
       }
 
       document.getElementById('trainer-raw-send').onclick = () => {
-        const bytes = parseHexInput(document.getElementById('trainer-raw-hex').value)
-        writeBytes(trainerCP(), bytes, 'trainer')
+        const bytes = parseHexOrExplain(document.getElementById('trainer-raw-hex').value, 'trainer')
+        if (bytes) writeBytes(trainerCP(), bytes, 'trainer')
       }
 
       // ── Controller (Click) device ────────────────────────────────────────────
       let clickDevice = null
       let clickServer = null
       const clickChars = {}
+
+      // ── H29 drop-survival measurement ───────────────────────────────────────
+      // The whole Click investigation turns on one number: how long does the link
+      // last? Measuring it by eye off a log has already produced vague ranges
+      // ("44-90s"), so the page keeps the clock itself and reports the elapsed time
+      // at the moment of the drop.
+      let clickConnectedAt = null
+      let clickUptimeTimer = null
+
+      function clickUptimeSeconds() {
+        return clickConnectedAt === null ? null : (Date.now() - clickConnectedAt) / 1000
+      }
+
+      function startClickUptime() {
+        clickConnectedAt = Date.now()
+        document.getElementById('click-lastdrop').textContent = ''
+        clearInterval(clickUptimeTimer)
+        clickUptimeTimer = setInterval(() => {
+          document.getElementById('click-uptime').textContent = `${clickUptimeSeconds().toFixed(0)}s`
+        }, 250)
+      }
+
+      function stopClickUptime() {
+        const held = clickUptimeSeconds()
+        clearInterval(clickUptimeTimer)
+        clickUptimeTimer = null
+        clickConnectedAt = null
+        if (held !== null) {
+          document.getElementById('click-lastdrop').textContent = ` — dropped after ${held.toFixed(1)}s`
+          log('controller', 'note', undefined, undefined, {
+            note: `LINK HELD ${held.toFixed(1)}s before dropping`,
+            heldSeconds: Number(held.toFixed(1)),
+          })
+        }
+        return held
+      }
+
+      // Identifying WHICH physical Click is connected, without 2A25.
+      //
+      // Both units advertise as "Zwift Click" and Chrome's chooser shows no address, so a
+      // survival number cannot be attributed to a unit without this — a confound that has
+      // already bitten this project (experiments/15 §5). The obvious route, reading 2A25
+      // Serial Number String, is IMPOSSIBLE from a browser: 2A25 is on the Web Bluetooth
+      // GATT blocklist as a device identifier, so Chrome both refuses the read
+      // (SecurityError) and hides the characteristic from getCharacteristics() — which is
+      // why the Device Information service appears to contain only 2A26/2A27/2A29.
+      //
+      // Two things that do work:
+      //  1. device.id — Chrome's per-origin opaque device identifier. Stable for the same
+      //     device on the same origin, so it reliably answers "is this the same unit as the
+      //     last arm?", which is what the A/B actually needs.
+      //  2. The serial arrives over the air anyway. `FF 05` status frames carry it as bare
+      //     ASCII hex, and the `3c` device-information reply carries it as `0A-…`/`0B-…`
+      //     (experiments/13, /16 §3-4). Sniffing those is passive — no extra writes, so it
+      //     cannot perturb a survival measurement.
+      const SERIAL_IN_FRAME = /(?:0[AB]-)?([0-9A-F]{12})/
+      let clickSerialSeen = null
+
+      // Serial tail -> advertised address: the two high bits of a static random address are
+      // forced set, so 34C45981D9A1 -> f4:c4:59:81:d9:a1.
+      function addressFromSerialTail(tail) {
+        const first = (parseInt(tail.slice(0, 2), 16) | 0xc0).toString(16)
+        return (first + tail.slice(2)).replace(/(..)(?=.)/g, '$1:').toLowerCase()
+      }
+
+      function sniffSerial(bytes) {
+        if (clickSerialSeen) return
+        let ascii = ''
+        for (const b of bytes) ascii += b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : ' '
+        const m = SERIAL_IN_FRAME.exec(ascii.toUpperCase())
+        if (!m) return
+        clickSerialSeen = m[1]
+        const addr = addressFromSerialTail(clickSerialSeen)
+        document.getElementById('click-serial').textContent =
+          `${clickSerialSeen} → ${addr} (sniffed over the air)`
+        log('controller', 'note', undefined, undefined, {
+          note: `unit identified: ${addr}`,
+          serial: clickSerialSeen,
+        })
+      }
+
+      function showClickIdentity(device) {
+        clickSerialSeen = null
+        // device.id is opaque and origin-scoped — not an address, but stable per unit.
+        document.getElementById('click-serial').textContent =
+          `device.id ${String(device.id).slice(0, 12)}… — awaiting an FF05/3c frame for the serial`
+      }
 
       document.getElementById('click-connect').onclick = async () => {
         try {
@@ -591,6 +832,8 @@
           clickServer = await clickDevice.gatt.connect()
           document.getElementById('click-status').textContent = `connected: ${clickDevice.name || '(unnamed)'}`
           log('controller', 'system', undefined, undefined, { event: 'connected', name: clickDevice.name })
+          startClickUptime()
+          showClickIdentity(clickDevice)
           await dumpAndSubscribe(clickServer, 'controller', document.getElementById('click-gatt'), clickChars)
         } catch (err) {
           log('controller', 'system', undefined, undefined, { event: 'connect-error', error: String(err) })
@@ -604,17 +847,36 @@
         return clickChars[Object.keys(clickChars).find((u) => u.startsWith('00000003-19ca'))]
       }
 
+      // Real Zwift writes EIGHT bytes: "RideOn" + 02 03, to Click V2 and to the trainer
+      // (captured 2026-07-29, experiments/16 §2). Our bare 6-byte write is the leading
+      // suspect for the 44-90s drop (H29), so the variant is selectable to make that an A/B
+      // rather than a code edit. Bare is kept because it is what every previous experiment
+      // used — comparisons against 03/04 need it.
+      const RIDEON = [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e]
+      function rideOnBytes() {
+        const bare = document.getElementById('click-rideon-variant').value === 'bare'
+        return new Uint8Array(bare ? RIDEON : [...RIDEON, 0x02, 0x03])
+      }
       document.getElementById('click-rideon').onclick = () => {
-        const rideOn = new Uint8Array([0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e]) // "RideOn"
-        writeBytesNoResponse(clickSyncRx(), rideOn, 'controller')
+        const bytes = rideOnBytes()
+        log('controller', 'note', undefined, undefined, {
+          note: `handshake variant: ${bytes.length} bytes`,
+        })
+        return writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
       }
       document.getElementById('click-haptic').onclick = () => {
         const haptic = new Uint8Array([0x12, 0x12, 0x08, 0x0a, 0x06, 0x08, 0x02, 0x10, 0x00, 0x18, 0x20])
         writeBytesNoResponse(clickSyncRx(), haptic, 'controller')
       }
+      // Asks the device for its own information: 00 08 00 -> a `3c 08 00 …` reply on SYNC TX
+      // carrying "Zwift Click" and the serial (experiments/16 §4). It is an extra write, so
+      // it must NOT be used inside a survival arm — sniffSerial() covers the passive case.
+      document.getElementById('click-identify').onclick = () =>
+        writeBytesNoResponse(clickSyncRx(), new Uint8Array([0x00, 0x08, 0x00]), 'controller')
+
       document.getElementById('click-raw-send').onclick = () => {
-        const bytes = parseHexInput(document.getElementById('click-raw-hex').value)
-        writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
+        const bytes = parseHexOrExplain(document.getElementById('click-raw-hex').value, 'controller')
+        if (bytes) writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
       }
 
       // Debug hook for driving exact/concurrent command sequences via evaluate_script,
@@ -637,6 +899,32 @@
         },
         readFeature,
         log: (source, note) => log(source, 'note', undefined, undefined, { note }),
+
+        // Click side, for the H29 A/B (experiments/16 §7.1). Lets the whole survival
+        // test run from evaluate_script instead of clicks, so both arms are driven
+        // identically — the one thing a hand-run A/B cannot guarantee.
+        click: {
+          connected: () => !!clickDevice?.gatt?.connected,
+          serial: () => document.getElementById('click-serial').textContent,
+          uptime: () => clickUptimeSeconds(),
+          disconnect: () => clickDevice?.gatt?.disconnect(),
+          // 'bare' = the 6 bytes every previous experiment sent; '0203' = what Zwift sends.
+          handshake: (variant) => {
+            const bytes = new Uint8Array(variant === 'bare' ? RIDEON : [...RIDEON, 0x02, 0x03])
+            log('controller', 'note', undefined, undefined, {
+              note: `handshake variant ${variant || '0203'} (${bytes.length} bytes)`,
+            })
+            return writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
+          },
+          sendRaw: (bytes) => writeBytesNoResponse(clickSyncRx(), new Uint8Array(bytes), 'controller'),
+          // Exposed so the button-discovery edge detection can be exercised without
+          // hardware — a held button spans ~10 frames/second and must count once.
+          feedBitmap: (bitmap) => feedButtonDiscovery(bitmap),
+          buttonsSeen: () => [...buttonSeen.entries()].map(([bit, m]) => ({
+            bit: `0x${bit.toString(16)}`,
+            count: m.count,
+          })),
+        },
       }
     </script>
   </body>
