@@ -39,6 +39,10 @@ export interface VirtualGearSnapshot {
   physicalRatioInferred: boolean
   /** What the telemetry implies the ratio is — a diagnostic, not an input. */
   inferredRatio: number | null
+  chainringTeeth: number
+  cogTeeth: number
+  wheelCircumferenceM: number
+  gearTable: readonly number[]
   atLimit: boolean
   last: DrivetrainResult | null
 }
@@ -47,7 +51,8 @@ const ratios: readonly number[] = ZWIFT_GEAR_RATIOS
 
 // The physical ratio is CONFIGURED, not guessed: with a Zwift Cog it is simply
 // chainring/cog and cannot change mid-ride. Inference is kept only as a cross-check.
-let physicalRatio = drivetrainRatio(loadDrivetrain())
+let drivetrain = loadDrivetrain()
+let physicalRatio = drivetrainRatio(drivetrain)
 let gearIndex = nearestGearIndex(physicalRatio, ratios)
 let physicalRatioInferred = false
 let inferredRatio: number | null = null
@@ -64,6 +69,10 @@ function snapshot(): VirtualGearSnapshot {
     physicalRatio,
     physicalRatioInferred,
     inferredRatio,
+    chainringTeeth: drivetrain.chainringTeeth,
+    cogTeeth: drivetrain.cogTeeth,
+    wheelCircumferenceM: DEFAULT_WHEEL_CIRCUMFERENCE_M,
+    gearTable: ratios,
     atLimit,
     last,
   }
@@ -103,7 +112,8 @@ export function updateTelemetry(next: GearTelemetry): void {
 
 /** Re-read the configured drivetrain — call after the user edits chainring/cog. */
 export function reloadDrivetrain(): VirtualGearSnapshot {
-  physicalRatio = drivetrainRatio(loadDrivetrain())
+  drivetrain = loadDrivetrain()
+  physicalRatio = drivetrainRatio(drivetrain)
   gearIndex = nearestGearIndex(physicalRatio, ratios)
   emit()
   return snapshot()
@@ -133,7 +143,8 @@ export function setGearIndex(index: number): VirtualGearSnapshot {
 
 /** Reset learned state — used when the trainer reconnects or the bike's gear changes. */
 export function resetVirtualGear(): void {
-  physicalRatio = drivetrainRatio(loadDrivetrain())
+  drivetrain = loadDrivetrain()
+  physicalRatio = drivetrainRatio(drivetrain)
   gearIndex = nearestGearIndex(physicalRatio, ratios)
   physicalRatioInferred = false
   inferredRatio = null

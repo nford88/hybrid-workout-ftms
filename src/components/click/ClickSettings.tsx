@@ -36,6 +36,7 @@ import {
   reloadDrivetrain,
 } from '../../services/virtualGearState'
 import { loadDrivetrain, saveDrivetrain } from '../../services/storage'
+import { downloadRideLog, rideLogSummary } from '../../services/rideLog'
 import { drivetrainRatio, ZWIFT_GEAR_RATIOS } from '../../services/virtualDrivetrain'
 
 /**
@@ -304,6 +305,32 @@ export default function ClickSettings() {
           )}
         </div>
       )}
+
+      {/* ── Ride log ────────────────────────────────────────────────────── */}
+      <div className="border-t pt-2 mb-3">
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <button
+            type="button"
+            onClick={() => downloadRideLog()}
+            className="bg-gray-700 text-white px-2 py-1 rounded"
+          >
+            Download ride log (JSON)
+          </button>
+          <span className="font-mono text-gray-400">
+            {(() => {
+              const s = rideLogSummary()
+              return s.events
+                ? `${s.events} events · ${s.sim} grade decisions · ${s.gear} shifts`
+                : 'nothing recorded yet — starts with the workout'
+            })()}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Sent grade, gear, target power and route position with absolute timestamps. None of this
+          is on a head unit, and the browser console truncates long rides — export this after every
+          ride you want compared against a FIT file.
+        </p>
+      </div>
 
       {/* ── Physical drivetrain ─────────────────────────────────────────── */}
       <h4 className="text-xs font-semibold text-blue-300 mt-4 mb-1">Your bike&apos;s gear</h4>

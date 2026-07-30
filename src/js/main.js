@@ -875,6 +875,25 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
     setSimGrade.__lastGrade = finalGrade
 
+    // Record the decision. This is the ONLY place sent grade, gear and target power exist —
+    // a head unit records none of them, so without this the ride cannot be reconstructed.
+    if (window.rideLog) {
+      const g = window.virtualDrivetrain ? window.virtualDrivetrain.getVirtualGear() : null
+      window.rideLog.logSim({
+        routeDistanceM: H.state.workout.simDistanceTraveled ?? null,
+        rawGradePct: rawGradePct,
+        realisticGradePct: realisticGrade,
+        sentGradePct: finalGrade,
+        gearIndex: g ? g.gearIndex : -1,
+        gearRatio: g ? g.gearRatio : 0,
+        physicalRatio: g ? g.physicalRatio : 0,
+        targetPowerW: g && g.last ? g.last.targetPowerW : 0,
+        virtualSpeedKph: g && g.last ? g.last.virtualSpeedMs * 3.6 : 0,
+        coasting: !!(g && g.last && g.last.coasting),
+        clamped: !!(g && g.last && g.last.clamped),
+      })
+    }
+
     // Remember the ROUTE grade we are currently on.
     //
     // `W.currentGrade` was initialised to 0, reset to 0, and never written — so every caller
@@ -1070,6 +1089,10 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       H.state.lastCadenceRpm = data.cadenceRpm
     }
 
+    if (window.rideLog && isValidSpeed) {
+      window.rideLog.logTelemetry(data.speedKph, data.cadenceRpm ?? 0, data.power ?? 0)
+    }
+
     // Integrate distance for EVERY step type, continuously.
     //
     // ERG steps used to derive distance as `speedAtTheMomentTheStepEnded x duration`, which
@@ -1166,6 +1189,22 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     W.stepSummary = [] // Reset workout summary
     W.routeCompleted = false // Reset route completion status
 
+    // Open a fresh ride log with the constants in force, so an exported file is
+    // self-describing and does not depend on remembering what the settings were.
+    if (window.rideLog && window.virtualDrivetrain) {
+      const g = window.virtualDrivetrain.getVirtualGear()
+      window.rideLog.startRideLog({
+        massKg: H.state.simPhysics.massKg ?? 0,
+        crr: H.state.simPhysics.crr,
+        cw: H.state.simPhysics.cw,
+        chainringTeeth: g.chainringTeeth ?? 0,
+        cogTeeth: g.cogTeeth ?? 0,
+        physicalRatio: g.physicalRatio,
+        wheelCircumferenceM: g.wheelCircumferenceM ?? 2.096,
+        gearTable: g.gearTable ?? [],
+      })
+    }
+
     console.log('=== WORKOUT STARTED ===')
     console.log(`Total steps: ${S.workoutPlan.length}`)
     window.dispatchEvent(new CustomEvent('workoutStarted'))
@@ -1200,6 +1239,13 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     W.stepStartTime = Date.now()
     H.state.workout.stepIntegratedDistance = 0
     H.state.workout.lastDistanceTs = null
+    if (window.rideLog) {
+      window.rideLog.logStep(
+        W.currentStepIndex,
+        currentStep.type,
+        currentStep.type === 'erg' ? `${currentStep.power}W` : currentStep.segmentName || 'route'
+      )
+    }
 
     console.log(
       `--- STEP ${W.currentStepIndex + 1}/${plan.length}: ${currentStep.type.toUpperCase()} ---`

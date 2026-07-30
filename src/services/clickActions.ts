@@ -13,6 +13,7 @@
 
 import type { ClickAction } from './clickBindings'
 import { shiftUp, shiftDown, getVirtualGear } from './virtualGearState'
+import { logGear } from './rideLog'
 
 interface LegacyBridge {
   state?: { workout?: { currentGrade?: number; isRunning?: boolean } }
@@ -79,6 +80,7 @@ export function dispatchAction(action: ClickAction): ActionResult {
         `[GEAR] ${before + 1} -> ${gear.gearIndex + 1}/24  ratio ${gear.gearRatio.toFixed(2)} ` +
           `(phys ${gear.physicalRatio.toFixed(2)})`
       )
+      logGear(before, gear.gearIndex, gear.gearRatio, action)
       return {
         action,
         performed: true,

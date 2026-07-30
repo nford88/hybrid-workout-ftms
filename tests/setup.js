@@ -25,11 +25,20 @@ global.console = {
 // Mock Date.now for consistent test timing
 const mockNow = vi.fn(() => 1234567890000) // Fixed timestamp
 
-// Properly mock Date object
-vi.stubGlobal('Date', {
-  ...Date,
-  now: mockNow,
-})
+// Freeze Date.now() while keeping Date a real CONSTRUCTOR.
+//
+// This previously did `vi.stubGlobal('Date', { ...Date, now: mockNow })`, which replaced the
+// constructor with a plain object. `new Date()` then threw, and anything doing an
+// `instanceof Date` check failed with "Right-hand side of 'instanceof' is not callable" --
+// which silently ruled out `expect().toMatchObject()`, `vi.useFakeTimers()` and any test
+// touching real dates, across the whole suite.
+const RealDate = Date
+class MockDate extends RealDate {
+  static now() {
+    return mockNow()
+  }
+}
+vi.stubGlobal('Date', MockDate)
 
 // Mock Math object to ensure it's available
 global.Math = Math
