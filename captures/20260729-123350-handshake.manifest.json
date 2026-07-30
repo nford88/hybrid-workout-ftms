@@ -1,0 +1,45 @@
+{
+  "scenario": "handshake",
+  "started_at": 1785324830.056926,
+  "backend": "macos",
+  "operator_notes": "",
+  "hardware": {
+    "trainer": "Wahoo KICKR CORE C26B",
+    "controller": "Zwift Click (Left+Right pair)",
+    "capture_host": "this machine"
+  },
+  "firmware": {
+    "trainer": "1.5.36",
+    "controller": "1.2"
+  },
+  "environment": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.6",
+    "hostname": "QTX4CCXQTQ",
+    "tz": "IST+0100",
+    "tshark": "TShark (Wireshark) 4.4.9 (Git commit 18457223d1eb).",
+    "macos_bt_firmware": "Address: BC:D0:74:81:F6:07; Chipset: BCM_4387; Firmware Version: 23.5.636.5344"
+  },
+  "software": {
+    "official_app": "Zwift for Mac",
+    "our_harness": "src/dev/ble-lab.html"
+  },
+  "markers": [
+    {
+      "ts": 1785324926.326623,
+      "label": "Click asleep, official app closed, capture backend running",
+      "kind": "action",
+      "detail": "step 1/4"
+    },
+    {
+      "ts": 1785324944.3450298,
+      "label": "Press a Click button to wake it",
+      "kind": "action",
+      "detail": "step 2/4"
+    }
+  ],
+  "finished_at": null,
+  "capture_files": [],
+  "started_at_iso": "2026-07-29T11:33:50.056Z"
+}

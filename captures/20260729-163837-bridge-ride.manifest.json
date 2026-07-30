@@ -1,0 +1,232 @@
+{
+  "scenario": "bridge-ride",
+  "backend": "android-bugreport",
+  "operator_notes": "",
+  "hardware": {
+    "capture_host": "Android phone (adb)"
+  },
+  "firmware": {},
+  "environment": {
+    "platform": "Android",
+    "snoop_mode": "FULL"
+  },
+  "software": {
+    "official_app": "Zwift Companion / Zwift game (bridged)"
+  },
+  "markers": [
+    {
+      "ts": 1785336368.066,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785336425.105,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785337217.118,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785337254.573,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785337270.104,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785337307.203,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785337800.999,
+      "label": "display OFF",
+      "kind": "environment",
+      "detail": "OFF"
+    },
+    {
+      "ts": 1785338209.115,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785338212.088,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785339823.367,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785339826.347,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785341234.379,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785341237.373,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785341841.857,
+      "label": "display OFF",
+      "kind": "environment",
+      "detail": "OFF"
+    },
+    {
+      "ts": 1785341896.737,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "plugged_in"
+    },
+    {
+      "ts": 1785341899.725,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785341900.176,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785341985.889,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785342025.267,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785342101.137,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785342311.202,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785342354.299,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785342584.061,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785342587.638,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1785342588.39,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1785342712.295,
+      "label": "Zwift Click CONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:81:d9:a1"
+    },
+    {
+      "ts": 1785342714.387,
+      "label": "Zwift Click CONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:3d:51:a6"
+    },
+    {
+      "ts": 1785342828.64,
+      "label": "Zwift Click DISCONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:3d:51:a6"
+    },
+    {
+      "ts": 1785342828.706,
+      "label": "KICKR CORE C26B DISCONNECTED",
+      "kind": "action",
+      "detail": "address ff:a1:82:dd:f0:79"
+    },
+    {
+      "ts": 1785342835.736,
+      "label": "Zwift Click CONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:3d:51:a6"
+    },
+    {
+      "ts": 1785342845.674,
+      "label": "KICKR CORE C26B CONNECTED",
+      "kind": "action",
+      "detail": "address ff:a1:82:dd:f0:79"
+    },
+    {
+      "ts": 1785342890.487,
+      "label": "Zwift Click DISCONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:3d:51:a6"
+    },
+    {
+      "ts": 1785342890.537,
+      "label": "KICKR CORE C26B DISCONNECTED",
+      "kind": "action",
+      "detail": "address ff:a1:82:dd:f0:79"
+    },
+    {
+      "ts": 1785342895.934,
+      "label": "KICKR CORE C26B CONNECTED",
+      "kind": "action",
+      "detail": "address ff:a1:82:dd:f0:79"
+    },
+    {
+      "ts": 1785342912.763,
+      "label": "Zwift Click CONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:3d:51:a6"
+    }
+  ],
+  "capture_files": [
+    "20260729-163837-bridge-ride.btsnoop"
+  ],
+  "marker_source": "the phone's own logcat (blelab/androidlog.py), not a human at a keyboard \u2014 same clock as the rest of the phone, and available retroactively"
+}

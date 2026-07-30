@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ble-lab · connection recipe harness</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1115;
+        --panel: #171a21;
+        --line: #262b36;
+        --text: #dfe3ea;
+        --dim: #8b93a3;
+        --ok: #4ec9a0;
+        --fail: #f2666f;
+        --warn: #e2b341;
+        --info: #6aa8f0;
+        --accent: #b78af5;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 24px 0 8px;
+        color: var(--dim);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .sub {
+        color: var(--dim);
+        margin: 0 0 20px;
+        max-width: 70ch;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      button {
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: var(--accent);
+        color: #14121c;
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      label {
+        color: var(--dim);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      input[type='number'] {
+        width: 68px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 4px 6px;
+        font: inherit;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        color: var(--dim);
+        font-weight: 500;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      td.mono,
+      pre,
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .st {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .st-ok {
+        color: var(--ok);
+      }
+      .st-fail {
+        color: var(--fail);
+      }
+      .st-skip {
+        color: var(--dim);
+      }
+      .st-run {
+        color: var(--warn);
+      }
+      .cls {
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        color: var(--dim);
+        white-space: nowrap;
+      }
+      .cls-reproducible {
+        color: var(--ok);
+        border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+      }
+      .cls-implicit {
+        color: var(--info);
+        border-color: color-mix(in srgb, var(--info) 40%, transparent);
+      }
+      .cls-unreachable {
+        color: var(--fail);
+        border-color: color-mix(in srgb, var(--fail) 40%, transparent);
+      }
+      pre#log {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 12px;
+        max-height: 460px;
+        overflow: auto;
+        white-space: pre-wrap;
+        margin: 0;
+      }
+      .verdict {
+        padding: 12px 16px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        margin: 16px 0;
+      }
+      .verdict.pass {
+        border-color: var(--ok);
+      }
+      .verdict.fail {
+        border-color: var(--fail);
+      }
+      .verdict b {
+        font-size: 16px;
+      }
+      .note {
+        color: var(--dim);
+        font-size: 12.5px;
+        max-width: 80ch;
+      }
+      #unsupported {
+        color: var(--fail);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ble-lab · connection recipe harness</h1>
+    <p class="sub">
+      Executes the inferred connection recipe against a real Zwift Click from a plain webpage, and
+      reports pass/fail <em>per step</em>. This is the falsification instrument for
+      <code>docs/virtual-shifting/CONNECTION-RECIPE.md</code>: if a step fails here, the recipe is
+      wrong or Web Bluetooth cannot do it. Close all other software that talks to the Click first.
+    </p>
+
+    <div class="row">
+      <button id="run" class="primary">Run recipe</button>
+      <button id="reconnect" disabled>Test reconnect</button>
+      <button id="disconnect" disabled>Disconnect</button>
+      <button id="copy">Copy results JSON</button>
+      <button id="post" disabled>POST results to replay.py</button>
+      <label
+        >steady-state watch
+        <input type="number" id="watch" value="180" min="5" max="900" /> s</label
+      >
+      <label
+        ><input type="checkbox" id="unlock" checked /> send <code>ff 04 00</code> after
+        RideOn</label
+      >
+      <label
+        ><input type="checkbox" id="bareRideOn" /> send the <strong>bare 6-byte</strong>
+        <code>RideOn</code> instead of Zwift's <code>RideOn 02 03</code> (H29 control arm)</label
+      >
+      <label><input type="checkbox" id="strict" /> strict: validate handshake status bytes</label>
+    </div>
+    <p class="note">
+      <b>The <code>ff 04 00</code> checkbox is the experiment.</b> It is the documented Click-v2
+      post-handshake vendor write (<code>PROTOCOLS.md</code> §1.5) that our code has never sent, and
+      the leading candidate explanation for the ~45–90 s disconnects. Run it <b>checked</b> and
+      <b>unchecked</b>, watching how long the connection survives each time — that comparison is the
+      whole point, and it also finally gives base validation BV2 a controlled before/after. Set the
+      watch window to at least 180 s so a drop at 90 s is unambiguous.
+    </p>
+    <p id="unsupported" hidden>
+      This browser has no <code>navigator.bluetooth</code>. Web Bluetooth is Chrome/Edge only —
+      Firefox and Safari will never run this page.
+    </p>
+
+    <div id="verdict" class="verdict" hidden></div>
+
+    <h2>Recipe steps</h2>
+    <table id="steps">
+      <thead>
+        <tr>
+          <th style="width: 2.5em">#</th>
+          <th>Step</th>
+          <th style="width: 9em">Web Bluetooth</th>
+          <th style="width: 5.5em">Status</th>
+          <th style="width: 5em">ms</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Event log</h2>
+    <pre id="log"></pre>
+
+    <script type="module">
+      // ── Recipe definition ────────────────────────────────────────────────
+      // Byte-level and ordering facts come from docs/virtual-shifting/PROTOCOLS.md
+      // §1.2/§1.3 and our own experiments/03 + /04. Each step declares its
+      // Web Bluetooth classification so a failure is immediately interpretable:
+      // a 'reproducible' step failing is our bug; an 'unreachable' step is the
+      // platform's limit and belongs in the Tier 1 vs Tier 2 argument.
+
+      const ZWIFT_SVC_FC82 = 0xfc82
+      const ZWIFT_SVC_LEGACY = '00000001-19ca-4651-86e5-fa29dcdd09d1'
+      const ZAP_ASYNC = '00000002-19ca-4651-86e5-fa29dcdd09d1'
+      const ZAP_SYNC_RX = '00000003-19ca-4651-86e5-fa29dcdd09d1'
+      const ZAP_SYNC_TX = '00000004-19ca-4651-86e5-fa29dcdd09d1'
+      const RIDEON = Uint8Array.from([0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e])
+      // Real Zwift writes EIGHT bytes — "RideOn" + 02 03 — to Click V2 and to the trainer
+      // (captured 2026-07-29, experiments/16 §2). The bare 6-byte form is what every
+      // earlier experiment sent, and is the leading suspect for the 44-90s drop (H29).
+      const RIDEON_ZWIFT = Uint8Array.from([0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x02, 0x03])
+      // PROTOCOLS.md §1.5: "Click v2 post-handshake (BikeControl, when previously
+      // unlocked): FF 04 00". Three bytes, and its protobuf body is empty — it
+      // asserts an unlock rather than proving one. See experiments/13.
+      const VENDOR_UNLOCK_ASSERT = Uint8Array.from([0xff, 0x04, 0x00])
+
+      // How long to wait for the handshake indication before declaring failure.
+      const HANDSHAKE_REPLY_TIMEOUT_MS = 3000
+      // PROTOCOLS.md §1.3: no ASYNC frames within ~10s means the firmware is
+      // plaintext-incapable and only speaks encrypted ZAP.
+      const FIRST_ASYNC_TIMEOUT_MS = 10000
+
+      const els = {
+        run: document.getElementById('run'),
+        reconnect: document.getElementById('reconnect'),
+        disconnect: document.getElementById('disconnect'),
+        copy: document.getElementById('copy'),
+        post: document.getElementById('post'),
+        watch: document.getElementById('watch'),
+        strict: document.getElementById('strict'),
+        unlock: document.getElementById('unlock'),
+        bareRideOn: document.getElementById('bareRideOn'),
+        steps: document.querySelector('#steps tbody'),
+        log: document.getElementById('log'),
+        verdict: document.getElementById('verdict'),
+        unsupported: document.getElementById('unsupported'),
+      }
+
+      if (!navigator.bluetooth) {
+        els.unsupported.hidden = false
+        els.run.disabled = true
+      }
+
+      const state = {
+        device: null,
+        server: null,
+        service: null,
+        chars: {},
+        results: [],
+        frames: [],
+        t0: 0,
+        connectedAt: 0,
+        disconnectedAt: null,
+        survivedFor: null,
+      }
+
+      const hex = (buf) =>
+        Array.from(new Uint8Array(buf.buffer ?? buf))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join(' ')
+
+      function log(msg, data) {
+        const t = ((performance.now() - state.t0) / 1000).toFixed(3).padStart(8)
+        const line = data !== undefined ? `${t}  ${msg}  ${data}` : `${t}  ${msg}`
+        els.log.textContent += line + '\n'
+        els.log.scrollTop = els.log.scrollHeight
+      }
+
+      // ── Step runner ──────────────────────────────────────────────────────
+      let rowIndex = 0
+      function addRow(name, classification) {
+        rowIndex += 1
+        const tr = document.createElement('tr')
+        tr.innerHTML =
+          `<td class="mono">${rowIndex}</td><td>${name}</td>` +
+          `<td><span class="cls cls-${classification}">${classification}</span></td>` +
+          `<td class="st st-run">running</td><td class="mono"></td><td class="mono"></td>`
+        els.steps.appendChild(tr)
+        return tr
+      }
+
+      async function step(name, classification, fn, { optional = false } = {}) {
+        const tr = addRow(name, classification)
+        const cells = tr.querySelectorAll('td')
+        const started = performance.now()
+        try {
+          const detail = await fn()
+          const ms = Math.round(performance.now() - started)
+          cells[3].textContent = 'PASS'
+          cells[3].className = 'st st-ok'
+          cells[4].textContent = ms
+          cells[5].textContent = detail ?? ''
+          state.results.push({
+            step: name,
+            classification,
+            status: 'pass',
+            ms,
+            detail: detail ?? '',
+          })
+          log(`PASS  ${name}`, detail ?? '')
+          return detail
+        } catch (err) {
+          const ms = Math.round(performance.now() - started)
+          const msg = String(err && err.message ? err.message : err)
+          cells[3].textContent = optional ? 'SKIP' : 'FAIL'
+          cells[3].className = optional ? 'st st-skip' : 'st st-fail'
+          cells[4].textContent = ms
+          cells[5].textContent = msg
+          state.results.push({
+            step: name,
+            classification,
+            status: optional ? 'skip' : 'fail',
+            ms,
+            detail: msg,
+          })
+          log(`${optional ? 'SKIP' : 'FAIL'}  ${name}`, msg)
+          if (!optional) throw err
+          return null
+        }
+      }
+
+      const waitFor = (ms) => new Promise((r) => setTimeout(r, ms))
+
+      function awaitValue(characteristic, predicate, timeoutMs, description) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            characteristic.removeEventListener('characteristicvaluechanged', onValue)
+            reject(new Error(`timeout after ${timeoutMs}ms waiting for ${description}`))
+          }, timeoutMs)
+          function onValue(evt) {
+            const bytes = new Uint8Array(evt.target.value.buffer)
+            if (!predicate(bytes)) return
+            clearTimeout(timer)
+            characteristic.removeEventListener('characteristicvaluechanged', onValue)
+            resolve(bytes)
+          }
+          characteristic.addEventListener('characteristicvaluechanged', onValue)
+        })
+      }
+
+      // ── The recipe ───────────────────────────────────────────────────────
+      async function runRecipe({ requestNewDevice = true } = {}) {
+        if (requestNewDevice) {
+          state.results = []
+          state.frames = []
+          rowIndex = 0
+          els.steps.innerHTML = ''
+          els.log.textContent = ''
+          els.verdict.hidden = true
+          state.t0 = performance.now()
+        }
+
+        // 1. Advertisement matching. Unreachable as *observation*; the only
+        //    reproducible part is declaring what we will accept.
+        await step(
+          'requestDevice — name filter + optionalServices',
+          requestNewDevice ? 'reproducible' : 'implicit',
+          async () => {
+            if (!requestNewDevice && state.device) return `reusing ${state.device.name}`
+            state.device = await navigator.bluetooth.requestDevice({
+              filters: [{ namePrefix: 'Zwift Click' }],
+              optionalServices: [
+                ZWIFT_SVC_FC82,
+                ZWIFT_SVC_LEGACY,
+                'battery_service',
+                'device_information',
+              ],
+            })
+            state.device.addEventListener('gattserverdisconnected', () => {
+              state.disconnectedAt = performance.now()
+              const alive = ((state.disconnectedAt - state.connectedAt) / 1000).toFixed(1)
+              log(
+                'EVENT gattserverdisconnected',
+                `after ${alive}s connected (no reason code available)`
+              )
+              els.reconnect.disabled = false
+              els.disconnect.disabled = true
+            })
+            return `${state.device.name} (id ${String(state.device.id).slice(0, 10)}…)`
+          }
+        )
+
+        await step('gatt.connect()', 'reproducible', async () => {
+          state.server = await state.device.gatt.connect()
+          state.connectedAt = performance.now()
+          state.disconnectedAt = null
+          state.survivedFor = null
+          els.disconnect.disabled = false
+          return `connected=${state.server.connected}`
+        })
+
+        // 3. Dual-UUID probe. The advertised service changed in Jan-2025
+        //    firmware (PROTOCOLS.md §1.1); characteristics are identical under
+        //    both, so probe FC82 first then fall back.
+        await step('probe service: FC82 then 19ca', 'reproducible', async () => {
+          try {
+            state.service = await state.server.getPrimaryService(ZWIFT_SVC_FC82)
+            return 'FC82 (post-Jan-2025 firmware)'
+          } catch (e) {
+            state.service = await state.server.getPrimaryService(ZWIFT_SVC_LEGACY)
+            return '19ca legacy (pre-Jan-2025 firmware)'
+          }
+        })
+
+        await step('getCharacteristic ASYNC / SYNC RX / SYNC TX', 'reproducible', async () => {
+          state.chars.async = await state.service.getCharacteristic(ZAP_ASYNC)
+          state.chars.syncRx = await state.service.getCharacteristic(ZAP_SYNC_RX)
+          state.chars.syncTx = await state.service.getCharacteristic(ZAP_SYNC_TX)
+          const props = (c) =>
+            Object.entries(c.properties)
+              .filter(([, v]) => v)
+              .map(([k]) => k)
+              .join('+')
+          return `0002[${props(state.chars.async)}] 0003[${props(state.chars.syncRx)}] 0004[${props(state.chars.syncTx)}]`
+        })
+
+        // 5/6. Ordering is load-bearing: the handshake reply is an INDICATION
+        //      on SYNC TX, so both subscriptions must exist before the write or
+        //      the reply is lost. ASYNC first, then SYNC TX, per PROTOCOLS §1.2.
+        await step('startNotifications on ASYNC (0002)', 'reproducible', async () => {
+          await state.chars.async.startNotifications()
+          state.chars.async.addEventListener('characteristicvaluechanged', (evt) => {
+            const bytes = new Uint8Array(evt.target.value.buffer)
+            state.frames.push({ t: performance.now() - state.t0, hex: hex(bytes) })
+            if (state.frames.length <= 8 || bytes[0] !== 0x23) {
+              log('ASYNC', hex(bytes))
+            }
+          })
+          return 'subscribed'
+        })
+
+        await step('startNotifications on SYNC TX (0004)', 'reproducible', async () => {
+          await state.chars.syncTx.startNotifications()
+          return `subscribed (browser chose ${
+            state.chars.syncTx.properties.indicate ? 'indications' : 'notifications'
+          } — not our choice)`
+        })
+
+        // 7/8. The handshake, and its reply.
+        const replyPromise = awaitValue(
+          state.chars.syncTx,
+          (b) => b.length >= 6 && String.fromCharCode(...b.slice(0, 6)) === 'RideOn',
+          HANDSHAKE_REPLY_TIMEOUT_MS,
+          'RideOn reply on SYNC TX'
+        ).catch((e) => e)
+
+        await step('write RideOn to SYNC RX (0003)', 'reproducible', async () => {
+          const bytes = els.bareRideOn?.checked ? RIDEON : RIDEON_ZWIFT
+          const what = `${hex(bytes)}${bytes.length === 8 ? ' (as Zwift sends)' : ' (bare, pre-16 behaviour)'}`
+          if (state.chars.syncRx.properties.writeWithoutResponse) {
+            await state.chars.syncRx.writeValueWithoutResponse(bytes)
+            return `write-without-response: ${what}`
+          }
+          await state.chars.syncRx.writeValueWithResponse(bytes)
+          return `write-with-response: ${what}`
+        })
+
+        await step('handshake reply on SYNC TX', 'reproducible', async () => {
+          const reply = await replyPromise
+          if (reply instanceof Error) throw reply
+          const tail = reply.slice(6)
+          // The reply mirrors what we SENT (experiments/16 §2): 6 bytes in, 6 back;
+          // 8 in, 02 03 back. So a bare echo is not a device property — it is our
+          // own doing, which is why strict mode only complains when we sent 8.
+          const sentEight = !els.bareRideOn?.checked
+          if (els.strict.checked && sentEight && tail.length !== 2) {
+            throw new Error(
+              `strict mode: sent RideOn 02 03, expected 2 status bytes back, got ${tail.length} (${hex(tail)})`
+            )
+          }
+          return tail.length === 0
+            ? 'bare RideOn echo — expected, since we sent the bare 6 bytes'
+            : `RideOn + ${tail.length} status bytes: ${hex(tail)}`
+        })
+
+        await step(
+          `first ASYNC frame within ${FIRST_ASYNC_TIMEOUT_MS / 1000}s`,
+          'reproducible',
+          async () => {
+            if (state.frames.length) return `already had ${state.frames.length} frame(s)`
+            const b = await awaitValue(
+              state.chars.async,
+              () => true,
+              FIRST_ASYNC_TIMEOUT_MS,
+              'any ASYNC frame'
+            )
+            const variant = b[0] === 0x37 ? 'v1' : b[0] === 0x23 ? 'v2/Ride-family' : 'unknown'
+            return `type 0x${b[0].toString(16)} ⇒ ${variant}: ${hex(b)}`
+          }
+        )
+
+        // The experiment. Deliberately placed straight after the handshake, which
+        // is where BikeControl sends it and where any 0xFF write in a real capture
+        // would be expected to sit.
+        if (els.unlock.checked) {
+          await step('write ff 04 00 (vendor unlock assertion)', 'reproducible', async () => {
+            if (state.chars.syncRx.properties.writeWithoutResponse) {
+              await state.chars.syncRx.writeValueWithoutResponse(VENDOR_UNLOCK_ASSERT)
+            } else {
+              await state.chars.syncRx.writeValueWithResponse(VENDOR_UNLOCK_ASSERT)
+            }
+            return (
+              'sent ff 04 00 — an ATT-level accept here proves nothing about ' +
+              'the unlock; only connection survival does'
+            )
+          })
+        } else {
+          addRow('write ff 04 00 (vendor unlock assertion)', 'reproducible')
+          const cells = els.steps.lastElementChild.querySelectorAll('td')
+          cells[3].textContent = 'SKIP'
+          cells[3].className = 'st st-skip'
+          cells[5].textContent = 'checkbox off — this run is the CONTROL condition'
+          state.results.push({
+            step: 'write ff 04 00 (vendor unlock assertion)',
+            classification: 'reproducible',
+            status: 'skip',
+            ms: 0,
+            detail: 'control condition: deliberately not sent',
+          })
+          log('SKIP  ff 04 00 not sent (control condition)')
+        }
+
+        await step(
+          'read firmware revision (0x2A26)',
+          'reproducible',
+          async () => {
+            const dis = await state.server.getPrimaryService('device_information')
+            const c = await dis.getCharacteristic('firmware_revision_string')
+            const v = await c.readValue()
+            return new TextDecoder().decode(v)
+          },
+          { optional: true }
+        )
+
+        await step(
+          'read + subscribe battery level',
+          'reproducible',
+          async () => {
+            const svc = await state.server.getPrimaryService('battery_service')
+            const c = await svc.getCharacteristic('battery_level')
+            const v = await c.readValue()
+            await c.startNotifications()
+            c.addEventListener('characteristicvaluechanged', (e) =>
+              log('BATTERY', `${new Uint8Array(e.target.value.buffer)[0]}%`)
+            )
+            return `${v.getUint8(0)}%`
+          },
+          { optional: true }
+        )
+
+        // Things the recipe deliberately records as impossible, so the
+        // Unreachable list is generated by the harness rather than asserted in
+        // prose. These are expected to FAIL — that is the finding.
+        await step(
+          'read negotiated ATT MTU',
+          'implicit',
+          async () => {
+            throw new Error('no Web Bluetooth API exposes the MTU; writes >20B may fail silently')
+          },
+          { optional: true }
+        )
+
+        await step(
+          'read advertisement / manufacturer data',
+          'unreachable',
+          async () => {
+            if (!state.device.watchAdvertisements) {
+              throw new Error('watchAdvertisements() unavailable (flag-gated in Chrome)')
+            }
+            throw new Error(
+              'watchAdvertisements() exists but requires a flag; company ID 0x094A ' +
+                'manufacturer data is never delivered to page script'
+            )
+          },
+          { optional: true }
+        )
+
+        await step(
+          'initiate pairing / bonding',
+          'unreachable',
+          async () => {
+            throw new Error('Web Bluetooth has no pairing, bonding, or link-security API')
+          },
+          { optional: true }
+        )
+
+        return summarise()
+      }
+
+      async function watchSteady() {
+        const seconds = Math.max(5, Number(els.watch.value) || 180)
+        const sent = els.unlock.checked ? 'WITH ff 04 00' : 'WITHOUT ff 04 00 (control)'
+        await step(`steady state: survive ${seconds}s — ${sent}`, 'reproducible', async () => {
+          const before = state.frames.length
+          const start = performance.now()
+          let lastReport = 0
+          while ((performance.now() - start) / 1000 < seconds) {
+            if (state.disconnectedAt) {
+              state.survivedFor = (state.disconnectedAt - state.connectedAt) / 1000
+              const band =
+                state.survivedFor < 100
+                  ? 'inside the ~45-90s pre-sync drop band from experiments/03'
+                  : 'past the ~45-90s pre-sync drop band'
+              throw new Error(
+                `DROPPED after ${state.survivedFor.toFixed(1)}s of connection — ${band}`
+              )
+            }
+            const elapsed = (performance.now() - start) / 1000
+            if (elapsed - lastReport >= 30) {
+              lastReport = elapsed
+              log(
+                'still alive',
+                `${elapsed.toFixed(0)}s / ${seconds}s, ${state.frames.length} frames`
+              )
+            }
+            await waitFor(250)
+          }
+          state.survivedFor = (performance.now() - state.connectedAt) / 1000
+          const gained = state.frames.length - before
+          return (
+            `SURVIVED ${state.survivedFor.toFixed(1)}s, still connected; ` +
+            `${gained} ASYNC frames in ${seconds}s (${(gained / seconds).toFixed(2)} Hz)`
+          )
+        })
+      }
+
+      function summarise() {
+        const pass = state.results.filter((r) => r.status === 'pass').length
+        const fail = state.results.filter((r) => r.status === 'fail').length
+        const required = state.results.filter((r) => r.status !== 'skip')
+        const ok = fail === 0 && required.length > 0
+        const gotFrames = state.frames.length > 0
+        const handshook = state.results.some(
+          (r) => r.step.startsWith('handshake reply') && r.status === 'pass'
+        )
+
+        els.verdict.hidden = false
+        els.verdict.className = `verdict ${ok && gotFrames ? 'pass' : 'fail'}`
+        const survival =
+          state.survivedFor === null
+            ? 'not measured'
+            : `${state.survivedFor.toFixed(1)}s ${state.disconnectedAt ? '(DROPPED)' : '(still up)'}`
+        els.verdict.innerHTML =
+          `<b>${ok && gotFrames ? 'REPLAY VERDICT: PASS' : 'REPLAY VERDICT: FAIL'}</b><br />` +
+          `subscribed: ${handshook ? 'yes' : 'no'} · ` +
+          `handshaken: ${handshook ? 'yes' : 'no'} · ` +
+          `button/ASYNC notifications arriving: ${gotFrames ? `yes (${state.frames.length})` : 'no'}<br />` +
+          `<b>connection survival: ${survival}</b> — ` +
+          `${els.unlock.checked ? 'WITH' : 'WITHOUT'} <code>ff 04 00</code><br />` +
+          `<span class="note">${pass} passed, ${fail} failed, ` +
+          `${state.results.length - required.length} expected-impossible steps skipped. ` +
+          `Now run it again with the <code>ff 04 00</code> checkbox flipped and compare ` +
+          `the survival figures — one run on its own proves nothing.</span>`
+        els.post.disabled = false
+        return { pass, fail }
+      }
+
+      // ── Buttons ──────────────────────────────────────────────────────────
+      els.run.onclick = async () => {
+        els.run.disabled = true
+        try {
+          await runRecipe({ requestNewDevice: true })
+          await watchSteady()
+        } catch (err) {
+          log('ABORTED', String(err))
+        } finally {
+          summarise()
+          els.run.disabled = false
+        }
+      }
+
+      els.reconnect.onclick = async () => {
+        els.reconnect.disabled = true
+        log('--- reconnect test: re-running the recipe on the retained device ---')
+        try {
+          if (state.device.gatt.connected) state.device.gatt.disconnect()
+          await waitFor(1200)
+          await runRecipe({ requestNewDevice: false })
+          await watchSteady()
+        } catch (err) {
+          log('RECONNECT ABORTED', String(err))
+        } finally {
+          summarise()
+        }
+      }
+
+      els.disconnect.onclick = () => {
+        state.device?.gatt?.disconnect()
+      }
+
+      const payload = () => ({
+        userAgent: navigator.userAgent,
+        at: new Date().toISOString(),
+        device: state.device ? { name: state.device.name, id: state.device.id } : null,
+        condition: {
+          vendorUnlockAssertSent: els.unlock.checked,
+          strictHandshakeValidation: els.strict.checked,
+          watchWindowSeconds: Number(els.watch.value),
+        },
+        survivedForSeconds: state.survivedFor,
+        dropped: Boolean(state.disconnectedAt),
+        results: state.results,
+        frames: state.frames.slice(0, 400),
+        frameCount: state.frames.length,
+      })
+
+      els.copy.onclick = async () => {
+        const text = JSON.stringify(payload(), null, 2)
+        try {
+          await navigator.clipboard.writeText(text)
+          log('copied results JSON to clipboard')
+        } catch {
+          els.log.textContent += '\n' + text + '\n'
+        }
+      }
+
+      els.post.onclick = async () => {
+        try {
+          const res = await fetch('/result', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload()),
+          })
+          log('POST /result', `${res.status} ${await res.text()}`)
+        } catch (err) {
+          log('POST failed', String(err) + ' — are you serving this via replay.py?')
+        }
+      }
+    </script>
+  </body>
+</html>

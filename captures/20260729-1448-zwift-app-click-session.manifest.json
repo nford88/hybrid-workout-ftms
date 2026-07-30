@@ -1,0 +1,28 @@
+{
+  "scenario": "zwift-app-click-connect (opportunistic, unmarked)",
+  "started_at_iso": "2026-07-29T14:48:00Z",
+  "backend": "android-bugreport",
+  "operator_notes": "Android HCI snoop pulled via `adb bugreport` from Samsung SM-S711B (Android 16), snoop mode FULL. NOT a pre-registered run: no capture.py markers, so packets are unattributed. Capture spans 1174.7s; the Click link occupies 1035.8-1109.5s. The Zwift app connected the Click and did discovery + 6 CCCD subscriptions, then sent nothing further; the link timed out. Pairing was almost certainly never completed in the app UI, so this is a partial session, not a full Zwift ride.",
+  "hardware": {
+    "trainer": "Wahoo KICKR CORE C26B (ACL handle 0x0002, addr ff:a1:82:dd:f0:79)",
+    "controller": "Zwift Click V2 RIGHT (ACL handle 0x0003, addr f4:c4:59:81:d9:a1)",
+    "capture_host": "Samsung SM-S711B, Android 16"
+  },
+  "firmware": {
+    "trainer": "1.5.36",
+    "controller": "1.2.0 (read from 2A26 in this capture; hw rev B.0, serial 0A-34C45981D9A1)"
+  },
+  "environment": {
+    "platform": "Android 16 (Samsung SM-S711B)",
+    "snoop_mode": "FULL"
+  },
+  "software": {
+    "official_app": "com.zwift.android.prod (phone)",
+    "our_harness": null
+  },
+  "markers": [],
+  "capture_files": [
+    "20260729-1448-zwift-app-click-session.btsnoop"
+  ],
+  "analysis": "docs/virtual-shifting/experiments/15-zwift-app-click-session.md"
+}
