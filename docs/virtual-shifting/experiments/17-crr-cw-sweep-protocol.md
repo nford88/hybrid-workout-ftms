@@ -1,6 +1,6 @@
 # 17 — Crr/Cw sweep protocol (pre-registration)
 
-**Date drafted:** 2026-08-04 · **Status:** pre-registration only, nothing ridden yet
+**Date drafted:** 2026-08-04 · **Ridden:** 2026-08-05 · **Status:** RESULTS IN — see §10
 **Hardware:** Wahoo KICKR CORE C26B fw 1.5.36, Zwift Click pair fw 1.2, Zwift Cog 34/14
 **Answers:** H31 (new, below) · advances handoff next-steps 2, 3 and 5
 
@@ -63,18 +63,27 @@ Two consequences, and they are the whole basis of the protocol:
 
 ## 3. Predicted effect sizes
 
-At 83 kg (75 rider + 8 bike defaults), 85 rpm in gear index 11 ⇒ `v_virt` = 25.66 kph = 7.13 m/s,
-on the 0% block where the grade term vanishes entirely and resistance is Crr + Cw _alone_:
+At **97 kg** — this rider's own saved settings, 89 rider + 8 bike, not the 75+8 defaults — 85 rpm
+in gear index 11 ⇒ `v_virt` = 25.66 kph = 7.13 m/s, on the 0% block where the grade term vanishes
+entirely and resistance is Crr + Cw _alone_:
 
-| Sweep             | Predicted Δ power if the KICKR honours the byte    |
-| ----------------- | -------------------------------------------------- |
-| Crr 0.004 → 0.020 | `m·g·ΔCrr·v` = 83 × 9.81 × 0.016 × 7.13 ≈ **93 W** |
-| Cw 0.51 → 0.20    | `Δcw·v³` = 0.31 × 362.5 ≈ **112 W**                |
+| Sweep             | Predicted Δ power if the KICKR honours the byte     | Model's own Δ target |
+| ----------------- | --------------------------------------------------- | -------------------- |
+| Crr 0.004 → 0.020 | `m·g·ΔCrr·v` = 97 × 9.81 × 0.016 × 7.13 ≈ **109 W** | 211.7 → 320.2 W      |
+| Cw 0.51 → 0.20    | `Δcw·v³` = 0.31 × 362.5 ≈ **112 W**                 | 211.7 → 99.5 W       |
 
-Our own model's target power moves by 92.8 W and 112.2 W respectively for the same changes — the
-formulas agree, as they must. Both effects are 6–10× typical rider power noise (±10–15 W), so the
-test has ample power to detect them. **A null result is therefore as informative as a positive
-one**, which is the property a good experiment needs.
+Hand-computed and model-measured agree to 0.1 W, as they must. Note the Crr figure scales with
+mass and the Cw figure does not — the aero term has no mass in it — so 97 kg moves the Crr
+prediction from 93 W to 109 W while leaving Cw at 112 W.
+
+Both effects are 7–11× typical rider power noise (±10–15 W), so the test has ample power to detect
+them. **A null result is therefore as informative as a positive one**, which is the property a good
+experiment needs.
+
+Re-measured at 97 kg 2026-08-05, the baseline invariance of §2 still holds: sweeping Crr moves the
+sent grade by **0.019 pp** and Cw by **0.059 pp**, both far inside the 0.3% deadband. That is
+expected — the identity is mass-independent — but it is now confirmed on the settings that will
+actually be ridden rather than on defaults.
 
 Byte encoding checked — no clipping, all presets distinguishable
 ([ftms.js:237-248](../../../src/js/ftms.js#L237-L248)): Crr u8 @1/10000 → 40/50/110/170/200;
@@ -87,6 +96,7 @@ Cw u8 @1/100 → 20/28/36/45/51.
 | [`17-crr-cw-sweep-route.json`](17-crr-cw-sweep-route.json)                                      | Paste into **Import Garmin Route**. 1.70 km, avg 1.147%, 35 points                                                          |
 | [`17-crr-cw-sweep-workout.json`](17-crr-cw-sweep-workout.json)                                  | Route **and** the 13-step plan in one file. `route` is what the import textarea accepts; `workout` is a `SavedWorkoutEntry` |
 | [`17-install-sweep-workout.js`](17-install-sweep-workout.js)                                    | **Paste into the console** — installs both and reloads. Skips the 13-step click-through                                     |
+| [`17-auto-conditions.js`](17-auto-conditions.js)                                                | **Paste into the console** — applies all six conditions on schedule so the ride is hands-free                               |
 | [`make_sweep_route.py`](make_sweep_route.py) / [`make_sweep_workout.py`](make_sweep_workout.py) | Regenerate, in that order                                                                                                   |
 
 13 steps: `ERG 5 min @120 W` warm-up, then **6 × (SIM lap + ERG 1.5 min @100 W)**, the last rest
@@ -198,7 +208,24 @@ baseline the whole thing is uninterpretable.
 You can see where you are: the metrics row shows **Gear** and **Gradient**, and Step Distance
 reads `Nm (P%)`. Gradient flipping to 0% with Step Distance past ~355 m is the start of block A.
 
-**Between laps:** change the presets and click **Apply** during the **90 s ERG rest step** that
+### Hands-free alternative (preferred)
+
+Paste [`17-auto-conditions.js`](17-auto-conditions.js) into the console **before** pressing Start
+Workout and the five changes apply themselves — nothing to touch after that but the pedals and the
+Click. It writes exactly what Apply writes (both localStorage keys, `H.state.simPhysics`, both
+`<select>`s) plus the `physicsApplied` note, applying lap N's condition when the ERG rest before
+lap N begins, ~90 s clear of any measurement block.
+
+This removes the protocol's biggest execution risk. Five manual changes mid-effort is five chances
+to fumble a dropdown or miss the toast, and a silently-discarded Apply voids a whole lap that you
+would only discover in the export.
+
+Verified 2026-08-05 by driving all 13 steps through the real `skipStep` path with the BLE surface
+stubbed: six `physicsApplied` notes (laps 1–6, one each, all inside the session), the four expected
+Crr/Cw pairs reaching `ftms.setSim`, no change on the cool-down, and pasting the script three times
+still applies each condition exactly once.
+
+**Manual alternative:** change the presets and click **Apply** during the **90 s ERG rest step** that
 follows each lap. If you miss it, the next lap's 3% opener is a second chance — anywhere in the
 first 350 m is fine, since the `physicsApplied` note timestamps the moment exactly and the
 analysis splits on that, not on the lap boundary. What you cannot do is change presets inside a
@@ -270,3 +297,88 @@ spread is itself comparable to 93 W, the session is inconclusive and the honest 
   that Crr/Cw are ours alone to choose, since only our maths consumes them.
 - Handoff next-step 5 (is gear 12 rideable now?) is answered as a by-product: six laps' worth of
   baseline-gear 0% and 3% blocks at Crr 0.004 is exactly that measurement.
+
+---
+
+## 10. RESULTS — ridden 2026-08-05
+
+**Executed as designed.** All 6 laps, all 6 conditions applied automatically at the right
+moments by [`17-auto-conditions.js`](17-auto-conditions.js), 33.2 min, 2006 events, both
+archived earlier runs preserved. Lap 1 was ridden with free shifting (gears 6-20) before the
+HUD existed and is excluded from the gear-12 comparisons; laps 2-6 held gear 12 throughout.
+
+### P4 CONFIRMED — the design's central assumption held
+
+Sent grade in the 0% blocks, by condition: **−0.003%, −0.092%, −0.042%, −0.104%**. All ≈ 0 and
+all within 0.10 pp of each other across a full Crr and Cw sweep. The deadband suppressed writes
+so completely that a whole lap produced **10** `sim` events. The trainer therefore received
+effectively the same grade in every condition, so any power difference is attributable to the
+Crr/Cw bytes alone. One causal pathway, as designed.
+
+### P1 PARTIALLY CONFIRMED for Crr — the KICKR does honour the byte
+
+Speed-matched within block (same 0.5 m/s trainer-speed bin, gear 12, |sent| < 0.4), Crr
+0.004 → 0.020:
+
+| Block | v bin   | Δ observed | Δ predicted |
+| ----- | ------- | ---------- | ----------- |
+| A     | 5.0-5.5 | +19 W      | +80 W       |
+| A     | 5.5-6.0 | +190 W     | +85 W       |
+| B     | 5.5-6.0 | +82 W      | +85 W       |
+| B     | 6.5-7.0 | +6 W       | +104 W      |
+
+**Positive in every bin**, mean **+74 W against +88 W predicted ≈ 84%**. Direction is
+unambiguous; magnitude is consistent with the road model but scatters widely.
+
+### Cw NOT ESTABLISHED
+
+Cw 0.51 → 0.20 gave **−11, −35, −9, −7, +6 W** across five bins against predictions of −49 to
+−98 W — mostly the right sign, roughly 5-47% of magnitude, and smaller than the scatter. Either
+the trainer applies a much smaller aero coefficient than the road model, or it ignores the byte
+and this is noise. **Not resolved.**
+
+### Prediction correction — use the TRAINER's speed, not `v_virt`
+
+§3 predicted 109 W using `v_virt` = 7.13 m/s. The trainer's own road model integrates _its own_
+speed, which was 5.1-6.8 m/s, giving 80-104 W. Recomputed against the trainer's speed the Crr
+result lands at 84% of prediction instead of 53%. **`v_virt` is the wrong `v` for any prediction
+about trainer-side behaviour.**
+
+### Step 3 still negative — the model does not predict ABSOLUTE power
+
+Across all 1292 pedalling samples the road model at the trainer's reported speed gives
+**MAE ≈ 120 W and negative R²** for every variant (swept, fixed, grade-only). It over-predicts
+baseline power by ~63 W. Differences-in-differences (speed-matched deltas) are sound; absolute
+residual comparisons are not, and an early pass that compared absolute residuals appeared to
+show the opposite Crr conclusion for exactly that reason.
+
+### Instrument validation
+
+The Garmin FIT and the browser console's own IBD lines agree to **0.2 W on mean pedalling power**
+(121.1 vs 121.3 W, n≈2300 each; quantiles within 6 W; cadence 84.2 vs 84.4 rpm). The FIT power
+channel is the trainer's power.
+
+### Two bugs this ride exposed
+
+1. **The ride log recorded `power: 0` for every sample of every run.** `handleFtmsData` read
+   `data.power`; the IBD parser emits `powerW` ([ftms.js:505](../../../src/js/ftms.js#L505)).
+   One word, and the single channel the experiment measures was zeroed. **The FIT saved this
+   ride; nothing in the app would have.** Fixed.
+2. **The Zwift Click disconnects the moment a workout starts.** `ClickSettings` owns the GATT
+   link and disconnects on unmount, and the setup view unmounts when the active view appears —
+   so paddles are dead for the entire ride and only the keyboard (`[` / `]`) shifts. Found
+   mid-ride. **Not yet fixed.**
+3. Minor: the drivetrain started in gear **13** (2.61), not the baseline 12, so the first 200 m
+   of lap 1 were ridden off baseline and sending 3.32% for a 3.0% road.
+
+### What the next run needs
+
+- **Replication.** One lap per non-baseline condition cannot separate "the trainer honoured the
+  byte" from "the rider pushed harder". Per-bin scatter reached ±190 W where the effect is ~80 W.
+  Two laps per condition, or a longer 0% block.
+- **Block B is not comparable to block A** — it follows the 6% climb, so the rider is recovering
+  in it (73-116 W vs 172-257 W at the same grade and gear). Compare within block only, or move
+  block B away from the climb.
+- **Control cadence harder, or control power.** An ERG-mode variant that pins power and measures
+  the _speed_ the trainer reports would remove the rider from the loop entirely and is probably
+  the better experiment for H31.

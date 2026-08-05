@@ -81,9 +81,39 @@ in sync.
 | H28 | ❌ **FALSIFIED 2026-07-29** (`experiments/16` §1): the authorised link went **225.8 s with zero ATT traffic in either direction** — three times the 73.5 s drop — and did not disconnect. Traffic volume is not what holds the link. ~~The Click V2's 44–90 s disconnect is an **idle/inactivity timeout**~~ — the device sleeps its radio when no ZAP traffic flows — rather than an authorisation timeout that third-party clients suffer and Zwift pairing cures. Basis: the **official Zwift app** was captured dropping a Click V2 link at 73.7 s on HCI reason `0x08` (supervision timeout; the Click stopped answering) after 70 s of zero traffic, and the one variable that tracks all three observations we have — our idle harness dropping at 44–90 s, our harness holding 5+ min *while paddles were being pressed*, and Zwift itself dropping while idle — is **whether traffic was flowing**, not who the client was | If TRUE, the drop is defeatable with a keepalive or periodic read and needs no unlock at all, which makes most of the `11`/`12` capture programme optional and unblocks the Click from the browser today. If FALSE, H16 stands and the unlock is genuinely required | **A 10-minute browser test, no capture, no phone**: right-side Click alone from `src/dev/ble-lab.html`, two 180 s arms — idle vs. a paddle press every 30 s — both with no recent Zwift contact. `experiments/15-zwift-app-click-session.md` §6.1. Confound to control: the captured Zwift session never completed pairing, so it may not represent a fully-onboarded Zwift link |
 | U17 | (New, 2026-07-29) What the `2901` User Description descriptors on `0100`/`0101`/`0102` say (handles `0x0025`/`0x0029`/`0x002d`). Zwift discovered all three and read none | They may name the unlock characteristics outright — no source we have, BikeControl included, documents `0102` at all | Free from Web Bluetooth: `getDescriptor('gatt.characteristic_user_description')` then `readValue()`. `experiments/15` §6.2 |
 | U15 | (New, 2026-07-28) The prior-session attribution of the Wahoo-proprietary wheel-circumference-per-shift technique to `Berg0162/Kickr-Virtual-Shifting` — a direct code read this session found that repo instead uses a gradient-multiplier forwarded via standard FTMS SIM params/CPS resistance, with no reference to a Wahoo proprietary control point in the files checked | Whether this is a genuine correction (the repo never did this) or an incomplete read (a Wahoo-specific file exists but wasn't checked) | A targeted follow-up read of that repo's full file tree, if this path is ever pursued for real |
-| H31 | (New, 2026-08-04) **Does the KICKR actually use the `Crr` and `Cw` bytes in our FTMS `0x11` write, or only the grade?** Never tested — every ride so far changed grade and gear together, so the Crr/Cw bytes have never been varied with everything else held still. Pre-registered in [`experiments/17-crr-cw-sweep-protocol.md`](experiments/17-crr-cw-sweep-protocol.md) | Decides whether half of what we transmit means anything, and settles the open Crr 0.017-vs-0.004 argument by measurement rather than preference. **If NULL, Crr/Cw affect only our own speed/distance maths and never the felt resistance** — which would also mean the rider's gear-choice complaints cannot be blamed on Crr. The design is unusually clean because our own model's sent grade is *measured* to be Crr/Cw-invariant in the baseline gear (0.019 pp for a full Crr sweep, 0.069 pp for Cw — both inside `setSimGrade`'s 0.3% deadband), so the trainer is the only remaining causal pathway | **Experiment 17** — 6 laps of a synthetic constant-grade route (`17-crr-cw-sweep-route.json`), A-B-A-C-D-A condition schedule, gear + cadence pinned on the 0% blocks. Predicted Δpower if honoured: **≈93 W** across the Crr sweep, **≈112 W** across the Cw sweep, vs ±10–15 W rider noise |
+| H31 | ⚠️ **PARTIALLY ANSWERED 2026-08-05 (`experiments/17` §10): Crr IS honoured (~84% of the road-model prediction, positive in every speed-matched bin); Cw NOT established (5-47% of prediction, smaller than the scatter).** Prediction corrected mid-analysis: the trainer integrates ITS OWN speed (5.1-6.8 m/s), not `v_virt` (7.13), which moves the Crr result from 53% to 84%. Absolute power is still not predicted by the model (MAE ~120 W, negative R²) — only differences-in-differences are sound. Needs replication: one lap per condition cannot separate the trainer honouring the byte from the rider pushing harder. Original: (New, 2026-08-04) **Does the KICKR actually use the `Crr` and `Cw` bytes in our FTMS `0x11` write, or only the grade?** Never tested — every ride so far changed grade and gear together, so the Crr/Cw bytes have never been varied with everything else held still. Pre-registered in [`experiments/17-crr-cw-sweep-protocol.md`](experiments/17-crr-cw-sweep-protocol.md) | Decides whether half of what we transmit means anything, and settles the open Crr 0.017-vs-0.004 argument by measurement rather than preference. **If NULL, Crr/Cw affect only our own speed/distance maths and never the felt resistance** — which would also mean the rider's gear-choice complaints cannot be blamed on Crr. The design is unusually clean because our own model's sent grade is *measured* to be Crr/Cw-invariant in the baseline gear (0.019 pp for a full Crr sweep, 0.069 pp for Cw — both inside `setSimGrade`'s 0.3% deadband), so the trainer is the only remaining causal pathway | **Experiment 17** — 6 laps of a synthetic constant-grade route (`17-crr-cw-sweep-route.json`), A-B-A-C-D-A condition schedule, gear + cadence pinned on the 0% blocks. Predicted Δpower if honoured: **≈109 W** across the Crr sweep and **≈112 W** across the Cw sweep, at this rider's actual 97 kg (89+8), vs ±10–15 W rider noise. The Crr figure scales with mass, the Cw figure does not |
 
 ## E. Result log
+
+### 2026-08-05 — experiment 17, Crr/Cw sweep ridden (H31 partially answered)
+
+Six laps of a synthetic constant-grade route, tyre/position swept A-B-A-C-D-A, conditions applied
+automatically by a console script. 33.2 min, 2006 ride-log events.
+
+- **P4 CONFIRMED — the design's key assumption held.** Sent grade in the 0% blocks was
+  condition-invariant: −0.003 / −0.092 / −0.042 / −0.104 % across a full Crr and Cw sweep, all
+  within 0.10 pp. The 0.3% deadband suppressed writes so hard a whole lap produced 10 `sim`
+  events. The trainer saw the same grade in every condition ⇒ one causal pathway, as designed.
+- **Crr IS honoured.** Speed-matched within block, Crr 0.004→0.020 gave +19 / +190 / +82 / +6 W
+  across four bins — positive in every one — mean **+74 W vs +88 W predicted (84%)**.
+- **Cw not established.** −11 / −35 / −9 / −7 / +6 W against −49 to −98 W predicted. Mostly the
+  right sign, far below magnitude, smaller than the scatter.
+- **Prediction correction:** predictions about trainer-side behaviour must use the trainer's own
+  speed, not `v_virt`. Using `v_virt` = 7.13 m/s understated the result as 53% of prediction;
+  the trainer's 5.1-6.8 m/s gives 84%.
+- **Absolute power still unpredicted** (step 3): MAE ~120 W, negative R² for every model variant,
+  ~63 W baseline over-prediction. Absolute-residual comparisons are unsound here and an early
+  pass that used them reached the opposite Crr conclusion.
+- **Instrument cross-validated:** Garmin FIT vs the browser's own IBD lines agree to 0.2 W on mean
+  pedalling power (121.1 vs 121.3 W, n≈2300 each).
+- **Bug found, ride nearly lost:** the ride log recorded `power: 0` for every sample of every run
+  (`data.power` read; parser emits `powerW`). The FIT is the only reason this ride is analysable.
+- **Bug found, not yet fixed:** the Zwift Click disconnects when a workout starts — `ClickSettings`
+  owns the GATT link and the setup view unmounts on the active view. Paddles are dead for the whole
+  ride; only `[` / `]` shift.
+
+Full detail and the next-run requirements: [`experiments/17-crr-cw-sweep-protocol.md`](experiments/17-crr-cw-sweep-protocol.md) §10.
+
 
 > Append entries as experiments run. Format:
 > `YYYY-MM-DD · HW-Vn · result · raw evidence (log file / screenshot / hex dump)`

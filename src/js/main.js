@@ -22,7 +22,13 @@ import {
 } from '../services/storage.js'
 import { preprocessRouteData, getGradeForDistance } from '../services/routeService.js'
 import { calculateRealisticGrade } from '../services/simPhysics.js'
-import { resolvePhysicsConstants, ZWIFT_CRR, ZWIFT_CW } from '../services/riderPhysics.js'
+import {
+  resolvePhysicsConstants,
+  ZWIFT_CRR,
+  ZWIFT_CW,
+  DEFAULT_RIDER_WEIGHT_KG,
+  DEFAULT_BIKE_WEIGHT_KG,
+} from '../services/riderPhysics.js'
 import {
   GRAPH_CONFIG,
   calculateWorkoutMetrics,
@@ -1106,7 +1112,10 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     }
 
     if (window.rideLog && isValidSpeed) {
-      window.rideLog.logTelemetry(data.speedKph, data.cadenceRpm ?? 0, data.power ?? 0)
+      // `powerW`, not `power` — the IBD parser emits powerW (ftms.js:505). Reading `data.power`
+      // silently logged 0 for every sample of the 2026-08-05 sweep ride, zeroing the one channel
+      // the whole experiment measures. The FIT saved that ride; nothing in the app would have.
+      window.rideLog.logTelemetry(data.speedKph, data.cadenceRpm ?? 0, data.powerW ?? 0)
     }
 
     // Integrate distance for EVERY step type, continuously.
@@ -1209,8 +1218,15 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     // self-describing and does not depend on remembering what the settings were.
     if (window.rideLog && window.virtualDrivetrain) {
       const g = window.virtualDrivetrain.getVirtualGear()
+      // Mass comes from the saved rider physics, NOT from simPhysics — resolvePhysicsConstants
+      // returns only { crr, cw }, so `simPhysics.massKg` was always undefined and the header
+      // recorded mass 0. Every predicted-power figure needs rider+bike mass, so a 0 there makes
+      // the file exactly as un-self-describing as the header exists to prevent.
+      const savedPhysics = loadRiderPhysicsSettings()
       window.rideLog.startRideLog({
-        massKg: H.state.simPhysics.massKg ?? 0,
+        massKg:
+          (savedPhysics.riderWeightKg ?? DEFAULT_RIDER_WEIGHT_KG) +
+          (savedPhysics.bikeWeightKg ?? DEFAULT_BIKE_WEIGHT_KG),
         crr: H.state.simPhysics.crr,
         cw: H.state.simPhysics.cw,
         chainringTeeth: g.chainringTeeth ?? 0,
