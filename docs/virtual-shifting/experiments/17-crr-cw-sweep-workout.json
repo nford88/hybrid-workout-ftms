@@ -1,0 +1,323 @@
+{
+ "bundleVersion": 1,
+ "name": "Crr/Cw Sweep \u2014 6 laps",
+ "notes": "Experiment 17 \u2014 Crr/Cw sweep. Six laps of a constant-grade route, tyre/position changed between laps on an A-B-A-C-D-A schedule. Hold gear 12 (index 11, ratio 2.40) and ~85 rpm on the two 0% blocks; shift freely elsewhere. Protocol: 17-crr-cw-sweep-protocol.md",
+ "route": {
+  "name": "Crr/Cw Sweep Lap",
+  "geoPoints": [
+   {
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "elevation": 100.0,
+    "distance": 0.0,
+    "timestamp": 1785000000000
+   },
+   {
+    "latitude": 0.0004496608,
+    "longitude": 0.0,
+    "elevation": 101.5,
+    "distance": 0.05,
+    "timestamp": 1785000009000
+   },
+   {
+    "latitude": 0.0008993216,
+    "longitude": 0.0,
+    "elevation": 103.0,
+    "distance": 0.1,
+    "timestamp": 1785000018000
+   },
+   {
+    "latitude": 0.0013489824,
+    "longitude": 0.0,
+    "elevation": 104.5,
+    "distance": 0.15,
+    "timestamp": 1785000027000
+   },
+   {
+    "latitude": 0.0017986432,
+    "longitude": 0.0,
+    "elevation": 106.0,
+    "distance": 0.2,
+    "timestamp": 1785000036000
+   },
+   {
+    "latitude": 0.002248304,
+    "longitude": 0.0,
+    "elevation": 107.5,
+    "distance": 0.25,
+    "timestamp": 1785000045000
+   },
+   {
+    "latitude": 0.0026979648,
+    "longitude": 0.0,
+    "elevation": 109.0,
+    "distance": 0.3,
+    "timestamp": 1785000054000
+   },
+   {
+    "latitude": 0.0031476256,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.35,
+    "timestamp": 1785000063000
+   },
+   {
+    "latitude": 0.0035972864,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.4,
+    "timestamp": 1785000071999
+   },
+   {
+    "latitude": 0.0040469472,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.45,
+    "timestamp": 1785000080999
+   },
+   {
+    "latitude": 0.004496608,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.5,
+    "timestamp": 1785000089999
+   },
+   {
+    "latitude": 0.0049462688,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.55,
+    "timestamp": 1785000098999
+   },
+   {
+    "latitude": 0.0053959296,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.6,
+    "timestamp": 1785000108000
+   },
+   {
+    "latitude": 0.0058455904,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.65,
+    "timestamp": 1785000117000
+   },
+   {
+    "latitude": 0.0062952512,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.7,
+    "timestamp": 1785000126000
+   },
+   {
+    "latitude": 0.006744912,
+    "longitude": 0.0,
+    "elevation": 110.5,
+    "distance": 0.75,
+    "timestamp": 1785000135000
+   },
+   {
+    "latitude": 0.0071945728,
+    "longitude": 0.0,
+    "elevation": 113.5,
+    "distance": 0.8,
+    "timestamp": 1785000144000
+   },
+   {
+    "latitude": 0.0076442337,
+    "longitude": 0.0,
+    "elevation": 116.5,
+    "distance": 0.85,
+    "timestamp": 1785000153000
+   },
+   {
+    "latitude": 0.0080938945,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 0.9,
+    "timestamp": 1785000162000
+   },
+   {
+    "latitude": 0.0085435553,
+    "longitude": 0.0,
+    "elevation": 122.5,
+    "distance": 0.95,
+    "timestamp": 1785000171000
+   },
+   {
+    "latitude": 0.0089932161,
+    "longitude": 0.0,
+    "elevation": 125.5,
+    "distance": 1.0,
+    "timestamp": 1785000180000
+   },
+   {
+    "latitude": 0.0094428769,
+    "longitude": 0.0,
+    "elevation": 124.5,
+    "distance": 1.05,
+    "timestamp": 1785000189000
+   },
+   {
+    "latitude": 0.0098925377,
+    "longitude": 0.0,
+    "elevation": 123.5,
+    "distance": 1.1,
+    "timestamp": 1785000198000
+   },
+   {
+    "latitude": 0.0103421985,
+    "longitude": 0.0,
+    "elevation": 122.5,
+    "distance": 1.15,
+    "timestamp": 1785000207000
+   },
+   {
+    "latitude": 0.0107918593,
+    "longitude": 0.0,
+    "elevation": 121.5,
+    "distance": 1.2,
+    "timestamp": 1785000216000
+   },
+   {
+    "latitude": 0.0112415201,
+    "longitude": 0.0,
+    "elevation": 120.5,
+    "distance": 1.25,
+    "timestamp": 1785000225000
+   },
+   {
+    "latitude": 0.0116911809,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.3,
+    "timestamp": 1785000234000
+   },
+   {
+    "latitude": 0.0121408417,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.35,
+    "timestamp": 1785000243000
+   },
+   {
+    "latitude": 0.0125905025,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.4,
+    "timestamp": 1785000252000
+   },
+   {
+    "latitude": 0.0130401633,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.45,
+    "timestamp": 1785000261000
+   },
+   {
+    "latitude": 0.0134898241,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.5,
+    "timestamp": 1785000270000
+   },
+   {
+    "latitude": 0.0139394849,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.55,
+    "timestamp": 1785000279000
+   },
+   {
+    "latitude": 0.0143891457,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.6,
+    "timestamp": 1785000288000
+   },
+   {
+    "latitude": 0.0148388065,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.65,
+    "timestamp": 1785000297000
+   },
+   {
+    "latitude": 0.0152884673,
+    "longitude": 0.0,
+    "elevation": 119.5,
+    "distance": 1.7,
+    "timestamp": 1785000306000
+   }
+  ],
+  "totalDistance": 1700.0,
+  "averageGrade": 1.1471
+ },
+ "workout": {
+  "name": "Crr/Cw Sweep \u2014 6 laps",
+  "plan": [
+   {
+    "type": "erg",
+    "duration": 5,
+    "power": 120
+   },
+   {
+    "type": "sim",
+    "segmentName": "Crr/Cw Sweep Lap"
+   },
+   {
+    "type": "erg",
+    "duration": 1.5,
+    "power": 100
+   },
+   {
+    "type": "sim",
+    "segmentName": "Crr/Cw Sweep Lap"
+   },
+   {
+    "type": "erg",
+    "duration": 1.5,
+    "power": 100
+   },
+   {
+    "type": "sim",
+    "segmentName": "Crr/Cw Sweep Lap"
+   },
+   {
+    "type": "erg",
+    "duration": 1.5,
+    "power": 100
+   },
+   {
+    "type": "sim",
+    "segmentName": "Crr/Cw Sweep Lap"
+   },
+   {
+    "type": "erg",
+    "duration": 1.5,
+    "power": 100
+   },
+   {
+    "type": "sim",
+    "segmentName": "Crr/Cw Sweep Lap"
+   },
+   {
+    "type": "erg",
+    "duration": 1.5,
+    "power": 100
+   },
+   {
+    "type": "sim",
+    "segmentName": "Crr/Cw Sweep Lap"
+   },
+   {
+    "type": "erg",
+    "duration": 5,
+    "power": 100
+   }
+  ],
+  "routeName": "Crr/Cw Sweep Lap",
+  "savedAt": null
+ }
+}
