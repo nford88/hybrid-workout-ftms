@@ -90,6 +90,7 @@ export default function ClickSettings() {
   const [battery, setBattery] = useState<number | null>(null)
   const [gear, setGear] = useState(getVirtualGear)
   const [drivetrain, setDrivetrain] = useState(loadDrivetrain)
+  const [logSummary, setLogSummary] = useState(rideLogSummary)
   const detector = useRef(createButtonEdgeDetector())
   const connection = useRef<ClickConnection | null>(null)
 
@@ -117,6 +118,25 @@ export default function ClickSettings() {
 
   // Disconnect on unmount so a stale GATT link cannot outlive the panel.
   useEffect(() => () => connection.current?.disconnect(), [])
+
+  // The recorder is written to from the legacy SIM loop, which cannot notify React. Without a
+  // poll the counter only refreshed when something else re-rendered the panel (a shift), so a
+  // ride that was recording perfectly read as "nothing recorded yet" — the opposite of the
+  // reassurance this readout exists to give. Re-state only on a change, to avoid 1 Hz churn.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setLogSummary((prev) => {
+        const next = rideLogSummary()
+        return next.events === prev.events &&
+          next.sim === prev.sim &&
+          next.gear === prev.gear &&
+          next.earlierRuns === prev.earlierRuns
+          ? prev
+          : next
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Key capture for rebinding. Bound to the window so the user can press the key itself
   // rather than typing its name.
@@ -317,12 +337,11 @@ export default function ClickSettings() {
             Download ride log (JSON)
           </button>
           <span className="font-mono text-gray-400">
-            {(() => {
-              const s = rideLogSummary()
-              return s.events
-                ? `${s.events} events · ${s.sim} grade decisions · ${s.gear} shifts`
-                : 'nothing recorded yet — starts with the workout'
-            })()}
+            {logSummary.events
+              ? `${logSummary.events} events · ${logSummary.sim} grade decisions · ${logSummary.gear} shifts`
+              : 'nothing recorded yet — starts with the workout'}
+            {logSummary.earlierRuns > 0 &&
+              ` · ${logSummary.earlierRuns} earlier run${logSummary.earlierRuns > 1 ? 's' : ''} kept`}
           </span>
         </div>
         <p className="text-xs text-gray-500 mt-1">

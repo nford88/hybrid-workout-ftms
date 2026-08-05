@@ -586,6 +586,20 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
         saveRiderPhysicsSettings(physicsSettings)
         H.state.simPhysics = resolvePhysicsConstants(physicsSettings)
 
+        // Mark the exact instant of a condition change. The per-sample crr/cw on `sim` events
+        // is the authoritative record, but it only refreshes on the next grade write (up to 3 s
+        // later, longer inside the 0.3% deadband). For the Crr/Cw sweep this note is the
+        // boundary the analysis splits laps on.
+        if (window.rideLog) {
+          window.rideLog.logNote('physicsApplied', {
+            tireType: physicsSettings.tireType,
+            ridingPosition: physicsSettings.ridingPosition,
+            ...H.state.simPhysics,
+            riderWeightKg,
+            bikeWeightKg,
+          })
+        }
+
         updatePowerCurveStatus()
         H.utils.showError('Virtual gearing settings applied!', 'success')
       }
@@ -891,6 +905,8 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
         virtualSpeedKph: g && g.last ? g.last.virtualSpeedMs * 3.6 : 0,
         coasting: !!(g && g.last && g.last.coasting),
         clamped: !!(g && g.last && g.last.clamped),
+        crr,
+        cw,
       })
     }
 

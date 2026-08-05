@@ -9,6 +9,7 @@ import {
   getRideLog,
   rideLogSummary,
   rideLogJson,
+  resetRideLog,
 } from '../../src/services/rideLog'
 
 const SESSION = {
@@ -34,9 +35,15 @@ const SIM = {
   virtualSpeedKph: 13.1,
   coasting: false,
   clamped: false,
+  crr: 0.004,
+  cw: 0.51,
 }
 
-beforeEach(() => startRideLog(SESSION))
+beforeEach(() => {
+  // Archived runs outlive a single startRideLog by design, so tests must start truly clean.
+  resetRideLog()
+  startRideLog(SESSION)
+})
 afterEach(() => vi.useRealTimers())
 
 describe('rideLog — the record a head unit cannot make', () => {
@@ -77,6 +84,16 @@ describe('rideLog — the record a head unit cannot make', () => {
     expect(sim.routeDistanceM).toBe(4200)
   })
 
+  test('carries the Crr/Cw actually sent, so a mid-ride sweep stays attributable', () => {
+    // experiments/17 changes tyre and position between laps of one workout. With Crr/Cw only
+    // in the session header, every sample of every condition would look identical on export.
+    logSim(SIM)
+    logSim({ ...SIM, crr: 0.02, cw: 0.2 })
+    const [a, b] = getRideLog().filter((e) => e.type === 'sim')
+    expect(a).toMatchObject({ crr: 0.004, cw: 0.51 })
+    expect(b).toMatchObject({ crr: 0.02, cw: 0.2 })
+  })
+
   test('records shifts, which left no trace at all on the first ride', () => {
     logGear(11, 10, 2.22, 'shiftDown')
     logGear(10, 11, 2.4, 'shiftUp')
@@ -96,12 +113,37 @@ describe('rideLog — the record a head unit cannot make', () => {
     expect(rideLogSummary().telemetry).toBe(2)
   })
 
-  test('starting a new ride clears the previous one', () => {
+  test('starting a new ride clears the live log but KEEPS the previous run', () => {
     logSim(SIM)
     logGear(11, 10, 2.22, 'shiftDown')
     expect(rideLogSummary().events).toBeGreaterThan(2)
     startRideLog(SESSION)
-    expect(rideLogSummary()).toMatchObject({ events: 1, sim: 0, gear: 0 })
+    expect(rideLogSummary()).toMatchObject({ events: 1, sim: 0, gear: 0, earlierRuns: 1 })
+  })
+
+  test('a lap-per-run protocol survives six restarts with all six runs exported', () => {
+    // experiments/17 is naturally ridden as stop / change the tyre / start again. Every Start
+    // Workout calls startRideLog, so clearing outright exported six laps as one.
+    for (let lap = 0; lap < 6; lap += 1) {
+      startRideLog(SESSION)
+      logStep(0, 'sim', 'Crr/Cw Sweep Lap')
+      logSim({ ...SIM, crr: 0.004 + lap * 0.002 })
+    }
+    const parsed = JSON.parse(rideLogJson())
+    // 5 archived + the live one = the 6 laps ridden. Plus the beforeEach session, which had
+    // nothing logged into it and so is correctly dropped rather than archived as an empty run.
+    expect(parsed.earlierRuns).toHaveLength(5)
+    expect(rideLogSummary().earlierRuns).toBe(5)
+    const crrPerRun = [...parsed.earlierRuns, parsed.events].map(
+      (run) => run.find((e) => e.type === 'sim').crr
+    )
+    expect(crrPerRun).toEqual([0.004, 0.006, 0.008, 0.01, 0.012, 0.014])
+  })
+
+  test('an empty run is not archived, so pressing Start twice costs nothing', () => {
+    startRideLog(SESSION)
+    startRideLog(SESSION)
+    expect(rideLogSummary().earlierRuns).toBe(0)
   })
 
   test('exports as parseable JSON with a version', () => {
