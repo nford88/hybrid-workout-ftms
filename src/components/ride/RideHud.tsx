@@ -34,8 +34,23 @@ function StatusDot({ label, on }: { label: string; on: boolean }) {
   )
 }
 
-export default function RideHud() {
-  const { isConnected } = useTrainer()
+interface Props {
+  /**
+   * `full` — the four-row HUD, the whole screen.
+   * `band` — one compressed strip above a full-width video (cinema mode). A 16:9 video at
+   * 1470px wide is 827px tall, leaving about 130px, so the band is a genuine budget rather than
+   * a styling choice: the gear numeral alone is 227px in `full`.
+   */
+  variant?: 'full' | 'band'
+  /**
+   * Rendered inline in the status strip / band rather than on a row of its own — a dedicated row
+   * for one small button cost ~40px of the vertical budget.
+   */
+  modeToggle?: React.ReactNode
+}
+
+export default function RideHud({ variant = 'full', modeToggle }: Props) {
+  const { isConnected, liveData } = useTrainer()
   const click = useClickConnection()
   const { isRunning, workoutStartTime, currentStepIndex, stepStartTime, simDistanceTraveled } =
     useWorkout()
@@ -72,6 +87,97 @@ export default function RideHud() {
   const clamped = !!gear?.last?.clamped
   const gearTone = clamped ? 'text-amber-400' : 'text-orange-400'
 
+  // ── Cinema band ─────────────────────────────────────────────────────────────
+  // Same information, one strip. Everything that can be folded onto a shared line is: the
+  // liveness readouts join the status dots, and the step's own progress bar carries the
+  // remaining time instead of a separate row for each.
+  if (variant === 'band') {
+    return (
+      <div
+        data-testid="hud-band"
+        className="flex items-stretch gap-4 rounded-xl border border-border bg-surface px-4 py-2"
+      >
+        {/* Gear — still the anchor, just no longer 227px. */}
+        <div className="flex shrink-0 items-baseline gap-1.5">
+          <span className="text-hud-label uppercase tracking-wider text-hud-muted">Gear</span>
+          <span
+            data-testid="hud-gear"
+            className={`text-hud-band font-extrabold leading-none tabular-nums ${gearTone}`}
+          >
+            {gear ? gear.gearIndex + 1 : '—'}
+          </span>
+          <span className="text-hud-label tabular-nums text-hud-muted">
+            /{ZWIFT_GEAR_RATIOS.length}
+            {gear && ` · ${gear.gearRatio.toFixed(2)}`}
+          </span>
+          {clamped && (
+            <span
+              data-testid="hud-gear-clamped"
+              className="text-hud-label font-semibold uppercase text-amber-400"
+            >
+              <span aria-hidden="true">▲</span> clamped
+            </span>
+          )}
+        </div>
+
+        {/* Step: badge, name, target, remaining, and both bars stacked thin. */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+          <div className="flex items-baseline gap-2 text-hud-sub">
+            {step.kind && (
+              <span
+                className={`rounded px-1.5 text-hud-label font-bold uppercase tracking-wider ${
+                  step.kind === 'SIM'
+                    ? 'bg-orange-900/50 text-orange-400'
+                    : 'bg-cyan-900/50 text-cyan-400'
+                }`}
+              >
+                {step.kind}
+              </span>
+            )}
+            <span className="truncate font-semibold text-white">
+              {step.label || 'Ready to start'}
+            </span>
+            <span
+              data-testid="hud-target"
+              className={`ml-auto shrink-0 font-extrabold tabular-nums ${
+                step.kind === 'SIM' ? 'text-red-400' : 'text-cyan-400'
+              }`}
+            >
+              {step.targetValue}
+              <span className="ml-1 text-hud-label font-normal text-hud-muted">
+                {step.targetUnit}
+              </span>
+            </span>
+            <span data-testid="hud-remaining" className="shrink-0 tabular-nums text-gray-200">
+              {step.remaining}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-border">
+            <div
+              data-testid="hud-step-progress"
+              data-progress={step.progressPct.toFixed(2)}
+              className={`h-2 rounded-full transition-[width] duration-1000 ${
+                step.kind === 'SIM' ? 'bg-orange-500' : 'bg-cyan-500'
+              }`}
+              style={{ width: `${step.progressPct}%` }}
+            />
+          </div>
+          <div className="flex items-baseline gap-3 text-hud-label text-hud-muted">
+            <StatusDot label="Trn" on={isConnected} />
+            <StatusDot label="Clk" on={click.connected} />
+            <span className="tabular-nums text-cyan-400">{liveData.power} W</span>
+            <span className="tabular-nums text-yellow-400">{Math.round(liveData.cadence)} rpm</span>
+            {step.next && <span className="truncate">next: {step.next}</span>}
+            <span className="ml-auto shrink-0 tabular-nums text-purple-400">
+              {isRunning ? formatTime(elapsedSec) : '—'}
+            </span>
+            {modeToggle}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       {/* ── Row 1: status ───────────────────────────────────────────────── */}
@@ -90,6 +196,7 @@ export default function RideHud() {
         <span className="ml-auto tabular-nums text-purple-400" data-testid="hud-elapsed">
           {isRunning ? formatTime(elapsedSec) : '—'}
         </span>
+        {modeToggle}
       </div>
 
       {/* ── Row 2: gear + current step ──────────────────────────────────── */}

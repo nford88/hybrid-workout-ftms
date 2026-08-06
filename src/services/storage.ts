@@ -31,6 +31,7 @@ const KEYS = {
   CLICK_BINDINGS: 'clickBindings',
   KEY_BINDINGS: 'keyBindings',
   DRIVETRAIN: 'drivetrainConfig',
+  MEDIA_TARGET: 'mediaTarget',
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -190,4 +191,20 @@ export function loadDrivetrain(): DrivetrainConfig {
 
 export function saveDrivetrain(config: DrivetrainConfig): void {
   writeJSON(KEYS.DRIVETRAIN, config)
+}
+
+// ── Ride video (YouTube playlist or single video) ─────────────────────────────
+//
+// The raw pasted string is stored, not the parsed object, and re-parsed on read. Parsing rules
+// change (new URL shapes, tighter host checks) and a stored parse would be frozen at whatever the
+// rules were the day it was saved — re-parsing means a fix reaches old values too. It also means a
+// value that stops being valid degrades to "nothing configured" rather than to a broken player.
+
+export function loadMediaInput(): string {
+  const raw = readJSON<unknown>(KEYS.MEDIA_TARGET, null)
+  return typeof raw === 'string' ? raw : ''
+}
+
+export function saveMediaInput(input: string): void {
+  writeJSON(KEYS.MEDIA_TARGET, input)
 }

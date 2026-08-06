@@ -57,37 +57,46 @@ export default function AppShell({ buildVersion }: Props) {
       {/* `max-w-4xl` (896px) is right for the setup form and wrong for the HUD — it wasted
           ~40% of a 1512px laptop screen and squeezed the graph. The ride view gets the width. */}
       <div className={`mx-auto ${isActive ? 'max-w-[1600px]' : 'max-w-4xl'}`}>
-        <header
-          className={`flex items-center justify-between ${isActive ? 'mb-2' : 'mb-6 sm:mb-8'}`}
-        >
-          <h1
-            className={`font-bold text-white tracking-tight ${
-              isActive ? 'text-lg' : 'text-2xl sm:text-3xl'
+        {/* Header and the connection panel share ONE row while riding. As two stacked rows they
+            cost ~90px above the HUD, which was the difference between the liveness row fitting a
+            windowed Chrome window and being cut off. The wrapper is unconditional — only its
+            flex-direction changes — because moving `ConnectionPanel` between parents would remount
+            the buttons that main.js holds references to. */}
+        <div className={isActive ? 'flex items-center gap-4' : ''}>
+          <header
+            className={`flex items-center justify-between ${
+              isActive ? 'shrink-0' : 'mb-6 sm:mb-8 w-full'
             }`}
           >
-            FTMS <span className="text-cyan-400">Hybrid</span> Workout
-          </h1>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* No LIVE badge here while riding — the HUD's own status strip carries it, and two
+            <h1
+              className={`font-bold text-white tracking-tight ${
+                isActive ? 'text-lg' : 'text-2xl sm:text-3xl'
+              }`}
+            >
+              FTMS <span className="text-cyan-400">Hybrid</span> Workout
+            </h1>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* No LIVE badge here while riding — the HUD's own status strip carries it, and two
                 of them a few hundred pixels apart is just noise. */}
-            {/* Reclaims the browser chrome for the ride HUD. Needs a click to satisfy the
+              {/* Reclaims the browser chrome for the ride HUD. Needs a click to satisfy the
                 Fullscreen API's user-gesture requirement, so it cannot be automatic. */}
-            {fullscreenSupported && (
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                aria-pressed={isFullscreen}
-                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen — hide the browser chrome'}
-                className="rounded-lg border border-border bg-surface-elevated px-2.5 py-1.5 text-sm text-gray-400 transition-colors hover:text-white hover:border-cyan-600"
-              >
-                <span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span>
-                <span className="sr-only">{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
-              </button>
-            )}
-          </div>
-        </header>
+              {fullscreenSupported && (
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  aria-pressed={isFullscreen}
+                  title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen — hide the browser chrome'}
+                  className="rounded-lg border border-border bg-surface-elevated px-2.5 py-1.5 text-sm text-gray-400 transition-colors hover:text-white hover:border-cyan-600"
+                >
+                  <span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span>
+                  <span className="sr-only">{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
+                </button>
+              )}
+            </div>
+          </header>
 
-        <ConnectionPanel compact={isActive} />
+          <ConnectionPanel compact={isActive} />
+        </div>
         <div className={isActive ? 'hidden' : ''}>
           <SetupView />
         </div>
@@ -109,7 +118,11 @@ export default function AppShell({ buildVersion }: Props) {
           </div>
         )}
 
-        <footer className={`text-center text-xs text-gray-600 ${isActive ? 'py-1' : 'py-4 mt-4'}`}>
+        {/* Hidden while riding: the build hash is a debugging affordance for the setup screen, and
+            during a ride its row is ~30px that cinema mode would rather give to the video. */}
+        <footer
+          className={`text-center text-xs text-gray-600 py-4 mt-4 ${isActive ? 'hidden' : ''}`}
+        >
           Build: {buildVersion}
         </footer>
       </div>

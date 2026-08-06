@@ -36,6 +36,10 @@
      liveness row fell off the bottom. Legibility was never the constraint; vertical budget was. */
   --text-hud-hero: clamp(6rem, 15vw, 16rem);
   --text-hud-major: clamp(4rem, 10vw, 10rem); /* current step target */
+  /* Gear in CINEMA mode's band. Reusing `--text-hud-major` there made the band ~170px, and every
+     pixel of band is a pixel of video: at 1470px wide, 40px off the band buys ~70px of video
+     width. Still the largest thing in the band, just not a hero. */
+  --text-hud-band: clamp(2.25rem, 5vw, 4.5rem);
   --text-hud-mid: clamp(1.75rem, 3vw, 3.25rem); /* time remaining in step */
   --text-hud-name: clamp(1.25rem, 2.25vw, 2.25rem); /* segment name */
   --text-hud-sub: clamp(1rem, 1.7vw, 1.75rem); /* gear ratio, next-step line */

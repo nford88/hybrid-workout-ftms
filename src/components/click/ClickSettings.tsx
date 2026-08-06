@@ -35,8 +35,14 @@ import {
   subscribeVirtualGear,
   reloadDrivetrain,
 } from '../../services/virtualGearState'
-import { loadDrivetrain, saveDrivetrain } from '../../services/storage'
+import {
+  loadDrivetrain,
+  saveDrivetrain,
+  loadMediaInput,
+  saveMediaInput,
+} from '../../services/storage'
 import { downloadRideLog, rideLogSummary } from '../../services/rideLog'
+import { describeTarget, parseYouTubeTarget } from '../../services/youtube'
 import { drivetrainRatio, ZWIFT_GEAR_RATIOS } from '../../services/virtualDrivetrain'
 
 /**
@@ -91,6 +97,8 @@ export default function ClickSettings() {
   const [gear, setGear] = useState(getVirtualGear)
   const [drivetrain, setDrivetrain] = useState(loadDrivetrain)
   const [logSummary, setLogSummary] = useState(rideLogSummary)
+  const [mediaInput, setMediaInput] = useState(loadMediaInput)
+  const mediaTarget = useMemo(() => parseYouTubeTarget(mediaInput), [mediaInput])
   const detector = useRef(createButtonEdgeDetector())
   const connection = useRef<ClickConnection | null>(null)
 
@@ -356,6 +364,46 @@ export default function ClickSettings() {
           )}
         </div>
       )}
+
+      {/* ── Ride video ──────────────────────────────────────────────────── */}
+      <div className="border-t pt-2 mb-3">
+        <label className="form-label" htmlFor="media-input">
+          Ride video — YouTube playlist or video URL
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="media-input"
+            type="text"
+            className="form-input"
+            placeholder="https://www.youtube.com/playlist?list=…"
+            value={mediaInput}
+            onChange={(e) => {
+              const next = e.target.value
+              setMediaInput(next)
+              saveMediaInput(next)
+              // Same pattern as the key bindings: the ride view re-reads on this event, so a
+              // paste takes effect without a reload.
+              window.dispatchEvent(new Event('mediaTargetChanged'))
+            }}
+          />
+        </div>
+        <p className="text-xs mt-1">
+          {mediaInput.trim() === '' ? (
+            <span className="text-gray-500">
+              Shown in the ride view&apos;s Cinema mode. Leave empty for no video.
+            </span>
+          ) : mediaTarget ? (
+            <span className="text-emerald-400">{describeTarget(mediaTarget)}</span>
+          ) : (
+            // Rejected input is called out here rather than only failing in the ride view, so it
+            // is caught while stationary instead of mid-effort.
+            <span className="text-amber-400">
+              <span aria-hidden="true">▲</span> Not a YouTube URL or ID — the ride view will show
+              nothing
+            </span>
+          )}
+        </p>
+      </div>
 
       {/* ── Ride log ────────────────────────────────────────────────────── */}
       <div className="border-t pt-2 mb-3">
