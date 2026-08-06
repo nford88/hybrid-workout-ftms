@@ -1,11 +1,5 @@
-import MetricsRow from '../metrics/MetricsRow'
-import WorkoutProgress from '../workout/WorkoutProgress'
+import LaptopRideView from '../ride/LaptopRideView'
 
 export default function ActiveView() {
-  return (
-    <div>
-      <MetricsRow />
-      <WorkoutProgress />
-    </div>
-  )
+  return <LaptopRideView />
 }

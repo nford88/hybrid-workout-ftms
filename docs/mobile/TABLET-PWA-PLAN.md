@@ -1,6 +1,6 @@
 # Mobile / Tablet / PWA Plan
 
-Status: **plan only — no code changed.** Claims are labelled CONFIRMED / INFERRED / UNKNOWN
+Status: **§2 (the laptop HUD) is BUILT — see the work-items table in §2.7. Everything else is still plan.** Claims are labelled CONFIRMED / INFERRED / UNKNOWN
 per the repo convention (see `docs/virtual-shifting/HYPOTHESES.md`).
 
 **Revision 2** — rewritten after clarifications: a Garmin Edge already covers live vital
@@ -355,19 +355,36 @@ laptop on a desk directly in front of the trainer.
 
 ### 2.7 Work items
 
-| # | Item | Notes |
+| # | Item | Status |
 |---|---|---|
-| T1 | Fix the dead Tailwind config; breakpoints in `@theme` | **Blocks the rest** |
-| T2 | Fix the `xs:` fallout at `main.js:284` | Trivial |
-| T3 | Disconnect wiring (§1.3 item 1) | Do early — protects ride-log integrity |
-| T4 | Wake lock on workout start; re-acquire on `visibilitychange` → visible | macOS sleeps the display |
-| T5 | Fluid type scale — `clamp()` tokens in `@theme`, set from **viewing distance** | Replaces the old `useLayoutMode` breakpoint plan; makes the hardware question moot |
-| T6 | `RideHud` — the row-2/row-4 composition, reusing `MetricCard` where it fits | Keep `MetricsRow` intact for desktop; it's the experiment rig |
-| T7 | `LaptopRideView` — the §2.4 four-row layout | One mode. No cinema mode. |
-| T8 | Lift the workout-graph height cap; give the graph real height | `main.css` `max-height: 200px` |
-| T9 | Fullscreen toggle via the Fullscreen API, button in row 1 | Needs a gesture — pre-ride tap |
-| T10 | Show bound keys next to on-screen actions via `keyForAction()` | Already exists, unused in the ride view (§2.2.1) |
-| T11 | Gear "clamped" state — amber **plus a glyph** | Colour must not be the only channel |
+| T1 | Fix the dead Tailwind config; breakpoints in `@theme` | DONE `51df698` — config file deleted so it cannot mislead again |
+| T2 | Fix the `xs:` fallout at `main.js:284` | DONE `51df698` — fixed by T1 |
+| T3 | Disconnect wiring (§1.3 item 1) | DONE `51df698` |
+| T4 | Wake lock on workout start | **still open** |
+| T5 | Fluid type scale — `clamp()` tokens set from **viewing distance** | DONE `51df698`; hero retuned 17vw → 15vw for vertical fit |
+| T6 | `RideHud` — status strip + gear/step hero pair | DONE, plus `describeCurrentStep` in `workoutService` (pure, 13 tests) |
+| T7 | `LaptopRideView` — the §2.4 four-row layout | DONE; `MetricsRow` reused as row 4, `WorkoutProgress` deleted as redundant |
+| T8 | Lift the workout-graph height cap | DONE — 200px → 24vh, scoped to `.hud-graph` |
+| T9 | Fullscreen toggle via the Fullscreen API | DONE `7d81ff9` |
+| T10 | Show bound keys next to on-screen actions | DONE `7d81ff9` |
+| T11 | Gear "clamped" state — amber **plus a glyph** | DONE `7d81ff9`, and on the HUD hero |
+
+**Screenshot-verified at 1512×982: all four rows fit one screen with no scrolling.** That took four
+iterations of the vertical budget, and the lesson is worth recording: **rows must be sized to add
+up to less than the viewport, not to fight over it.**
+
+- `flex-1` + `min-h-0` on a row whose content cannot shrink (a 227px numeral) makes it *overlap*
+  its neighbour rather than shrink.
+- Constraining the graph's HEIGHT makes its fixed-aspect 800×150 SVG letterbox *horizontally*,
+  throwing away the width. Let width drive and cap the height instead.
+
+Two things landed that were found while building rather than planned:
+
+- **`ConnectionPanel` gained a `compact` mode.** The full card cost ~180px of vertical space
+  mid-ride. Its buttons are hidden, never unmounted — `main.js` holds references to
+  `#connect-button`, `#start-workout-button` and `#skip-step-button` from import time.
+- **`AppShell` widens to 1600px and sheds padding while riding.** `max-w-4xl` wasted ~40% of a
+  1512px screen — the §2.5 blocker, which the first HUD build walked straight into.
 
 ---
 

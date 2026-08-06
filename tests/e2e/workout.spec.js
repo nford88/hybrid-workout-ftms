@@ -108,7 +108,7 @@ test.describe('ERG Workout', () => {
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
 
     // Active view should appear with MetricsRow
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
     await expect(page.getByRole('heading', { name: 'Power' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Speed' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Cadence' })).toBeVisible()
@@ -120,7 +120,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     // Push IBD data through mock
     await emitIbd(page, { powerW: 245, speedKph: 32.4, cadenceRpm: 91 })
@@ -135,7 +135,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     const timeBefore = await page.locator('.metric-value.text-purple-400').textContent()
     await page.waitForTimeout(2100)
@@ -149,7 +149,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     await page.getByRole('button', { name: 'Skip Step' }).click()
 
@@ -162,7 +162,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     // Gradient card should show — in ERG mode
     const gradientCard = page.locator('.metric-card-compact').filter({ hasText: 'GRADIENT' })
@@ -197,7 +197,7 @@ test.describe('SIM Workout', () => {
     await page.locator('#step-type').selectOption('sim')
     await page.getByRole('button', { name: 'Add Step' }).click()
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     // Push speed data — SIM mode computes gradient from route
     await emitIbd(page, { powerW: 200, speedKph: 25, cadenceRpm: 80 })
@@ -224,7 +224,7 @@ test.describe('SIM Workout', () => {
 
     // Start — should land on ERG step first
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
     await expect(page.locator('#target-display')).toContainText('200W', { timeout: 2000 })
 
     // ERG step auto-advances after ~3s — wait a little past that
@@ -247,7 +247,7 @@ test.describe('SIM Workout', () => {
     await page.locator('#step-type').selectOption('sim')
     await page.getByRole('button', { name: 'Add Step' }).click()
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     // Emit speed data a few times to accumulate distance
     for (let i = 0; i < 5; i++) {
@@ -255,9 +255,14 @@ test.describe('SIM Workout', () => {
       await page.waitForTimeout(2200) // past the 2s SIM throttle
     }
 
-    // Step Distance should show meters, not dash
-    const stepDist = page.locator('text=Step Distance').locator('..').locator('.text-lg')
-    const distText = await stepDist.textContent()
-    expect(distText).not.toBe('—')
+    // A SIM step is bounded by ROUTE DISTANCE, so accumulating distance must move the step
+    // progress off zero and leave less of the route remaining. (Was asserted against the old
+    // "Step Distance" card, which the ride HUD replaced with distance-remaining plus this bar.)
+    const progress = Number(
+      await page.locator('[data-testid="hud-step-progress"]').getAttribute('data-progress')
+    )
+    expect(progress).toBeGreaterThan(0)
+
+    await expect(page.locator('[data-testid="hud-remaining"]')).toContainText('km left')
   })
 })

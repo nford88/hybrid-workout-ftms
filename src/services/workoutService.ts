@@ -29,6 +29,103 @@ export function calculateErgProgress(
   return Math.min(100, (elapsedSec / durationSec) * 100)
 }
 
+// ── Ride HUD: what the current step is doing ───────────────────────────────────
+
+export interface StepView {
+  /** 'ERG' | 'SIM' | null when nothing is running. */
+  kind: 'ERG' | 'SIM' | null
+  /** Segment name for SIM, a duration for ERG, '' when idle. */
+  label: string
+  /** The number the rider is being asked to hit, already formatted. */
+  targetValue: string
+  targetUnit: string
+  /** How much of this step is left, as a phrase — time for ERG, distance for SIM. */
+  remaining: string
+  /** 0–100. */
+  progressPct: number
+  /** A one-line preview of the next step, or '' when this is the last one. */
+  next: string
+}
+
+const IDLE_STEP_VIEW: StepView = {
+  kind: null,
+  label: '',
+  targetValue: '—',
+  targetUnit: '',
+  remaining: '—',
+  progressPct: 0,
+  next: '',
+}
+
+function stepPreview(step: WorkoutStep | undefined): string {
+  if (!step) return ''
+  return step.type === 'erg' ? `ERG ${step.power} W` : `SIM ${step.segmentName}`
+}
+
+/**
+ * Derive everything the ride HUD shows about the current step, as formatted strings.
+ *
+ * Pure and separate from the components so it can be tested without a DOM, and so the ERG and
+ * SIM branches — which measure progress in completely different units — are decided in one
+ * place rather than in JSX. ERG steps are bounded by TIME; SIM steps are bounded by ROUTE
+ * DISTANCE and have no meaningful time remaining, which is why `remaining` is a phrase rather
+ * than a number of seconds.
+ *
+ * `gradePct` is the grade the app is COMMANDING at the current route position, not anything the
+ * trainer reports back — that distinction is load-bearing everywhere else in this project and
+ * the HUD label should not blur it.
+ */
+export function describeCurrentStep(input: {
+  step: WorkoutStep | undefined
+  nextStep: WorkoutStep | undefined
+  isRunning: boolean
+  elapsedSecInStep: number
+  distanceM: number
+  routeTotalM: number
+  gradePct: number | null
+  formatDuration: (seconds: number) => string
+}): StepView {
+  const {
+    step,
+    nextStep,
+    isRunning,
+    elapsedSecInStep,
+    distanceM,
+    routeTotalM,
+    gradePct,
+    formatDuration,
+  } = input
+
+  if (!isRunning || !step) return IDLE_STEP_VIEW
+
+  if (step.type === 'erg') {
+    const totalSec = step.duration * 60
+    const leftSec = Math.max(0, Math.round(totalSec - elapsedSecInStep))
+    return {
+      kind: 'ERG',
+      label: `${step.duration} min`,
+      targetValue: String(step.power),
+      targetUnit: 'watts',
+      remaining: `${formatDuration(leftSec)} left`,
+      progressPct: totalSec > 0 ? Math.min(100, (elapsedSecInStep / totalSec) * 100) : 0,
+      next: stepPreview(nextStep),
+    }
+  }
+
+  const leftM = routeTotalM > 0 ? Math.max(0, routeTotalM - distanceM) : null
+  return {
+    kind: 'SIM',
+    label: step.segmentName,
+    // A SIM step with no grade yet is normal: the first telemetry sample can land before the
+    // first grade decision. Say so with a dash rather than printing a misleading 0.0%.
+    targetValue: gradePct === null ? '—' : `${gradePct > 0 ? '+' : ''}${gradePct.toFixed(1)}`,
+    targetUnit: '% gradient',
+    remaining: leftM === null ? '—' : `${(leftM / 1000).toFixed(1)} km left`,
+    progressPct: routeTotalM > 0 ? Math.min(100, (distanceM / routeTotalM) * 100) : 0,
+    next: stepPreview(nextStep),
+  }
+}
+
 // ── Step summary ──────────────────────────────────────────────────────────────
 
 /**

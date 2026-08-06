@@ -31,7 +31,10 @@
    * one, and later a mounted tablet, so the still-open hardware question does not force a
    * redesign. Tuned so the middle of each range lands on a ~1512px-wide viewport.
    */
-  --text-hud-hero: clamp(7rem, 17vw, 18rem); /* gear number — the visual anchor */
+  /* Gear number — the visual anchor. 15vw ≈ 227px on a 1512px laptop: unmissable at 1.2 m, and
+     tuned down from 17vw because at that size the four HUD rows did not fit one screen and the
+     liveness row fell off the bottom. Legibility was never the constraint; vertical budget was. */
+  --text-hud-hero: clamp(6rem, 15vw, 16rem);
   --text-hud-major: clamp(4rem, 10vw, 10rem); /* current step target */
   --text-hud-mid: clamp(1.75rem, 3vw, 3.25rem); /* time remaining in step */
   --text-hud-name: clamp(1.25rem, 2.25vw, 2.25rem); /* segment name */
@@ -140,6 +143,34 @@
   #workout-graph {
     min-height: 80px;
   }
+}
+
+/**
+ * Ride HUD: let the graph have real height.
+ *
+ * The 200px cap above is a desktop-page constraint — sensible when the graph is one card among
+ * many in a scrolling setup view, and far too small when it is the third of four rows on a HUD
+ * read from 1.2 m away. Lifting `max-height` lets the 800x150 viewBox scale from the container
+ * WIDTH instead, so at ~1200px wide it renders about 225px tall, proportionally and without
+ * distortion. Deliberately not `preserveAspectRatio: none`: stretching would warp the position
+ * marker and the axis labels.
+ */
+.hud-graph #workout-graph-container {
+  /* Bounded, not unbounded: the SVG's 800x150 viewBox scales from WIDTH, so on a wide laptop it
+     would happily grow past 270px and push the liveness row off the bottom of a fixed-height
+     HUD. 34vh keeps it far larger than the 200px desktop cap while leaving room for row 4. */
+  max-height: 24vh;
+  min-height: 130px;
+  margin-bottom: 0;
+}
+
+/**
+ * The liveness row is compact in the HUD. `metric-card-compact`'s `md:p-5` is sized for the
+ * setup page, where the cards are the main event; here they are the least important row and
+ * that padding was the last ~30px keeping the fourth row from fitting on one screen.
+ */
+.hud-metrics .metric-card-compact {
+  padding: 0.5rem 0.75rem;
 }
 
 /* ── Scrollbar ───────────────────────────────────────────────────── */

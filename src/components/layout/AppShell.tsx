@@ -39,7 +39,9 @@ export default function AppShell({ buildVersion }: Props) {
   }, [])
 
   return (
-    <div className="min-h-screen bg-app py-4 sm:py-8 px-2 sm:px-4">
+    // The ride view drops the vertical padding: every pixel above the HUD is a pixel the graph
+    // does not get, and the whole thing has to fit one screen without scrolling.
+    <div className={`min-h-screen bg-app px-2 sm:px-4 ${isActive ? 'py-2' : 'py-4 sm:py-8'}`}>
       {/* Error toast — always rendered so main.js can find it */}
       <div
         id="error-message"
@@ -48,17 +50,22 @@ export default function AppShell({ buildVersion }: Props) {
         <span id="error-text" />
       </div>
 
-      <div className="max-w-4xl mx-auto">
-        <header className="flex items-center justify-between mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+      {/* `max-w-4xl` (896px) is right for the setup form and wrong for the HUD — it wasted
+          ~40% of a 1512px laptop screen and squeezed the graph. The ride view gets the width. */}
+      <div className={`mx-auto ${isActive ? 'max-w-[1600px]' : 'max-w-4xl'}`}>
+        <header
+          className={`flex items-center justify-between ${isActive ? 'mb-2' : 'mb-6 sm:mb-8'}`}
+        >
+          <h1
+            className={`font-bold text-white tracking-tight ${
+              isActive ? 'text-lg' : 'text-2xl sm:text-3xl'
+            }`}
+          >
             FTMS <span className="text-cyan-400">Hybrid</span> Workout
           </h1>
           <div className="flex items-center gap-2 sm:gap-3">
-            {isActive && (
-              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-900/60 text-green-400 border border-green-700 animate-pulse">
-                LIVE
-              </span>
-            )}
+            {/* No LIVE badge here while riding — the HUD's own status strip carries it, and two
+                of them a few hundred pixels apart is just noise. */}
             {/* Reclaims the browser chrome for the ride HUD. Needs a click to satisfy the
                 Fullscreen API's user-gesture requirement, so it cannot be automatic. */}
             {fullscreenSupported && (
@@ -76,7 +83,7 @@ export default function AppShell({ buildVersion }: Props) {
           </div>
         </header>
 
-        <ConnectionPanel />
+        <ConnectionPanel compact={isActive} />
         <div className={isActive ? 'hidden' : ''}>
           <SetupView />
         </div>

@@ -105,6 +105,25 @@ export default function ClickSettings() {
     window.dispatchEvent(new Event('keyBindingsChanged'))
   }, [keyBindings])
 
+  /**
+   * Publish the Click link state so the ride HUD can show it.
+   *
+   * Keyed on the derived values rather than hooked into each `setStatus` call site, so adding a
+   * new one cannot forget to announce itself — and so the BLE path in `connect` is left
+   * completely untouched. That path is currently under investigation for the
+   * dies-at-workout-start bug and is the last thing that should gain incidental edits.
+   *
+   * Whether the paddles are still alive mid-workout is the single most useful thing the HUD can
+   * tell the rider right now, given that bug.
+   */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('clickConnectionChanged', {
+        detail: { connected: status.connected, battery },
+      })
+    )
+  }, [status.connected, battery])
+
   function updateDrivetrain(patch: Partial<typeof drivetrain>) {
     const next = { ...drivetrain, ...patch }
     setDrivetrain(next)

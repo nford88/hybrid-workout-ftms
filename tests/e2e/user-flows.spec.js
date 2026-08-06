@@ -181,7 +181,7 @@ test.describe('Test 2: Full Workout Flow', () => {
 
     // ── Start ────────────────────────────────────────────────────────────────
     await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
-    await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid="ride-view"]')).toBeVisible({ timeout: 3000 })
 
     // ── Step 1: ERG 100W — emit IBD and verify live metrics, then auto-advance ─
     await expect(page.locator('#target-display')).toContainText('100W', { timeout: 2000 })
