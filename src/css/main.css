@@ -6,6 +6,49 @@
   --color-surface: #161929;
   --color-surface-elevated: #1e2235;
   --color-border: #2a2f47;
+
+  /**
+   * Breakpoints live HERE, not in tailwind.config.js.
+   *
+   * Tailwind v4 does not load a JS config unless the stylesheet says `@config`, and this one
+   * does not — so the `screens.xs` entry that used to sit in tailwind.config.js was never
+   * compiled. `375px` appeared zero times in the built CSS, which meant main.js's
+   * `hidden xs:inline` hid the SIM segment name at EVERY width and `xs:hidden` never fired.
+   * A whole breakpoint silently did nothing. The config file has been deleted so it cannot
+   * mislead again.
+   */
+  --breakpoint-xs: 375px;
+
+  /**
+   * Ride-HUD type scale — sized for a laptop screen read at roughly 1.2 m WHILE RIDING, not
+   * for desk work, and not to be reused for ordinary UI.
+   *
+   * Legible height scales about linearly with viewing distance, so type that works at 50 cm
+   * needs 2-3x the size here. The existing `.metric-value` scale (max `text-3xl`) is a
+   * desk-distance scale and is far too small for a glance at threshold.
+   *
+   * Fluid on purpose: `vw`-based clamps mean the same layout holds on a 13" laptop, a 16"
+   * one, and later a mounted tablet, so the still-open hardware question does not force a
+   * redesign. Tuned so the middle of each range lands on a ~1512px-wide viewport.
+   */
+  --text-hud-hero: clamp(7rem, 17vw, 18rem); /* gear number — the visual anchor */
+  --text-hud-major: clamp(4rem, 10vw, 10rem); /* current step target */
+  --text-hud-mid: clamp(1.75rem, 3vw, 3.25rem); /* time remaining in step */
+  --text-hud-name: clamp(1.25rem, 2.25vw, 2.25rem); /* segment name */
+  --text-hud-sub: clamp(1rem, 1.7vw, 1.75rem); /* gear ratio, next-step line */
+  --text-hud-value: clamp(1.1rem, 1.85vw, 1.9rem); /* liveness readouts — deliberately small */
+  --text-hud-label: clamp(0.75rem, 1.05vw, 1.05rem); /* uppercase field labels */
+
+  /**
+   * Muted text at riding distance. `text-gray-500/600` is fine at a desk and unreadable
+   * across a room, so the HUD gets its own lighter muted tone rather than reusing the
+   * desk-distance greys.
+   *
+   * Note the namespace overlap: this emits the utility `text-hud-muted` as a COLOUR, while
+   * `--text-hud-*` above emit font sizes under the same `text-hud-` prefix. There is no
+   * collision today, but do not add a `--text-hud-muted` font size — it would fight this one.
+   */
+  --color-hud-muted: #9ca3af;
 }
 
 /* ── Component classes ──────────────────────────────────────────── */

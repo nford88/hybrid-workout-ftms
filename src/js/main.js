@@ -1161,8 +1161,65 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
     }
   }
 
+  /**
+   * Register FTMS event handlers exactly once.
+   *
+   * `window.ftms` is a single long-lived instance (ftms.js:1098) and its `Emitter.on` does not
+   * dedupe, so subscribing from inside connectTrainer() — as this used to — stacked a fresh
+   * handler on every reconnect. Two connects meant every Indoor Bike Data frame was handled
+   * twice, i.e. duplicate telemetry rows in the ride log.
+   */
+  let ftmsSubscribed = false
+  function subscribeFtmsEvents() {
+    if (ftmsSubscribed) return
+    ftmsSubscribed = true
+    H.ftms.on('ibd', H.handlers.handleFtmsData)
+    H.ftms.on('disconnected', H.handlers.handleFtmsDisconnect)
+  }
+
+  /**
+   * A mid-ride GATT drop used to be completely invisible: ftms.js emitted 'disconnected' and
+   * NOTHING subscribed, so `ftmsConnected` stayed true, the React metrics froze on their last
+   * values instead of blanking, the workout clock kept running, the SIM pipeline kept writing
+   * to a dead handle — and the ride log kept appending samples. An exported log therefore had
+   * a tail of stale data with no marker saying where the trainer had gone. That is the same
+   * class of silently-wrong evidence as commit 54f511a (a whole ride logged at 0 W).
+   *
+   * Deliberately does NOT end the workout. BLE drops can be transient, endWorkout() is
+   * irreversible and writes a summary, and binning a session over a two-second blip would be
+   * worse than the problem. The contract here is: tell the truth, loudly, and mark the log.
+   */
+  function handleFtmsDisconnect() {
+    H.state.ftmsConnected = false
+    window.dispatchEvent(new CustomEvent('ftmsDisconnected'))
+
+    const wasRunning = !!H.state.workout?.isRunning
+    if (window.rideLog) {
+      window.rideLog.logNote('trainerDisconnected', { workoutRunning: wasRunning })
+    }
+    console.warn(
+      '[FTMS] Disconnected%s',
+      wasRunning ? ' MID-RIDE — resistance is uncontrolled' : ''
+    )
+
+    H.utils.showError(
+      wasRunning
+        ? 'Trainer disconnected mid-ride — resistance is no longer being controlled. ' +
+            'Reconnect to resume; the ride log has marked the gap.'
+        : 'Trainer disconnected.'
+    )
+  }
+
   async function connectTrainer() {
-    console.clear()
+    // Clear only on the FIRST connect of the page session. Now that a mid-ride disconnect is
+    // handled and reconnecting is a real flow, clearing here would wipe the console record of
+    // the ride so far — and the console is still used as experiment evidence alongside the
+    // ride log (docs/virtual-shifting/experiments). A clean slate is worth having once; losing
+    // half a ride's log to recover from a dropped link is not.
+    if (!connectTrainer._hasConnectedOnce) {
+      connectTrainer._hasConnectedOnce = true
+      console.clear()
+    }
     console.info('--- Starting Bluetooth Trainer Connection ---')
     window.dispatchEvent(new CustomEvent('ftmsConnecting'))
     try {
@@ -1172,14 +1229,16 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
         log: (msg) => console.log('[FTMS]', msg),
       })
 
-      // Set up event listeners for FTMS data
-      H.ftms.on('ibd', H.handlers.handleFtmsData)
-
-      // No need for custom parsing - ftms.js is now fixed!
+      subscribeFtmsEvents()
 
       H.state.ftmsConnected = true
       H.utils.hideError()
       window.dispatchEvent(new CustomEvent('ftmsConnected'))
+      if (window.rideLog) {
+        // Bounds the gap a disconnect opened, so an exported log says when data resumed
+        // rather than leaving the analyst to infer it from the sample timestamps.
+        window.rideLog.logNote('trainerConnected')
+      }
     } catch (e) {
       console.error('Bluetooth connection failed:', e)
       H.state.ftmsConnected = false
@@ -1542,6 +1601,7 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
   H.handlers = {
     connectTrainer,
     handleFtmsData,
+    handleFtmsDisconnect,
     startWorkout: H.workout.startWorkout,
     runWorkoutStep: H.workout.runWorkoutStep,
     skipStep: H.workout.skipStep,
