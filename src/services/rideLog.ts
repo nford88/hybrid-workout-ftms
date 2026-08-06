@@ -54,7 +54,30 @@ export type RideLogEvent =
       cw: number
     }
   | { t: number; type: 'gear'; from: number; to: number; ratio: number; action: string }
-  | { t: number; type: 'telemetry'; speedKph: number; cadenceRpm: number; powerW: number }
+  | {
+      t: number
+      type: 'telemetry'
+      speedKph: number
+      cadenceRpm: number
+      powerW: number
+      /**
+       * The state in force at this sample, so a 1 Hz row is self-describing.
+       *
+       * The 2026-08-05 analysis had to RECONSTRUCT route distance by re-integrating cadence
+       * through the drivetrain, and step-hold gear/sent-grade/Crr/Cw from `sim` events — of
+       * which a whole lap produced ten, because the 0.3% deadband suppresses writes. Every
+       * filter the experiment depends on (which block, which gear, which condition) was
+       * therefore inferred rather than recorded. These fields remove that entire class of
+       * guesswork; they are nullable because a telemetry sample can arrive before the first
+       * grade decision of a step.
+       */
+      routeDistanceM: number | null
+      gearIndex: number | null
+      gearRatio: number | null
+      sentGradePct: number | null
+      crr: number | null
+      cw: number | null
+    }
   | { t: number; type: 'step'; index: number; stepType: string; target: string }
   | { t: number; type: 'note'; note: string; data?: unknown }
 
@@ -137,11 +160,35 @@ export function logNote(note: string, data?: unknown): void {
   push({ t: Date.now(), type: 'note', note, data })
 }
 
-export function logTelemetry(speedKph: number, cadenceRpm: number, powerW: number): void {
+export function logTelemetry(
+  speedKph: number,
+  cadenceRpm: number,
+  powerW: number,
+  state: {
+    routeDistanceM?: number | null
+    gearIndex?: number | null
+    gearRatio?: number | null
+    sentGradePct?: number | null
+    crr?: number | null
+    cw?: number | null
+  } = {}
+): void {
   const now = Date.now()
   if (now - lastTelemetryAt < 950) return
   lastTelemetryAt = now
-  push({ t: now, type: 'telemetry', speedKph, cadenceRpm, powerW })
+  push({
+    t: now,
+    type: 'telemetry',
+    speedKph,
+    cadenceRpm,
+    powerW,
+    routeDistanceM: state.routeDistanceM ?? null,
+    gearIndex: state.gearIndex ?? null,
+    gearRatio: state.gearRatio ?? null,
+    sentGradePct: state.sentGradePct ?? null,
+    crr: state.crr ?? null,
+    cw: state.cw ?? null,
+  })
 }
 
 export function getRideLog(): RideLogEvent[] {

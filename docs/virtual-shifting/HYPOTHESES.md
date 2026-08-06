@@ -108,9 +108,8 @@ automatically by a console script. 33.2 min, 2006 ride-log events.
   pedalling power (121.1 vs 121.3 W, n≈2300 each).
 - **Bug found, ride nearly lost:** the ride log recorded `power: 0` for every sample of every run
   (`data.power` read; parser emits `powerW`). The FIT is the only reason this ride is analysable.
-- **Bug found, not yet fixed:** the Zwift Click disconnects when a workout starts — `ClickSettings`
-  owns the GATT link and the setup view unmounts on the active view. Paddles are dead for the whole
-  ride; only `[` / `]` shift.
+- **Bug confirmed, mechanism unknown:** the Zwift Click stops responding when a workout starts — every Click dispatch in the console log precedes both workout starts, and the rider confirms it on the bike. ⚠️ A first diagnosis blaming `ClickSettings` unmounting is **retracted**: `AppShell` keeps both views mounted and hides one with CSS, so it never unmounts. Bindings and bit decode are correct. The log cannot discriminate because `onLog` was never wired to `connectClick` — the Click path was entirely silent. Leading candidate: BLE-stack contention from the unserialised FTMS writes. Click logging added for the next run.
+- **Bug found and fixed — 40% of grade writes never arrived:** 64 of 159 SIM writes failed with `GATT operation already in progress`. The Control Point had no mutex and three callers interleaved, tripping Chrome's one-op-at-a-time rule and cancelling each other's ACKs. Likely the main source of the per-bin scatter above. Now serialised.
 
 Full detail and the next-run requirements: [`experiments/17-crr-cw-sweep-protocol.md`](experiments/17-crr-cw-sweep-protocol.md) §10.
 

@@ -113,6 +113,44 @@ describe('rideLog — the record a head unit cannot make', () => {
     expect(rideLogSummary().telemetry).toBe(2)
   })
 
+  test('telemetry carries the state in force, so no analysis has to reconstruct it', () => {
+    // The 2026-08-05 analysis re-integrated cadence to recover route distance and step-held
+    // gear/sent-grade/Crr/Cw from `sim` events — of which a whole lap produced ten, because the
+    // 0.3% deadband suppresses writes. Every filter the experiment relies on was inferred.
+    logTelemetry(24.5, 85, 187, {
+      routeDistanceM: 412.5,
+      gearIndex: 11,
+      gearRatio: 2.4,
+      sentGradePct: -0.09,
+      crr: 0.004,
+      cw: 0.51,
+    })
+    const t = getRideLog().find((e) => e.type === 'telemetry')
+    expect(t).toMatchObject({
+      speedKph: 24.5,
+      cadenceRpm: 85,
+      powerW: 187,
+      routeDistanceM: 412.5,
+      gearIndex: 11,
+      gearRatio: 2.4,
+      sentGradePct: -0.09,
+      crr: 0.004,
+      cw: 0.51,
+    })
+  })
+
+  test('telemetry state is nullable, not undefined — a sample before the first grade decision', () => {
+    // A telemetry sample can arrive before any sim write in a step. Nulls survive JSON; undefined
+    // keys vanish silently and would look identical to a field we forgot to record.
+    logTelemetry(0, 0, 0)
+    const t = getRideLog().find((e) => e.type === 'telemetry')
+    const round = JSON.parse(JSON.stringify(t))
+    for (const k of ['routeDistanceM', 'gearIndex', 'gearRatio', 'sentGradePct', 'crr', 'cw']) {
+      expect(k in round).toBe(true)
+      expect(round[k]).toBeNull()
+    }
+  })
+
   test('starting a new ride clears the live log but KEEPS the previous run', () => {
     logSim(SIM)
     logGear(11, 10, 2.22, 'shiftDown')

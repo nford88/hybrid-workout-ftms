@@ -158,6 +158,12 @@ export default function ClickSettings() {
   function performAction(action: ClickAction) {
     const result = dispatchAction(action)
     if (action !== 'none') {
+      // Every Click-originated action reaches the console. Without this, "the paddles did
+      // nothing" is unfalsifiable after the fact — we could not tell a dropped BLE link from a
+      // press that arrived and was ignored, which is exactly where the 2026-08-05 ride left us.
+      console.log(
+        `[CLICK] ${action} → ${result.performed ? 'performed' : 'no-op'}: ${result.detail}`
+      )
       setLastAction(`${CLICK_ACTION_LABEL[action]} — ${result.detail}`)
     }
   }
@@ -201,9 +207,15 @@ export default function ClickSettings() {
         onBattery: (level) => setBattery(level),
         onSilent: () => setSilent(true),
         onDisconnected: () => {
+          // Logged, loudly. On the 2026-08-05 sweep ride the Click stopped responding the
+          // moment the workout started and we could not tell why afterwards, because NOTHING
+          // on the Click path reached the console — `onLog` was never wired up. A silent
+          // failure on the rider's only input device is not acceptable during an experiment.
+          console.warn('[CLICK] disconnected — paddles are dead until reconnected')
           setStatus((s) => ({ ...s, connected: false }))
           detector.current.reset()
         },
+        onLog: (message) => console.log(`[CLICK] ${message}`),
       })
       setStatus({ connected: true, bitmap: null, error: null })
       setPhase('left')

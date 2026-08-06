@@ -1115,7 +1115,21 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       // `powerW`, not `power` — the IBD parser emits powerW (ftms.js:505). Reading `data.power`
       // silently logged 0 for every sample of the 2026-08-05 sweep ride, zeroing the one channel
       // the whole experiment measures. The FIT saved that ride; nothing in the app would have.
-      window.rideLog.logTelemetry(data.speedKph, data.cadenceRpm ?? 0, data.powerW ?? 0)
+      //
+      // The state block makes each 1 Hz row self-describing, so an analysis never has to
+      // reconstruct route distance or step-hold the gear and condition from sparse `sim` events.
+      const vg = window.virtualDrivetrain ? window.virtualDrivetrain.getVirtualGear() : null
+      window.rideLog.logTelemetry(data.speedKph, data.cadenceRpm ?? 0, data.powerW ?? 0, {
+        routeDistanceM: H.state.workout.simDistanceTraveled ?? null,
+        gearIndex: vg ? vg.gearIndex : null,
+        gearRatio: vg ? vg.gearRatio : null,
+        sentGradePct:
+          H.sim && H.sim.setSimGrade.__lastGrade !== undefined
+            ? H.sim.setSimGrade.__lastGrade
+            : null,
+        crr: H.state.simPhysics.crr,
+        cw: H.state.simPhysics.cw,
+      })
     }
 
     // Integrate distance for EVERY step type, continuously.

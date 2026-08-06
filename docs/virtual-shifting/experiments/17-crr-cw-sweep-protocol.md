@@ -364,11 +364,36 @@ channel is the trainer's power.
    `data.power`; the IBD parser emits `powerW` ([ftms.js:505](../../../src/js/ftms.js#L505)).
    One word, and the single channel the experiment measures was zeroed. **The FIT saved this
    ride; nothing in the app would have.** Fixed.
-2. **The Zwift Click disconnects the moment a workout starts.** `ClickSettings` owns the GATT
-   link and disconnects on unmount, and the setup view unmounts when the active view appears —
-   so paddles are dead for the entire ride and only the keyboard (`[` / `]`) shifts. Found
-   mid-ride. **Not yet fixed.**
-3. Minor: the drivetrain started in gear **13** (2.61), not the baseline 12, so the first 200 m
+2. **The Zwift Click stops responding the moment a workout starts.** Confirmed by the rider on
+   the bike and by the console log: every Click-dispatched action in the 2026-08-05 log sits at
+   lines 322-342, and both workouts start at lines 640 and 1609 — **nothing from the Click after
+   either**. Keyboard shifting worked throughout, which is what the ride actually used.
+
+   ⚠️ **A first diagnosis here was WRONG and is retracted.** It claimed `ClickSettings` unmounts
+   when the active view appears and its cleanup disconnects the GATT link. `AppShell` in fact
+   renders **both views permanently** and hides one with CSS ([AppShell.tsx:61-66](../../../src/components/layout/AppShell.tsx#L61-L66)),
+   so the panel never unmounts and that cleanup never runs. The mistake came from reading
+   `document.body.innerText`, which omits CSS-hidden elements — the panel looked absent because
+   it was invisible, not because it was gone. Bindings and bit decode were also checked and are
+   correct (`SHIFT_DOWN: 0x100`, `SHIFT_UP: 0x1000`, matching the H18 correction).
+
+   **Mechanism still UNKNOWN, and the log cannot settle it**: `ClickSettings` never passed
+   `onLog` to `connectClick`, so not one byte of the Click path reached the console. Leading
+   candidate is BLE-stack saturation from the unserialised FTMS writes below — 64 failed writes
+   plus a RequestControl before every one is a lot of contention for a shared radio. Fixed for
+   tomorrow: the Click now logs connect, disconnect and every dispatched action, so the next run
+   discriminates a dropped link from a press that arrived and was ignored.
+
+3. **40% of SIM grade writes never reached the trainer.** 64 of 159 failed with
+   `NetworkError: GATT operation already in progress`. The FTMS Control Point had no mutex, and
+   each `_writeCpAndWaitAck` is really two writes (RequestControl, then payload) with three
+   independent callers — the 3 s SIM loop, ERG step transitions, and a shift's forced re-send.
+   Interleaved they trip Chrome's one-op-at-a-time rule and cancel each other's pending ACK via
+   "Replaced by new command". **The trainer never received 40% of the grades the app believed it
+   had sent**, which is invisible from inside the app and is the most likely source of the wide
+   per-bin scatter in §10. Now serialised through a promise chain, with 5 regression tests.
+
+4. Minor: the drivetrain started in gear **13** (2.61), not the baseline 12, so the first 200 m
    of lap 1 were ridden off baseline and sending 3.32% for a 3.0% road.
 
 ### What the next run needs

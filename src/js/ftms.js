@@ -74,6 +74,19 @@ class FTMSClient extends Emitter {
     this.chars = {}
     this._pendingAck = null // {opcode, resolve, reject, timer}
     this._log = (s) => this.emit('log', s)
+    /**
+     * Serialises every Control Point operation.
+     *
+     * Without this, the 2026-08-05 sweep ride lost **64 of 159** SIM grade writes to
+     * `NetworkError: GATT operation already in progress`. Each `_writeCpAndWaitAck` is really
+     * two writes (RequestControl, then the payload) and there are three independent callers —
+     * the 3 s SIM loop, ERG step transitions, and a shift's forced re-send. Interleaved, they
+     * both trip Chrome's one-GATT-op-at-a-time rule AND cancel each other's pending ACK via
+     * "Replaced by new command". The trainer simply never received 40% of the grades we thought
+     * we sent, which is invisible from inside the app and corrupts any physics experiment.
+     */
+    this._cpChain = Promise.resolve()
+    this._cpQueueDepth = 0
   }
 
   async connect({ nameHint, log } = {}) {
@@ -341,7 +354,34 @@ class FTMSClient extends Emitter {
     return res
   }
 
+  /**
+   * Run `task` after every previously-queued Control Point operation has settled.
+   *
+   * `.then(task, task)` runs it whether the previous one resolved or rejected, and the chain
+   * itself swallows failures so one bad write cannot wedge the queue permanently.
+   */
+  _serialiseCp(task) {
+    this._cpQueueDepth += 1
+    if (this._cpQueueDepth > 1) {
+      this._log(`CP queue: waiting behind ${this._cpQueueDepth - 1} operation(s)`)
+    }
+    const run = this._cpChain.then(task, task)
+    this._cpChain = run.then(
+      () => {},
+      () => {}
+    )
+    return run.finally(() => {
+      this._cpQueueDepth -= 1
+    })
+  }
+
   async _writeCpAndWaitAck(opcode, payload, { timeoutMs = 4000 } = {}) {
+    // The RequestControl + payload pair must be atomic with respect to other callers, so the
+    // whole sequence goes through the queue as one unit rather than each write separately.
+    return this._serialiseCp(() => this._writeCpAndWaitAckUnlocked(opcode, payload, timeoutMs))
+  }
+
+  async _writeCpAndWaitAckUnlocked(opcode, payload, timeoutMs = 4000) {
     // Many trainers want us to own control before other ops.
     if (opcode !== 0x00) {
       // not REQUEST_CONTROL
