@@ -1,9 +1,16 @@
 import { useTrainer } from '../../context'
+import { keyForAction } from '../../services/clickBindings'
+import { useKeyBindings } from '../../hooks/useKeyBindings'
+import KeyHint from '../common/KeyHint'
 
 export default function ConnectionPanel() {
   const { isConnected, isConnecting } = useTrainer()
+  const keys = useKeyBindings()
 
   const statusText = isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Disconnected'
+
+  const startKey = keyForAction(keys, 'startWorkout')
+  const skipKey = keyForAction(keys, 'nextStep')
 
   return (
     <div className="section-card">
@@ -13,11 +20,17 @@ export default function ConnectionPanel() {
         <button id="connect-button" className="btn-connect">
           Connect Trainer
         </button>
-        <button id="start-workout-button" className="btn-start">
+        <button
+          id="start-workout-button"
+          className="btn-start"
+          aria-keyshortcuts={startKey ?? undefined}
+        >
           Start Workout
+          <KeyHint keyName={startKey} />
         </button>
-        <button id="skip-step-button" className="btn-skip">
+        <button id="skip-step-button" className="btn-skip" aria-keyshortcuts={skipKey ?? undefined}>
           Skip Step
+          <KeyHint keyName={skipKey} />
         </button>
         <button
           id="debug-bluetooth-button"

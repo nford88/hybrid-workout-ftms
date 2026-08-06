@@ -6,6 +6,8 @@ import {
   DEFAULT_KEY_BINDINGS,
   actionForKey,
   actionForButton,
+  keyForAction,
+  formatKeyLabel,
 } from '../../src/services/clickBindings'
 import { ALL_CLICK_BUTTONS, CLICK_BUTTON } from '../../src/services/clickButtons'
 import { getVirtualGear, resetVirtualGear, setGearIndex } from '../../src/services/virtualGearState'
@@ -194,5 +196,39 @@ describe('the bindings actually reach the dispatcher', () => {
     // Guards against the 0x20-vs-0x1000 regression that wired shiftUp to the B button.
     expect(CLICK_BUTTON.SHIFT_UP).toBe(0x1000)
     expect(CLICK_BUTTON.SHIFT_DOWN).toBe(0x100)
+  })
+})
+
+describe('shortcut chips shown in the ride UI', () => {
+  test('unprintable keys get a readable label', () => {
+    expect(formatKeyLabel(' ')).toBe('Space')
+    expect(formatKeyLabel('ArrowRight')).toBe('→')
+    expect(formatKeyLabel('ArrowLeft')).toBe('←')
+    expect(formatKeyLabel('ArrowUp')).toBe('↑')
+    expect(formatKeyLabel('ArrowDown')).toBe('↓')
+  })
+
+  test('printable keys are shown verbatim, NOT upper-cased', () => {
+    // Upper-casing would render the binding `e` as "E", telling the rider to press Shift+E —
+    // which emits the key `E` and matches nothing, because actionForKey is case-sensitive.
+    expect(formatKeyLabel('e')).toBe('e')
+    expect(formatKeyLabel('l')).toBe('l')
+    expect(formatKeyLabel('[')).toBe('[')
+    expect(formatKeyLabel(']')).toBe(']')
+  })
+
+  test('every default-bound key renders as something non-empty', () => {
+    for (const key of Object.keys(DEFAULT_KEY_BINDINGS)) {
+      expect(formatKeyLabel(key).length).toBeGreaterThan(0)
+    }
+  })
+
+  test('the chip for an action round-trips through the binding it came from', () => {
+    // A hint that shows a key the dispatcher would not accept is worse than no hint.
+    for (const action of Object.values(DEFAULT_KEY_BINDINGS)) {
+      const key = keyForAction(DEFAULT_KEY_BINDINGS, action)
+      expect(key).not.toBeNull()
+      expect(actionForKey(DEFAULT_KEY_BINDINGS, key)).toBe(action)
+    }
   })
 })

@@ -52,9 +52,12 @@ export default function MetricsRow() {
 
   // Gear turns amber at the top of the range, where the model wants more than the ±25%
   // grade clamp can deliver — the rider is getting less resistance than the gear implies.
+  // Amber alone was too quiet to notice mid-effort and meaningless to anyone who does not
+  // know the palette, so the card also says the word (MetricCard `warning`).
   const gearValue = gear ? `${gear.gearIndex + 1}` : dash
   const gearUnit = gear ? `of ${ZWIFT_GEAR_RATIOS.length} · ${gear.gearRatio.toFixed(2)}` : 'ratio'
-  const gearColor = gear?.last?.clamped ? 'text-amber-400' : 'text-orange-400'
+  const gearClamped = !!gear?.last?.clamped
+  const gearColor = gearClamped ? 'text-amber-400' : 'text-orange-400'
 
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
@@ -66,7 +69,13 @@ export default function MetricsRow() {
         value={speed}
       />
       <MetricCard label="Cadence" unit="rpm" color="text-yellow-400" value={cadence} />
-      <MetricCard label="Gear" unit={gearUnit} color={gearColor} value={gearValue} />
+      <MetricCard
+        label="Gear"
+        unit={gearUnit}
+        color={gearColor}
+        value={gearValue}
+        warning={gearClamped ? 'clamped' : undefined}
+      />
       <MetricCard label="Time" unit="mm:ss" color="text-purple-400" value={time} />
       <MetricCard label="Gradient" unit="%" color={gradientColor} value={gradientValue} />
     </div>

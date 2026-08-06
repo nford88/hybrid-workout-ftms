@@ -66,7 +66,7 @@ test.describe('Setup View', () => {
     await expect(page.getByText('FTMS Hybrid Workout')).toBeVisible()
     await expect(page.getByText('Status: Disconnected')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Connect Trainer' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Start Workout' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start Workout', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Import Route' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add Step' })).toBeVisible()
   })
@@ -105,7 +105,7 @@ test.describe('ERG Workout', () => {
     await page.getByRole('button', { name: 'Add Step' }).click()
 
     // Start workout
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
 
     // Active view should appear with MetricsRow
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
@@ -119,7 +119,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-duration').fill('5')
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     // Push IBD data through mock
@@ -134,7 +134,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-duration').fill('5')
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     const timeBefore = await page.locator('.metric-value.text-purple-400').textContent()
@@ -148,7 +148,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-duration').fill('5')
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     await page.getByRole('button', { name: 'Skip Step' }).click()
@@ -161,7 +161,7 @@ test.describe('ERG Workout', () => {
     await page.locator('#erg-duration').fill('5')
     await page.locator('#erg-power').fill('250')
     await page.getByRole('button', { name: 'Add Step' }).click()
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     // Gradient card should show — in ERG mode
@@ -196,7 +196,7 @@ test.describe('SIM Workout', () => {
   test('SIM workout shows gradient when IBD speed arrives', async ({ page }) => {
     await page.locator('#step-type').selectOption('sim')
     await page.getByRole('button', { name: 'Add Step' }).click()
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     // Push speed data — SIM mode computes gradient from route
@@ -223,7 +223,7 @@ test.describe('SIM Workout', () => {
     await expect(page.getByText('SIM:').first()).toBeVisible()
 
     // Start — should land on ERG step first
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
     await expect(page.locator('#target-display')).toContainText('200W', { timeout: 2000 })
 
@@ -246,7 +246,7 @@ test.describe('SIM Workout', () => {
   test('step distance updates during SIM step', async ({ page }) => {
     await page.locator('#step-type').selectOption('sim')
     await page.getByRole('button', { name: 'Add Step' }).click()
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     // Emit speed data a few times to accumulate distance

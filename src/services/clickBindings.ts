@@ -94,6 +94,30 @@ export function keyForAction(bindings: KeyBindings, action: ClickAction): string
   return found ? found[0] : null
 }
 
+/** `KeyboardEvent.key` values that would render as nothing useful on their own. */
+const KEY_LABELS: Record<string, string> = {
+  ' ': 'Space',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  Escape: 'Esc',
+  Enter: '⏎',
+  Tab: 'Tab',
+}
+
+/**
+ * A `KeyboardEvent.key` rendered for display on a shortcut chip.
+ *
+ * Printable single characters are shown VERBATIM, deliberately not upper-cased. Keycaps are
+ * conventionally drawn uppercase, but `actionForKey` matches case-sensitively — so rendering
+ * the binding `e` as "E" would tell the rider to press Shift+E, which produces the key `E` and
+ * matches nothing. The convention loses to being correct.
+ */
+export function formatKeyLabel(key: string): string {
+  return KEY_LABELS[key] ?? key
+}
+
 export function actionForKey(bindings: KeyBindings, key: string): ClickAction {
   return bindings[key] ?? 'none'
 }

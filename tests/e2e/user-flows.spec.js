@@ -180,7 +180,7 @@ test.describe('Test 2: Full Workout Flow', () => {
     await expect(page.locator('.remove-step-button')).toHaveCount(4)
 
     // ── Start ────────────────────────────────────────────────────────────────
-    await page.getByRole('button', { name: 'Start Workout' }).click()
+    await page.getByRole('button', { name: 'Start Workout', exact: true }).click()
     await expect(page.getByText('Workout Progress')).toBeVisible({ timeout: 3000 })
 
     // ── Step 1: ERG 100W — emit IBD and verify live metrics, then auto-advance ─
