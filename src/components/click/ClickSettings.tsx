@@ -41,7 +41,7 @@ import {
   loadMediaInput,
   saveMediaInput,
 } from '../../services/storage'
-import { downloadRideLog, rideLogSummary } from '../../services/rideLog'
+import { downloadRideLog, logNote, rideLogSummary } from '../../services/rideLog'
 import { describeTarget, parseYouTubeTarget } from '../../services/youtube'
 import { drivetrainRatio, ZWIFT_GEAR_RATIOS } from '../../services/virtualDrivetrain'
 
@@ -93,6 +93,8 @@ export default function ClickSettings() {
   const [keyBindings, setKeyBindings] = useState(loadKeyBindings)
   const [capturingKeyFor, setCapturingKeyFor] = useState<ClickAction | null>(null)
   const [silent, setSilent] = useState(false)
+  // Seconds-since-connect at which frames stopped, or null while they are still flowing.
+  const [starvedAt, setStarvedAt] = useState<number | null>(null)
   const [battery, setBattery] = useState<number | null>(null)
   const [gear, setGear] = useState(getVirtualGear)
   const [drivetrain, setDrivetrain] = useState(loadDrivetrain)
@@ -208,6 +210,7 @@ export default function ClickSettings() {
     setPhase('connecting')
     setStatus({ connected: false, bitmap: null, error: null })
     setSilent(false)
+    setStarvedAt(null)
     connection.current?.disconnect()
     detector.current.reset()
     setSeen({})
@@ -233,6 +236,13 @@ export default function ClickSettings() {
         },
         onBattery: (level) => setBattery(level),
         onSilent: () => setSilent(true),
+        // The link stays "connected" while delivering nothing, so without this the panel keeps
+        // claiming the Click is fine. Recording WHEN it went quiet is what will separate a
+        // time-based cutoff from BLE contention.
+        onStarved: (msSinceConnect) => {
+          setStarvedAt(Math.round(msSinceConnect / 1000))
+          logNote('clickStarved', { secondsSinceConnect: msSinceConnect / 1000 })
+        },
         onDisconnected: () => {
           // Logged, loudly. On the 2026-08-05 sweep ride the Click stopped responding the
           // moment the workout started and we could not tell why afterwards, because NOTHING
@@ -308,6 +318,15 @@ export default function ClickSettings() {
           it&apos;s the pair&apos;s <strong>secondary</strong> unit, and its link will drop after
           about a minute. Press a button on the <strong>other</strong> controller and connect that
           one instead.
+        </p>
+      )}
+
+      {starvedAt !== null && (
+        <p className="text-xs text-amber-400 mb-3">
+          <span aria-hidden="true">▲</span> The Click stopped sending after{' '}
+          <strong>{starvedAt}s</strong> — the link is still open but no frames are arriving, so the
+          paddles are dead. Reconnect it. (Recorded in the ride log as <code>clickStarved</code>;
+          the elapsed time is what tells us whether this is a timeout or interference.)
         </p>
       )}
 

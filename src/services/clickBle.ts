@@ -29,12 +29,25 @@ export const RIDE_ON = Uint8Array.from([0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e, 0x02
 /** How long to wait for a frame before concluding we are on the secondary unit. */
 export const PRIMARY_PROBE_MS = 4000
 
+/**
+ * A gap longer than this means the device stopped talking, not that the rider stopped pressing.
+ *
+ * The primary streams battery every ~5 s unprompted, so silence beyond ~8 s is the device going
+ * quiet. Kept generous so a missed battery frame does not cry wolf mid-ride.
+ */
+export const FRAME_STARVATION_MS = 8000
+
 export interface ClickHandlers {
   onButtons: (bitmap: number) => void
   onBattery?: (level: number) => void
   onDisconnected?: () => void
   /** Fired when the link works but publishes nothing — i.e. this is the secondary unit. */
   onSilent?: () => void
+  /**
+   * Fired when frames STOP arriving on a link that never disconnected, with the ms since connect.
+   * The elapsed value is what separates a time-based cutoff from BLE contention.
+   */
+  onStarved?: (msSinceConnect: number) => void
   onLog?: (message: string) => void
 }
 
@@ -68,8 +81,29 @@ export async function connectClick(handlers: ClickHandlers): Promise<ClickConnec
   let sawFrame = false
   let probe: ReturnType<typeof setTimeout> | undefined
 
+  /**
+   * Frame watchdog — turns "the paddles just stopped" into a timestamped log line.
+   *
+   * Every Click failure on 2026-08-06 looked identical from outside: a burst of working buttons,
+   * then silence, with NO `gattserverdisconnected` and so no disconnect log. Nothing recorded when
+   * the frames stopped or how long the link had been up, which is why "dies at workout start",
+   * "dies when the trainer connects" and "dies ~60 s after connecting" could not be separated —
+   * they are confounded in every log we have, because the trainer is always connected within the
+   * first minute.
+   *
+   * `elapsed` on every line is the discriminator: a time-based cutoff lands at the same elapsed
+   * value regardless of what else happened, a contention-based one does not.
+   */
+  const connectedAt = Date.now()
+  const elapsed = () => `${((Date.now() - connectedAt) / 1000).toFixed(1)}s`
+  let lastFrameAt = Date.now()
+  let starving = false
+  let watchdog: ReturnType<typeof setInterval> | undefined
+
   const onGattDisconnected = () => {
     if (probe) clearTimeout(probe)
+    if (watchdog) clearInterval(watchdog)
+    log(`GATT disconnected after ${elapsed()}`)
     handlers.onDisconnected?.()
   }
   device.addEventListener('gattserverdisconnected', onGattDisconnected)
@@ -102,6 +136,11 @@ export async function connectClick(handlers: ClickHandlers): Promise<ClickConnec
     const frame = parseClickFrame(toBytes(ch.value))
     if (!frame) return
     sawFrame = true
+    lastFrameAt = Date.now()
+    if (starving) {
+      starving = false
+      log(`frames RESUMED at ${elapsed()} — the link recovered on its own`)
+    }
     if (frame.type === 'buttons') handlers.onButtons(frame.bitmap)
     else if (frame.type === 'battery') handlers.onBattery?.(frame.level)
   }
@@ -125,11 +164,26 @@ export async function connectClick(handlers: ClickHandlers): Promise<ClickConnec
     }
   }, PRIMARY_PROBE_MS)
 
+  // The primary streams battery every ~5 s even when nothing is pressed, so a gap this long means
+  // the device has stopped talking rather than the rider having stopped pressing.
+  watchdog = setInterval(() => {
+    const quiet = Date.now() - lastFrameAt
+    if (!starving && sawFrame && quiet > FRAME_STARVATION_MS) {
+      starving = true
+      log(
+        `NO FRAMES for ${(quiet / 1000).toFixed(1)}s (link still connected, elapsed ${elapsed()}) ` +
+          `— the device has gone quiet without disconnecting`
+      )
+      handlers.onStarved?.(Date.now() - connectedAt)
+    }
+  }, 1000)
+
   return {
     deviceId: device.id,
     deviceName: device.name ?? 'Zwift Click',
     disconnect() {
       if (probe) clearTimeout(probe)
+      if (watchdog) clearInterval(watchdog)
       async_.removeEventListener('characteristicvaluechanged', onAsync)
       device.removeEventListener('gattserverdisconnected', onGattDisconnected)
       device.gatt?.disconnect()
