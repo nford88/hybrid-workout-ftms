@@ -3,6 +3,7 @@ import RideHud from './RideHud'
 import MediaPanel from './MediaPanel'
 import MetricsRow from '../metrics/MetricsRow'
 import WorkoutGraph from '../workout/WorkoutGraph'
+import { useWorkout } from '../../context'
 import { loadMediaInput } from '../../services/storage'
 
 /**
@@ -34,6 +35,21 @@ type Mode = 'side' | 'expanded'
 export default function LaptopRideView() {
   const [mode, setMode] = useState<Mode>('side')
   const [mediaInput, setMediaInput] = useState('')
+
+  /**
+   * The video is mounted only once a workout is RUNNING.
+   *
+   * `AppShell` keeps both views permanently mounted and hides one with CSS, so without this gate
+   * the iframe existed from page load: ~22 requests to YouTube fired before the rider had touched
+   * anything, the player buffered (and autoplays muted) behind `display: none`, and a ride would
+   * start with the video already minutes in — burning bandwidth and CPU next to the BLE pipeline
+   * the whole time.
+   *
+   * Mounting on `isRunning` rather than on visibility keeps the guarantee that matters elsewhere:
+   * the iframe is created once per ride and mode switches only change its container's classes, so
+   * expanding or shrinking never restarts playback.
+   */
+  const { isRunning } = useWorkout()
 
   // Read at mount and on change rather than at module load, so pasting a playlist in settings
   // takes effect without a reload — the same reason `useKeyBindings` listens for its event.
@@ -79,7 +95,7 @@ export default function LaptopRideView() {
           data-testid="media-column"
         >
           <div className={expanded ? 'min-h-0 flex-1' : 'shrink-0'}>
-            <MediaPanel input={mediaInput} fill={expanded} />
+            {isRunning && <MediaPanel input={mediaInput} fill={expanded} />}
           </div>
 
           {/* Graph — hidden when expanded, NEVER unmounted (see the rules above). */}
