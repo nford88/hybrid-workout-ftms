@@ -91,16 +91,25 @@ export default function LaptopRideView() {
       <div className={expanded ? 'mt-2 flex min-h-0 flex-1' : 'flex min-h-0 flex-1 gap-4'}>
         {/* Left column: video, and the graph beneath it. */}
         <div
-          className={`flex min-w-0 flex-col ${expanded ? 'w-full' : 'w-[62%] shrink-0'}`}
+          className={`flex min-h-0 min-w-0 flex-col ${expanded ? 'w-full' : 'w-[62%] shrink-0'}`}
           data-testid="media-column"
         >
-          <div className={expanded ? 'min-h-0 flex-1' : 'shrink-0'}>
-            {isRunning && <MediaPanel input={mediaInput} fill={expanded} />}
+          {/* A BOUNDED height, always — never `shrink-0` around a width-derived 16:9 box.
+              That was the overlap bug: a 16:9 video derived from a 62%-wide column is ~500px
+              tall, more than the column's height could absorb, so the content overflowed this
+              flex row and the liveness strip below drew on top of the graph. Percentages of the
+              row height cannot overflow it. */}
+          <div className={expanded ? 'min-h-0 flex-1' : 'h-[56%] shrink-0'}>
+            {isRunning && <MediaPanel input={mediaInput} />}
           </div>
 
           {/* Graph — hidden when expanded, NEVER unmounted (see the rules above). */}
+          {/* Takes the slack the video leaves — `flex-1 min-h-0` is correct HERE, because unlike
+              the video the graph genuinely can shrink (the SVG scales). `overflow-hidden` is the
+              backstop: if it ever cannot shrink far enough it clips itself rather than spilling
+              onto a sibling. */}
           <section
-            className={`hud-graph mt-3 flex flex-none flex-col rounded-xl border border-border bg-surface p-3 ${
+            className={`hud-graph mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface p-3 ${
               expanded ? 'hidden' : ''
             }`}
           >
@@ -126,8 +135,17 @@ export default function LaptopRideView() {
           </section>
         </div>
 
-        {/* Right column: the HUD heroes, stacked. Hidden when expanded. */}
-        <div className={`min-w-0 flex-1 ${expanded ? 'hidden' : ''}`}>
+        {/* Right column: the HUD heroes, stacked. Hidden when expanded.
+            `min-h-0 overflow-hidden` for the same reason as the graph — the gear numeral cannot
+            shrink, so on a short viewport this must clip itself rather than overlap the liveness
+            strip below. */}
+        {/* `flex flex-col` so RideHud's hero stack has a height to distribute — without it the
+            cards fall back to content size and clip. */}
+        <div
+          className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+            expanded ? 'hidden' : ''
+          }`}
+        >
           {/* The button goes to whichever HUD is VISIBLE. This column is only CSS-hidden, never
               unmounted, so passing it unconditionally rendered two of them — a duplicate control
               and a duplicate test id. */}
@@ -135,9 +153,10 @@ export default function LaptopRideView() {
         </div>
       </div>
 
-      {/* Liveness. Hidden when expanded — the band already carries power and cadence, and this is
-          the row most easily given up for video. `hud-metrics` tightens the shared cards. */}
-      <div className={`hud-metrics mt-3 ${expanded ? 'hidden' : ''}`}>
+      {/* Liveness — kept in BOTH modes. The video wrapper is `flex-1`, so expanding takes what is
+          left after this row rather than pushing it off; the row is a fixed cost either way.
+          `hud-metrics` tightens the shared cards for this context. */}
+      <div className="hud-metrics mt-3">
         <MetricsRow />
       </div>
     </div>

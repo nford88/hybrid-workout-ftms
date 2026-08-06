@@ -202,17 +202,16 @@ export default function RideHud({ variant = 'full', modeToggle }: Props) {
       </div>
 
       {/* ── Row 2: gear + current step ──────────────────────────────────── */}
-      {/* Natural height, and deliberately NOT `flex-1 min-h-0`: that let the grid shrink below
-          its content, and the gear number does not shrink, so the graph overlapped it. Rows are
-          sized to add up to less than the viewport instead of fighting over it. */}
-      <div
-        className={`mb-3 grid gap-4 ${
-          variant === 'column' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[38fr_62fr]'
-        }`}
-      >
-        {/* Gear — the single largest thing on screen. It is what the rider acts on, and the
-            only place it is shown at all. */}
-        <div className="flex flex-col justify-center rounded-xl border border-border bg-surface p-4 text-center">
+      {/* DISTRIBUTES the available height rather than sizing to content.
+          `grid-cols-1` with natural rows could not resize: the two cards took whatever their
+          content wanted, overflowed the fixed-height column, and got clipped by its
+          `overflow-hidden` — losing the bottom of the step card. As a flex column with two
+          `flex-1` children they split whatever height the column has, and the numerals inside are
+          `min(vw, vh)`-bounded so they shrink with it instead of forcing an overflow. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        {/* Gear — the largest thing on screen. It is what the rider acts on, and the only place
+            it is shown at all. */}
+        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-xl border border-border bg-surface p-3 text-center">
           <h3 className="text-hud-label font-semibold uppercase tracking-wider text-hud-muted">
             Gear
           </h3>
@@ -247,7 +246,7 @@ export default function RideHud({ variant = 'full', modeToggle }: Props) {
         </div>
 
         {/* Current step — what is being asked for, and how much of it is left. */}
-        <div className="flex flex-col justify-center rounded-xl border border-border bg-surface p-4">
+        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-xl border border-border bg-surface p-3">
           <div className="mb-2 flex items-center gap-3">
             {step.kind && (
               <span
