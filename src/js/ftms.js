@@ -89,7 +89,7 @@ class FTMSClient extends Emitter {
     this._cpQueueDepth = 0
   }
 
-  async connect({ nameHint, log } = {}) {
+  async connect({ nameHint, log, zwiftProbe = false } = {}) {
     // If log is provided, use it (either as function or boolean for console logging)
     if (typeof log === 'function') {
       this._log = log
@@ -143,7 +143,62 @@ class FTMSClient extends Emitter {
       /* noop */
     }
 
-    // Optional Zwift service (not required)
+    /**
+     * Zwift service on the TRAINER — OFF by default, and that is the fix for the Click dying.
+     *
+     * The KICKR and the Zwift Click expose BYTE-IDENTICAL service and characteristic UUIDs:
+     *
+     *   service   00000001-19ca-4651-86e5-fa29dcdd09d1
+     *   0002      notify    — trainer "RidingData"  /  Click ASYNC (button frames)
+     *   0003      write     — trainer CP            /  Click SYNC RX (handshake)
+     *   0004      indicate  — trainer "SyncTX"      /  Click SYNC TX (handshake reply)
+     *
+     * We were subscribing to 0002 and 0004 on the trainer — the exact two characteristics the
+     * Click delivers buttons on. Confirmed on hardware 2026-08-06: the Click works, the trainer
+     * connects, and the Click goes silent that instant, with no disconnect event and no further
+     * frames. Every button worked right up to `--- Starting Bluetooth Trainer Connection ---`.
+     *
+     * These subscriptions were never load-bearing: `zwiftRD` and `zwiftSync` only ever logged hex
+     * for the protocol-capture work in experiments/13-16, and `zwiftCP` is never written to at all.
+     * So the default path drops them entirely and the capture capability stays available via the
+     * flag, which is the only thing that ever wanted them.
+     *
+     * Set `window.FTMS_ZWIFT_PROBE = true` (or pass `zwiftProbe: true`) before connecting to
+     * restore the old behaviour — but expect the Click to stop working while it is on.
+     */
+    await this._discoverZwiftService(
+      zwiftProbe || (typeof window !== 'undefined' && window.FTMS_ZWIFT_PROBE === true)
+    )
+
+    // Subscribe
+    await this._subscribeAll()
+    this._log('[BT] Connected & subscribed.')
+    this.emit('connected', { name: this.device.name, id: this.device.id })
+  }
+
+  async disconnect() {
+    try {
+      if (this._pendingAck?.reject) {
+        this._pendingAck.reject(new Error('Disconnected'))
+        this._clearPendingAck()
+      }
+      if (this.device?.gatt.connected) this.device.gatt.disconnect()
+    } finally {
+      this.device = null
+      this.server = null
+      this.chars = {}
+    }
+  }
+
+  async _discoverZwiftService(want) {
+    if (!want) {
+      this._log(
+        'Skipping the trainer\u2019s Zwift service: it shares UUIDs with the Zwift Click, and ' +
+          'subscribing to them kills the Click. Set window.FTMS_ZWIFT_PROBE = true to re-enable.'
+      )
+      return
+    }
+    this._log('WARNING: Zwift probe ON \u2014 the Zwift Click will stop sending buttons.')
     try {
       const zw = await this.server.getPrimaryService(UUID.ZWIFT_SERVICE)
       try {
@@ -163,25 +218,6 @@ class FTMSClient extends Emitter {
       }
     } catch (_e) {
       /* noop */
-    }
-
-    // Subscribe
-    await this._subscribeAll()
-    this._log('[BT] Connected & subscribed.')
-    this.emit('connected', { name: this.device.name, id: this.device.id })
-  }
-
-  async disconnect() {
-    try {
-      if (this._pendingAck?.reject) {
-        this._pendingAck.reject(new Error('Disconnected'))
-        this._clearPendingAck()
-      }
-      if (this.device?.gatt.connected) this.device.gatt.disconnect()
-    } finally {
-      this.device = null
-      this.server = null
-      this.chars = {}
     }
   }
 
