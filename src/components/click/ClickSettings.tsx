@@ -243,6 +243,14 @@ export default function ClickSettings() {
           setStarvedAt(Math.round(msSinceConnect / 1000))
           logNote('clickStarved', { secondsSinceConnect: msSinceConnect / 1000 })
         },
+        // Auto-reconnect is now automatic in clickBle, so a drop is a GAP not an ending. Clearing
+        // `starvedAt` on success keeps the panel honest instead of leaving a stale warning up.
+        onReconnected: (attempt) => {
+          console.log(`[CLICK] reconnected automatically (attempt ${attempt})`)
+          setStarvedAt(null)
+          setStatus((st) => ({ ...st, connected: true }))
+          logNote('clickReconnected', { attempt })
+        },
         onDisconnected: () => {
           // Logged, loudly. On the 2026-08-05 sweep ride the Click stopped responding the
           // moment the workout started and we could not tell why afterwards, because NOTHING

@@ -37,6 +37,15 @@ export const PRIMARY_PROBE_MS = 4000
  */
 export const FRAME_STARVATION_MS = 8000
 
+/** How long to wait before reconnecting after a drop. Short: the device is usually ready at once. */
+export const RECONNECT_DELAY_MS = 600
+
+/**
+ * Cap on unattended reconnects, so a device that is off or out of range cannot spin forever.
+ * At ~78 s per link that is well over an hour of riding, which covers any protocol we run.
+ */
+export const MAX_RECONNECTS = 60
+
 export interface ClickHandlers {
   onButtons: (bitmap: number) => void
   onBattery?: (level: number) => void
@@ -48,6 +57,8 @@ export interface ClickHandlers {
    * The elapsed value is what separates a time-based cutoff from BLE contention.
    */
   onStarved?: (msSinceConnect: number) => void
+  /** Fired after an automatic reconnect succeeds, with the attempt number. */
+  onReconnected?: (attempt: number) => void
   onLog?: (message: string) => void
 }
 
@@ -94,41 +105,54 @@ export async function connectClick(handlers: ClickHandlers): Promise<ClickConnec
    * `elapsed` on every line is the discriminator: a time-based cutoff lands at the same elapsed
    * value regardless of what else happened, a contention-based one does not.
    */
-  const connectedAt = Date.now()
+  let connectedAt = Date.now()
   const elapsed = () => `${((Date.now() - connectedAt) / 1000).toFixed(1)}s`
   let lastFrameAt = Date.now()
   let starving = false
   let watchdog: ReturnType<typeof setInterval> | undefined
 
+  let closed = false // set by disconnect(), to stop the reconnect loop
+  let reconnects = 0
+  let async_: BluetoothRemoteGATTCharacteristic | undefined
+
+  /**
+   * AUTO-RECONNECT.
+   *
+   * Measured on hardware 2026-08-06: frames stop at ~70 s and the host tears the link down at
+   * 78.4 s — a supervision timeout, i.e. the device stops answering. That matches the 44-90 s drop
+   * family documented since July (H16/H28/H29) and it is NOT the secondary unit's 60.5-61.2 s hard
+   * timer. The root cause is still open, and one remaining candidate is closed to us entirely:
+   * Zwift subscribes with CCCD 0x0003 (notify AND indicate) on 0002/0004, which Web Bluetooth
+   * cannot express — `startNotifications()` picks one from the characteristic's properties.
+   *
+   * So rather than block on the cause, reconnect. `requestDevice` needs a user gesture but
+   * `device.gatt.connect()` on an ALREADY-PERMITTED device does not, so this can run unattended
+   * mid-ride. A 27-minute protocol becomes usable with brief gaps instead of dying at 78 s.
+   */
   const onGattDisconnected = () => {
     if (probe) clearTimeout(probe)
     if (watchdog) clearInterval(watchdog)
     log(`GATT disconnected after ${elapsed()}`)
     handlers.onDisconnected?.()
+    if (closed) return
+    if (reconnects >= MAX_RECONNECTS) {
+      log(`giving up after ${MAX_RECONNECTS} reconnects — press Reconnect to try again`)
+      return
+    }
+    reconnects += 1
+    const attempt = reconnects
+    setTimeout(() => {
+      if (closed) return
+      log(`reconnect attempt ${attempt}/${MAX_RECONNECTS}…`)
+      attach()
+        .then(() => {
+          log(`reconnected on attempt ${attempt}`)
+          handlers.onReconnected?.(attempt)
+        })
+        .catch((e) => log(`reconnect ${attempt} failed: ${e?.message ?? e}`))
+    }, RECONNECT_DELAY_MS)
   }
   device.addEventListener('gattserverdisconnected', onGattDisconnected)
-
-  const server = await device.gatt!.connect()
-  log(`connected to ${device.name ?? 'Zwift Click'}`)
-
-  // Probe the new service first, then the legacy one.
-  let service: BluetoothRemoteGATTService | undefined
-  for (const uuid of [ZWIFT_SVC_FC82, ZWIFT_SVC_LEGACY] as const) {
-    try {
-      service = await server.getPrimaryService(uuid)
-      break
-    } catch {
-      /* try the next */
-    }
-  }
-  if (!service) {
-    device.gatt?.disconnect()
-    throw new Error('No Zwift service on this device — is it a Click?')
-  }
-
-  const async_ = await service.getCharacteristic(ZAP_ASYNC)
-  const syncTx = await service.getCharacteristic(ZAP_SYNC_TX)
-  const syncRx = await service.getCharacteristic(ZAP_SYNC_RX)
 
   const onAsync = (e: Event) => {
     const ch = e.target as BluetoothRemoteGATTCharacteristic
@@ -145,46 +169,88 @@ export async function connectClick(handlers: ClickHandlers): Promise<ClickConnec
     else if (frame.type === 'battery') handlers.onBattery?.(frame.level)
   }
 
-  // SUBSCRIBE BEFORE THE HANDSHAKE — the reply lands on SYNC TX as an indication, and a
-  // subscription made afterwards misses it.
-  async_.addEventListener('characteristicvaluechanged', onAsync)
-  await async_.startNotifications()
-  await syncTx.startNotifications()
-  log('subscribed to ASYNC + SYNC TX')
+  /**
+   * Connect, discover, subscribe, handshake. Re-runnable, because a reconnect must redo ALL of it:
+   * a fresh GATT link invalidates the old characteristic objects and their subscriptions.
+   */
+  async function attach(): Promise<void> {
+    const server = await device.gatt!.connect()
+    log(`connected to ${device.name ?? 'Zwift Click'}`)
 
-  await syncRx.writeValueWithoutResponse(RIDE_ON)
-  log('handshake written (RideOn 02 03)')
+    // Probe the new service first, then the legacy one.
+    let service: BluetoothRemoteGATTService | undefined
+    for (const uuid of [ZWIFT_SVC_FC82, ZWIFT_SVC_LEGACY] as const) {
+      try {
+        service = await server.getPrimaryService(uuid)
+        break
+      } catch {
+        /* try the next */
+      }
+    }
+    if (!service) {
+      device.gatt?.disconnect()
+      throw new Error('No Zwift service on this device — is it a Click?')
+    }
+
+    async_ = await service.getCharacteristic(ZAP_ASYNC)
+    const syncTx = await service.getCharacteristic(ZAP_SYNC_TX)
+    const syncRx = await service.getCharacteristic(ZAP_SYNC_RX)
+
+    // SUBSCRIBE BEFORE THE HANDSHAKE — the reply lands on SYNC TX as an indication, and a
+    // subscription made afterwards misses it.
+    async_.addEventListener('characteristicvaluechanged', onAsync)
+    await async_.startNotifications()
+    await syncTx.startNotifications()
+    log('subscribed to ASYNC + SYNC TX')
+
+    await syncRx.writeValueWithoutResponse(RIDE_ON)
+    log('handshake written (RideOn 02 03)')
+
+    // Reset the liveness clocks so the watchdog measures THIS link, not the previous one.
+    connectedAt = Date.now()
+    lastFrameAt = Date.now()
+    starving = false
+    sawFrame = false
+    startTimers()
+  }
+
+  await attach()
 
   // Silence here means the secondary unit. Surfacing it in seconds beats letting the user
   // discover it when the link dies a minute later.
-  probe = setTimeout(() => {
-    if (!sawFrame) {
-      log('no frames after handshake — this is the pair’s secondary unit')
-      handlers.onSilent?.()
-    }
-  }, PRIMARY_PROBE_MS)
+  function startTimers() {
+    if (probe) clearTimeout(probe)
+    if (watchdog) clearInterval(watchdog)
+    probe = setTimeout(() => {
+      if (!sawFrame) {
+        log('no frames after handshake — this is the pair’s secondary unit')
+        handlers.onSilent?.()
+      }
+    }, PRIMARY_PROBE_MS)
 
-  // The primary streams battery every ~5 s even when nothing is pressed, so a gap this long means
-  // the device has stopped talking rather than the rider having stopped pressing.
-  watchdog = setInterval(() => {
-    const quiet = Date.now() - lastFrameAt
-    if (!starving && sawFrame && quiet > FRAME_STARVATION_MS) {
-      starving = true
-      log(
-        `NO FRAMES for ${(quiet / 1000).toFixed(1)}s (link still connected, elapsed ${elapsed()}) ` +
-          `— the device has gone quiet without disconnecting`
-      )
-      handlers.onStarved?.(Date.now() - connectedAt)
-    }
-  }, 1000)
+    // The primary streams battery every ~5 s even when nothing is pressed, so a gap this long means
+    // the device has stopped talking rather than the rider having stopped pressing.
+    watchdog = setInterval(() => {
+      const quiet = Date.now() - lastFrameAt
+      if (!starving && sawFrame && quiet > FRAME_STARVATION_MS) {
+        starving = true
+        log(
+          `NO FRAMES for ${(quiet / 1000).toFixed(1)}s (link still connected, elapsed ${elapsed()}) ` +
+            `— the device has gone quiet without disconnecting`
+        )
+        handlers.onStarved?.(Date.now() - connectedAt)
+      }
+    }, 1000)
+  }
 
   return {
     deviceId: device.id,
     deviceName: device.name ?? 'Zwift Click',
     disconnect() {
+      closed = true
       if (probe) clearTimeout(probe)
       if (watchdog) clearInterval(watchdog)
-      async_.removeEventListener('characteristicvaluechanged', onAsync)
+      async_?.removeEventListener('characteristicvaluechanged', onAsync)
       device.removeEventListener('gattserverdisconnected', onGattDisconnected)
       device.gatt?.disconnect()
     },
