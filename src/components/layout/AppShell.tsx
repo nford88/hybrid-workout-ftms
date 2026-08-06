@@ -4,6 +4,7 @@ import ActiveView from '../views/ActiveView'
 import ConnectionPanel from '../trainer/ConnectionPanel'
 import { useKeyboardActions } from '../../hooks/useKeyboardActions'
 import { useFullscreen } from '../../hooks/useFullscreen'
+import { useWakeLock } from '../../hooks/useWakeLock'
 
 // main.js dispatches these events when workout starts/ends
 const WORKOUT_STARTED = 'workoutStarted'
@@ -21,6 +22,9 @@ export default function AppShell({ buildVersion }: Props) {
   useKeyboardActions()
 
   const { isFullscreen, supported: fullscreenSupported, toggle: toggleFullscreen } = useFullscreen()
+
+  // Held only while a workout runs, so the laptop is not kept awake indefinitely afterwards.
+  const wakeLock = useWakeLock(isActive)
 
   useEffect(() => {
     const onStart = () => setIsActive(true)
@@ -91,7 +95,21 @@ export default function AppShell({ buildVersion }: Props) {
           <ActiveView />
         </div>
 
-        <footer className="text-center text-xs text-gray-600 py-4 mt-4">
+        {/* A wake lock that silently failed is indistinguishable from one that worked until the
+            screen goes black mid-ride, so say so while there is still time to nudge the trackpad
+            or change a system setting. */}
+        {isActive && !wakeLock.active && (
+          <div className="mt-2 text-center text-xs text-amber-400">
+            <span aria-hidden="true">▲</span>{' '}
+            {wakeLock.supported
+              ? `Screen may sleep mid-ride — wake lock not held${
+                  wakeLock.error ? ` (${wakeLock.error})` : ''
+                }`
+              : 'Screen may sleep mid-ride — this browser has no wake lock'}
+          </div>
+        )}
+
+        <footer className={`text-center text-xs text-gray-600 ${isActive ? 'py-1' : 'py-4 mt-4'}`}>
           Build: {buildVersion}
         </footer>
       </div>

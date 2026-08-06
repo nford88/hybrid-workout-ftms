@@ -360,7 +360,7 @@ laptop on a desk directly in front of the trainer.
 | T1 | Fix the dead Tailwind config; breakpoints in `@theme` | DONE `51df698` — config file deleted so it cannot mislead again |
 | T2 | Fix the `xs:` fallout at `main.js:284` | DONE `51df698` — fixed by T1 |
 | T3 | Disconnect wiring (§1.3 item 1) | DONE `51df698` |
-| T4 | Wake lock on workout start | **still open** |
+| T4 | Wake lock on workout start | DONE — released on end, re-acquired on `visibilitychange`, and failures are shown rather than swallowed |
 | T5 | Fluid type scale — `clamp()` tokens set from **viewing distance** | DONE `51df698`; hero retuned 17vw → 15vw for vertical fit |
 | T6 | `RideHud` — status strip + gear/step hero pair | DONE, plus `describeCurrentStep` in `workoutService` (pure, 13 tests) |
 | T7 | `LaptopRideView` — the §2.4 four-row layout | DONE; `MetricsRow` reused as row 4, `WorkoutProgress` deleted as redundant |
