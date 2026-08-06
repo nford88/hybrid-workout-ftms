@@ -4,6 +4,12 @@ import { buildEmbedUrl, parseYouTubeTarget } from '../../services/youtube'
 interface Props {
   /** Whatever the rider pasted — a URL or a bare ID. Parsed here, not stored parsed. */
   input: string
+  /**
+   * When true, fill the available height (expanded mode). When false, size from the container's
+   * WIDTH at 16:9 — which is what the side-by-side column needs, since its height is shared with
+   * the graph below it.
+   */
+  fill?: boolean
 }
 
 /**
@@ -22,13 +28,13 @@ interface Props {
  * laptop has a trackpad, and it avoids the global-singleton-plus-global-ready-callback problem that
  * React 19's double-mount creates. The API arrives when the Click drives playback (plan §4.2).
  */
-export default function MediaPanel({ input }: Props) {
+export default function MediaPanel({ input, fill = false }: Props) {
   const target = useMemo(() => parseYouTubeTarget(input), [input])
   const src = useMemo(() => (target ? buildEmbedUrl(target) : null), [target])
 
   if (!input.trim()) {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-xl border border-border bg-surface p-6 text-center text-hud-sub text-hud-muted">
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-border bg-surface p-6 text-center text-hud-sub text-hud-muted">
         No ride video configured — paste a YouTube playlist or video URL in the Zwift Click panel.
       </div>
     )
@@ -38,7 +44,7 @@ export default function MediaPanel({ input }: Props) {
     // Says WHAT was rejected. "Invalid URL" with the offending value hidden is the kind of error
     // that gets rediscovered every few months.
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border border-red-800 bg-red-950/40 p-6 text-center">
+      <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-red-800 bg-red-950/40 p-6 text-center">
         <div className="text-hud-sub font-semibold text-red-300">
           <span aria-hidden="true">▲</span> Not a YouTube URL or ID
         </div>
@@ -48,10 +54,14 @@ export default function MediaPanel({ input }: Props) {
   }
 
   return (
-    // Constrained to 16:9 and centred, rather than filled. Filling a wider-than-16:9 container
-    // makes YouTube pillarbox INSIDE the iframe, so the black bars sit inside our rounded border
-    // and the frame no longer hugs the picture.
-    <div className="mx-auto aspect-video h-full max-h-full overflow-hidden rounded-xl border border-border bg-black">
+    // Always 16:9, never stretched to fill an arbitrary box: filling a wider-than-16:9 container
+    // makes YouTube pillarbox INSIDE the iframe, so black bars end up inside our own border.
+    // Expanded mode drives the ratio from the available HEIGHT, side-by-side from the WIDTH.
+    <div
+      className={`aspect-video overflow-hidden rounded-xl border border-border bg-black ${
+        fill ? 'mx-auto h-full max-h-full' : 'w-full'
+      }`}
+    >
       <iframe
         // A stable key: React must not be tempted to remount this on a re-render.
         key="ride-media"

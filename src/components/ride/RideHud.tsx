@@ -36,12 +36,14 @@ function StatusDot({ label, on }: { label: string; on: boolean }) {
 
 interface Props {
   /**
-   * `full` — the four-row HUD, the whole screen.
-   * `band` — one compressed strip above a full-width video (cinema mode). A 16:9 video at
-   * 1470px wide is 827px tall, leaving about 130px, so the band is a genuine budget rather than
-   * a styling choice: the gear numeral alone is 227px in `full`.
+   * `full`   — gear and step side by side, for the full-width HUD with no video.
+   * `column` — the same heroes stacked, for the narrow right-hand column beside a video. Needed
+   *            because `full`'s two-column grid keys off a VIEWPORT breakpoint, so it would stay
+   *            two-up inside a 560px column.
+   * `band`   — one compressed strip above an expanded video. A genuine budget, not a style: the
+   *            gear numeral is 220px in `full` and the whole band has to fit ~110px.
    */
-  variant?: 'full' | 'band'
+  variant?: 'full' | 'column' | 'band'
   /**
    * Rendered inline in the status strip / band rather than on a row of its own — a dedicated row
    * for one small button cost ~40px of the vertical budget.
@@ -201,9 +203,13 @@ export default function RideHud({ variant = 'full', modeToggle }: Props) {
 
       {/* ── Row 2: gear + current step ──────────────────────────────────── */}
       {/* Natural height, and deliberately NOT `flex-1 min-h-0`: that let the grid shrink below
-          its content, and the gear number does not shrink, so the graph overlapped it. Rows 1-4
-          are sized to add up to less than the viewport instead of fighting over it. */}
-      <div className="mb-3 grid grid-cols-1 gap-4 lg:grid-cols-[38fr_62fr]">
+          its content, and the gear number does not shrink, so the graph overlapped it. Rows are
+          sized to add up to less than the viewport instead of fighting over it. */}
+      <div
+        className={`mb-3 grid gap-4 ${
+          variant === 'column' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[38fr_62fr]'
+        }`}
+      >
         {/* Gear — the single largest thing on screen. It is what the rider acts on, and the
             only place it is shown at all. */}
         <div className="flex flex-col justify-center rounded-xl border border-border bg-surface p-4 text-center">

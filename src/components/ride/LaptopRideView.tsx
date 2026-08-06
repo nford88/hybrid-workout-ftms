@@ -8,10 +8,12 @@ import { loadMediaInput } from '../../services/storage'
 /**
  * The ride screen, laid out for a laptop read at ~1.2 m while riding.
  *
- * Two modes, one layout:
+ * Two modes:
  *
- * - **hud** — four rows: status, gear + step heroes, the graph at real height, liveness.
- * - **cinema** — the HUD compressed to a ~130px band above a full-width video.
+ * - **side** (default) — video and graph in a left column, gear + step heroes stacked in a right
+ *   column, liveness across the bottom. Both readable at once.
+ * - **expanded** — the video takes the screen and the HUD compresses to a ~110px band, with the
+ *   graph and liveness row hidden. Driven by the "Expand video" button.
  *
  * THREE STRUCTURAL RULES, all learned the hard way:
  *
@@ -19,18 +21,18 @@ import { loadMediaInput } from '../../services/storage'
  *   holds must exist exactly once and must never unmount. That covers `#workout-graph` and its
  *   child groups, `#workout-progress-text` and `#target-display`. Re-mounting them leaves main.js
  *   writing to a detached node and the graph silently stops updating — which reads as a physics
- *   bug, not a React one. In cinema mode the graph is therefore HIDDEN, never removed.
- * - The media iframe is mounted once for the whole ride and only its container resizes. Swapping
- *   it out on a mode change restarts playback from the beginning.
+ *   bug, not a React one. When expanded the graph is therefore HIDDEN, never removed.
+ * - The media iframe is mounted once and only its container resizes, so switching modes does not
+ *   restart playback. This is why `MediaPanel` sits outside the mode branches.
  * - Rows are sized to add up to less than the viewport rather than to fight over it. `flex-1` plus
- *   `min-h-0` on a row whose content cannot shrink (a 227px numeral) makes it overlap its
+ *   `min-h-0` on a row whose content cannot shrink (a 220px numeral) makes it overlap its
  *   neighbour instead of shrinking.
  */
 
-type Mode = 'hud' | 'cinema'
+type Mode = 'side' | 'expanded'
 
 export default function LaptopRideView() {
-  const [mode, setMode] = useState<Mode>('hud')
+  const [mode, setMode] = useState<Mode>('side')
   const [mediaInput, setMediaInput] = useState('')
 
   // Read at mount and on change rather than at module load, so pasting a playlist in settings
@@ -46,69 +48,80 @@ export default function LaptopRideView() {
     }
   }, [])
 
-  const cinema = mode === 'cinema'
+  const expanded = mode === 'expanded'
+
+  const expandButton = (
+    <button
+      type="button"
+      data-testid="video-expand"
+      onClick={() => setMode(expanded ? 'side' : 'expanded')}
+      aria-pressed={expanded}
+      title={expanded ? 'Shrink the video back beside the HUD' : 'Expand the video, hide the rest'}
+      className="ml-3 shrink-0 rounded border border-border bg-surface-elevated px-2 py-0.5 text-xs text-gray-400 transition-colors hover:border-cyan-600 hover:text-white"
+    >
+      <span aria-hidden="true">{expanded ? '⤡' : '⤢'}</span>{' '}
+      {expanded ? 'Shrink video' : 'Expand video'}
+    </button>
+  )
 
   return (
     <div
       data-testid="ride-view"
-      className="flex h-[calc(100vh-6.5rem)] min-h-120 flex-col justify-start overflow-hidden"
+      className="flex h-[calc(100vh-5rem)] min-h-120 flex-col justify-start overflow-hidden"
     >
-      <RideHud
-        variant={cinema ? 'band' : 'full'}
-        modeToggle={
-          <button
-            type="button"
-            data-testid="mode-toggle"
-            onClick={() => setMode(cinema ? 'hud' : 'cinema')}
-            aria-pressed={cinema}
-            className="ml-3 shrink-0 rounded border border-border bg-surface-elevated px-2 py-0.5 text-xs text-gray-400 transition-colors hover:border-cyan-600 hover:text-white"
-          >
-            {cinema ? 'HUD' : 'Cinema'}
-          </button>
-        }
-      />
+      {/* The band, only when expanded — it replaces the right-hand column's status strip. */}
+      {expanded && <RideHud variant="band" modeToggle={expandButton} />}
 
-      {/* Video. Mounted only in cinema mode — but note the iframe inside is never swapped once
-          present, so switching back and forth within a ride does restart it. Accepted for now:
-          keeping it alive in HUD mode would mean a hidden 1470px iframe decoding video for no
-          reason, which is the bigger cost on a laptop running a BLE pipeline. */}
-      {cinema && (
-        <section className="mt-2 min-h-0 flex-1">
-          <MediaPanel input={mediaInput} />
-        </section>
-      )}
-
-      {/* Graph — hidden in cinema mode, NEVER unmounted (see the rules above). */}
-      <section
-        className={`hud-graph mb-3 flex flex-none flex-col rounded-xl border border-border bg-surface p-3 ${
-          cinema ? 'hidden' : ''
-        }`}
-      >
-        {/* Both legacy-bound readouts share the title row rather than bracketing the chart: a
-            separate line under the graph cost ~30px, and the rows have to add up to less than one
-            screen. `#target-display` arrives already prefixed with "Target:", so it gets no label
-            of its own. Kept even though the hero derives its own target in React — if the two ever
-            disagree, that disagreement is the bug worth seeing. */}
-        <div className="mb-2 flex items-baseline justify-between gap-4">
-          <h2 className="text-hud-label font-semibold uppercase tracking-wider text-hud-muted">
-            Workout
-          </h2>
-          <div className="flex items-baseline gap-4">
-            <span id="target-display" className="text-hud-label text-hud-muted">
-              —
-            </span>
-            <span id="workout-progress-text" className="text-hud-sub text-gray-300">
-              Ready to start workout
-            </span>
+      <div className={expanded ? 'mt-2 flex min-h-0 flex-1' : 'flex min-h-0 flex-1 gap-4'}>
+        {/* Left column: video, and the graph beneath it. */}
+        <div
+          className={`flex min-w-0 flex-col ${expanded ? 'w-full' : 'w-[62%] shrink-0'}`}
+          data-testid="media-column"
+        >
+          <div className={expanded ? 'min-h-0 flex-1' : 'shrink-0'}>
+            <MediaPanel input={mediaInput} fill={expanded} />
           </div>
+
+          {/* Graph — hidden when expanded, NEVER unmounted (see the rules above). */}
+          <section
+            className={`hud-graph mt-3 flex flex-none flex-col rounded-xl border border-border bg-surface p-3 ${
+              expanded ? 'hidden' : ''
+            }`}
+          >
+            {/* Both legacy-bound readouts share the title row rather than bracketing the chart.
+                `#target-display` arrives already prefixed with "Target:", so it gets no label of
+                its own. Kept even though the hero derives its own target in React — if the two ever
+                disagree, that disagreement is the bug worth seeing. */}
+            <div className="mb-2 flex items-baseline justify-between gap-4">
+              <h2 className="text-hud-label font-semibold uppercase tracking-wider text-hud-muted">
+                Workout
+              </h2>
+              <div className="flex items-baseline gap-4">
+                <span id="target-display" className="text-hud-label text-hud-muted">
+                  —
+                </span>
+                <span id="workout-progress-text" className="text-hud-sub text-gray-300">
+                  Ready to start workout
+                </span>
+              </div>
+            </div>
+
+            <WorkoutGraph />
+          </section>
         </div>
 
-        <WorkoutGraph />
-      </section>
+        {/* Right column: the HUD heroes, stacked. Hidden when expanded. */}
+        <div className={`min-w-0 flex-1 ${expanded ? 'hidden' : ''}`}>
+          {/* The button goes to whichever HUD is VISIBLE. This column is only CSS-hidden, never
+              unmounted, so passing it unconditionally rendered two of them — a duplicate control
+              and a duplicate test id. */}
+          <RideHud variant="column" modeToggle={expanded ? undefined : expandButton} />
+        </div>
+      </div>
 
-      {/* Liveness. Hidden in cinema mode — the band already carries power and cadence, and this is
+      {/* Liveness. Hidden when expanded — the band already carries power and cadence, and this is
           the row most easily given up for video. `hud-metrics` tightens the shared cards. */}
-      <div className={`hud-metrics ${cinema ? 'hidden' : ''}`}>
+      <div className={`hud-metrics mt-3 ${expanded ? 'hidden' : ''}`}>
         <MetricsRow />
       </div>
     </div>
