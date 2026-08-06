@@ -123,8 +123,20 @@
       phase = null
       return
     }
-    simStepSeen += 1
-    phase = PHASES[Math.min(simStepSeen, PHASES.length) - 1]
+    // Phase is derived from the step's POSITION IN THE PLAN, not from a counter.
+    //
+    // `simStepSeen += 1` was wrong and cost a 34-minute ride on 2026-08-06: it survives across
+    // workout restarts within a single paste, so a Start → abort → Start sequence advanced the
+    // counter past the Crr phase and ran Cw twice. The whole Crr arm was lost and nobody could tell
+    // from the HUD, because the label was consistent with what it had (wrongly) decided.
+    //
+    // Counting SIM steps before `idx` is stateless: the same step index always yields the same
+    // phase, no matter how many times the workout is started.
+    const simOrdinal = H.state.workoutPlan
+      .slice(0, idx)
+      .filter((s) => s && s.type === 'sim').length
+    simStepSeen = simOrdinal + 1
+    phase = PHASES[Math.min(simOrdinal, PHASES.length - 1)]
     toggleIndex = 0
     sideIsB = false
     nextToggleAt = Date.now() + TOGGLE_MS
@@ -190,6 +202,9 @@
   render()
   window.__auto18 = {
     onStep,
+    // Exposed so a DRY RUN can assert which phase a given step selects, without riding.
+    // The 2026-08-06 ride lost its Crr arm to a bug that one headless pass would have caught.
+    phaseName: () => phase?.name ?? null,
     PHASES,
     stop() {
       window.removeEventListener('workoutStepChanged', onStep)
