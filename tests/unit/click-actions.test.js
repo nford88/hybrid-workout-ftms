@@ -20,7 +20,9 @@ import { getVirtualGear, resetVirtualGear, setGearIndex } from '../../src/servic
 function fakeHybrid({ isRunning = false } = {}) {
   const calls = []
   window.Hybrid = {
-    state: { workout: { currentGrade: 4.2, isRunning } },
+    // currentRouteGrade, NOT currentGrade: the latter is simPhysics' ramp accumulator.
+    // A shift must re-send the road it is on, not the smoothing internals.
+    state: { workout: { currentRouteGrade: 4.2, currentGrade: 99, isRunning } },
     sim: { setSimGrade: (g, o) => calls.push(['setSimGrade', g, o]) },
     workout: {
       startWorkout: () => calls.push(['startWorkout']),

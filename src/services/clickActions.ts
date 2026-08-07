@@ -16,7 +16,7 @@ import { shiftUp, shiftDown, getVirtualGear } from './virtualGearState'
 import { logGear } from './rideLog'
 
 interface LegacyBridge {
-  state?: { workout?: { currentGrade?: number; isRunning?: boolean } }
+  state?: { workout?: { currentRouteGrade?: number; isRunning?: boolean } }
   sim?: { setSimGrade?: (grade: number, opts?: { forceUpdate?: boolean }) => void }
   workout?: { startWorkout?: () => void; skipStep?: () => void; endWorkout?: () => void }
 }
@@ -31,7 +31,7 @@ function hybrid(): LegacyBridge | undefined {
  */
 function applyShiftNow(): void {
   const H = hybrid()
-  const grade = H?.state?.workout?.currentGrade
+  const grade = H?.state?.workout?.currentRouteGrade
   if (typeof grade === 'number' && H?.sim?.setSimGrade) {
     H.sim.setSimGrade(grade, { forceUpdate: true })
   }

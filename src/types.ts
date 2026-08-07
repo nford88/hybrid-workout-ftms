@@ -43,7 +43,13 @@ export interface WorkoutState {
   stepSimDistance: number
   simDistanceTraveled: number
   routeCompleted: boolean
+  /** simPhysics' ramp accumulator — the smoothed grade it has ramped to. Owned by
+   * calculateRealisticGrade; do NOT overwrite it with the raw route grade. */
   currentGrade?: number
+  /** The raw route grade we are currently on, for callers that re-send "the grade we are on"
+   * (a gear shift, forceSimGradeUpdate). Kept separate from currentGrade because sharing one
+   * field made each writer destroy the other's meaning. */
+  currentRouteGrade?: number
   targetGrade?: number
   lastGradeUpdate?: number
   lastGradeDistance?: number

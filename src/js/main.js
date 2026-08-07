@@ -127,7 +127,8 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       summary: null, // Store workout summary here instead of global
 
       // Enhanced SIM mode state for realistic gradients
-      currentGrade: 0, // Currently applied grade
+      currentGrade: 0, // simPhysics' ramp accumulator (owned by calculateRealisticGrade)
+      currentRouteGrade: 0, // the raw route grade, for shift re-sends
       targetGrade: 0, // Target grade from route
       lastGradeUpdate: null,
       lastGradeDistance: 0, // Track distance for gradient ramping
@@ -852,8 +853,13 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
       windMS = 0.0,
       crr = H.state.simPhysics.crr,
       cw = H.state.simPhysics.cw,
-      currentSpeed = 0,
-      currentDistance = 0,
+      // Default to LIVE telemetry, not 0. A caller that omits these — `forceSimGradeUpdate`
+      // on every gear shift did — was telling calculateRealisticGrade the bike was stationary,
+      // which zeroes the momentum factor and sends up to 33% more grade than the road warrants.
+      // On a 22.7% hill that was the difference between 7.8% and 22.7% realistic grade, purely
+      // because the rider touched a paddle.
+      currentSpeed = H.state.lastSpeedKph || 0,
+      currentDistance = H.state.workout.simDistanceTraveled || 0,
       forceUpdate = false,
     } = opts
 
@@ -918,11 +924,12 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
     // Remember the ROUTE grade we are currently on.
     //
-    // `W.currentGrade` was initialised to 0, reset to 0, and never written — so every caller
-    // that re-sends "the current grade" (a virtual-gear shift, forceSimGradeUpdate) was
-    // actually sending 0%, briefly telling the trainer the road was flat. Storing the raw
-    // route grade here is what makes a shift recompute against the hill you are really on.
-    H.state.workout.currentGrade = rawGradePct
+    // This used to be written to `W.currentGrade`, which is `calculateRealisticGrade`'s ramp
+    // ACCUMULATOR. Two owners, two meanings, one field: every non-throttled call destroyed the
+    // accumulator by resetting it to the raw grade, so the smoothing restarted at random and
+    // "Realistic" could exceed "Raw" (2026-08-07 log: `Raw: 12.0% -> Realistic: 15.9%`).
+    // The route grade lives in its own field now.
+    H.state.workout.currentRouteGrade = rawGradePct
 
     try {
       await H.ftms.setSim({
@@ -1375,6 +1382,7 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
       // Reset gradient state for smooth transitions
       W.currentGrade = 0
+      W.currentRouteGrade = 0
       W.targetGrade = 0
       W.lastGradeUpdate = Date.now()
       W.lastGradeDistance = 0
@@ -1592,7 +1600,7 @@ import { buildStepSummary, buildWorkoutSummary } from '../services/workoutServic
 
     const W = H.state.workout
     // Use the current grade that's already being applied
-    const currentGrade = W.currentGrade || 0
+    const currentGrade = W.currentRouteGrade || 0
 
     // Reapply with new gear multiplier
     await H.sim.setSimGrade(currentGrade, { forceUpdate: true })

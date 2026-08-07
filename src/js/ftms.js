@@ -73,6 +73,11 @@ class FTMSClient extends Emitter {
     this.server = null
     this.chars = {}
     this._pendingAck = null // {opcode, resolve, reject, timer}
+    /**
+     * Whether we already hold FTMS control, so RequestControl is claimed once per link
+     * rather than before every payload. Cleared on disconnect and on a 0x05 rejection.
+     */
+    this._hasControl = false
     this._log = (s) => this.emit('log', s)
     /**
      * Serialises every Control Point operation.
@@ -114,6 +119,8 @@ class FTMSClient extends Emitter {
     this.device = await navigator.bluetooth.requestDevice(options)
     this.device.addEventListener('gattserverdisconnected', () => {
       this._log('[BT] Disconnected')
+      // Control does not survive the link, so a reconnect must claim it again.
+      this._hasControl = false
       this.emit('disconnected')
     })
 
@@ -187,6 +194,7 @@ class FTMSClient extends Emitter {
       this.device = null
       this.server = null
       this.chars = {}
+      this._hasControl = false
     }
   }
 
@@ -418,56 +426,37 @@ class FTMSClient extends Emitter {
   }
 
   async _writeCpAndWaitAckUnlocked(opcode, payload, timeoutMs = 4000) {
-    // Many trainers want us to own control before other ops.
-    if (opcode !== 0x00) {
-      // not REQUEST_CONTROL
+    // Claim control ONCE per link, not before every payload. Re-requesting each time doubled
+    // control-point traffic for no benefit — the trainer holds control for the whole session —
+    // and a rider shifting quickly produced "CP queue: waiting behind 3 operation(s)" pile-ups,
+    // since each shift costs a full RequestControl + SIM pair.
+    if (opcode !== 0x00 && !this._hasControl) {
       try {
         await this._requestControl(timeoutMs)
+        this._hasControl = true
       } catch (e) {
         this._log(`WARN: RequestControl failed: ${e.message}`)
       }
     }
 
-    // Clear any lingering waiter (should not happen in serialized flow)
-    if (this._pendingAck) {
-      this._pendingAck.reject?.(new Error('Replaced by new command'))
-      this._clearPendingAck()
-    }
-    // eslint-disable-next-line no-async-promise-executor
-    const p = new Promise(async (resolve, reject) => {
-      // arm waiter
-      this._pendingAck = {
-        opcode,
-        resolve: (res) => {
-          this._clearPendingAck()
-          resolve(res)
-        },
-        reject: (err) => {
-          this._clearPendingAck()
-          reject(err)
-        },
-        timer: setTimeout(() => {
-          this._clearPendingAck()
-          reject(new Error('ACK timeout'))
-        }, timeoutMs),
-      }
+    // Control CAN be revoked (trainer reset, another client). We cannot see that happen —
+    // it is signalled on Machine Status 0x2ADA, which we deliberately do not subscribe to —
+    // so recover from the rejection instead: 0x05 is "Control Not Permitted".
+    if (opcode !== 0x00) {
       try {
-        // Prefer writeValue; fall back if it throws (like trainer_debug.html)
-        await this.chars.cp.writeValue(payload)
+        return await this._writeCpAndWaitAckDirect(opcode, payload, timeoutMs)
       } catch (e) {
-        try {
-          this._log(`writeValue failed (${e.message}), trying writeValueWithoutResponse…`)
-          await this.chars.cp.writeValueWithoutResponse(payload)
-        } catch (e2) {
-          this._clearPendingAck()
-          reject(e2)
-        }
+        if (!/FTMS result 0x05/.test(e.message)) throw e
+        this._log('control was revoked (0x05) — re-requesting, then retrying once')
+        this._hasControl = false
+        await this._requestControl(timeoutMs)
+        this._hasControl = true
+        return await this._writeCpAndWaitAckDirect(opcode, payload, timeoutMs)
       }
-    })
-    const res = await p // res = result code byte
-    this.emit('ack', { forOpcode: opcode, result: res })
-    if (res !== 0x01) throw new Error(`FTMS result 0x${res.toString(16).padStart(2, '0')}`)
-    return res
+    }
+
+    // opcode 0x00 only: the write itself is identical, so there is one copy of it.
+    return this._writeCpAndWaitAckDirect(opcode, payload, timeoutMs)
   }
 
   _clearPendingAck() {

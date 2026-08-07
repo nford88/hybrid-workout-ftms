@@ -63,9 +63,10 @@ describe('FTMS control point serialisation', () => {
       client.setSim({ gradePct: 2 }),
       client.setSim({ gradePct: 3 }),
     ])
-    // Each setSim is RequestControl (0x00) then Sim Params (0x11).
+    // Every payload arrives — that is what this test is for.
     expect(order.filter((op) => op === 0x11)).toHaveLength(3)
-    expect(order.filter((op) => op === 0x00)).toHaveLength(3)
+    // Control is claimed once per link, not once per payload. See ftms-control-claim.test.js.
+    expect(order.filter((op) => op === 0x00)).toHaveLength(1)
   })
 
   test('operations run in the order they were requested', async () => {

@@ -44,6 +44,39 @@ describe('calculateRealisticGrade', () => {
     expect(highResult).toBeLessThan(lowResult)
   })
 
+  /**
+   * Regression guard for the gear-shift path. `forceSimGradeUpdate` called `setSimGrade`
+   * without `currentSpeed`, which defaulted to 0 — so every shift told this function the bike
+   * was stationary, zeroing the momentum factor. The 2026-08-07 workout log shows the same
+   * 22.7% hill sent as 0.49% on the timer path (speed 16.7 kph) and 4.90% on a shift, seconds
+   * apart. `setSimGrade` now defaults both to live telemetry.
+   */
+  test('a stationary reading loses momentum assistance entirely — 33% more grade', () => {
+    const movingState = makeGradeState()
+    calculateRealisticGrade(8, 20, 0, movingState, 0)
+    const moving = calculateRealisticGrade(8, 20, 10, movingState, 1000)
+
+    const stoppedState = makeGradeState()
+    calculateRealisticGrade(8, 0, 0, stoppedState, 0)
+    const stopped = calculateRealisticGrade(8, 0, 10, stoppedState, 1000)
+
+    // Above 12 kph the reduction saturates at 25%, so speed 0 sends 1/0.75 = 1.333x as much.
+    expect(stopped).toBeGreaterThan(moving)
+    expect(stopped / moving).toBeCloseTo(1 / 0.75, 5)
+  })
+
+  test('momentum assistance saturates at 12 kph, so it cannot keep growing with speed', () => {
+    const at12 = makeGradeState()
+    calculateRealisticGrade(8, 12, 0, at12, 0)
+    const twelve = calculateRealisticGrade(8, 12, 10, at12, 1000)
+
+    const at50 = makeGradeState()
+    calculateRealisticGrade(8, 50, 0, at50, 0)
+    const fifty = calculateRealisticGrade(8, 50, 10, at50, 1000)
+
+    expect(fifty).toBeCloseTo(twelve, 10)
+  })
+
   test('clamps negative grade to -2% floor', () => {
     const state = makeGradeState()
     calculateRealisticGrade(0, 10, 0, state, 0)
