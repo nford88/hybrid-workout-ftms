@@ -231,6 +231,52 @@ SCENARIOS: dict[str, dict] = {
             ("Leave it alone — we are timing how long the connection survives", 180),
         ],
     },
+    "authorise": {
+        "title": "★ Phase 2 — authorise the Click from Zwift's pairing screen",
+        "question": (
+            "Is the 21-byte FF 04 body a static per-device token (replayable) or "
+            "derived from the ephemeral FF 03 challenge (not replayable)?"
+        ),
+        "prediction": (
+            "On the LEFT unit's link: RideOn, an FF 03 challenge ~5s later answered "
+            "with the EMPTY ff 04 00, then a second challenge ~265s after the first, "
+            "and THAT one draws the 21-byte body. The decisive byte string is that "
+            "body: identical to "
+            "a5 6d ef 98 b0 95 57 7f 39 a5 3c 1f 0e 0e 39 64 2f 6e 29 15 d9 means a "
+            "static token and experiments/19 §0's 'not replayable' headline is "
+            "OVERTURNED; different means it is derived from the challenge and replay "
+            "is dead. A third challenge ~9min in gives a second body in the SAME "
+            "session, which separates per-session from per-challenge derivation. "
+            "Also expect trainer writes only in the first ~17s — that is what proves "
+            "no ride was running."
+        ),
+        "steps": [
+            ("Quit Chrome / anything holding the Click — only one GATT client at a time", 5),
+            ("On the phone: open Zwift Companion and put it in bridge mode", 15),
+            ("In another terminal: ./android-capture.py --watch --expect f4:c4:59:3d:51:a6", 10),
+            ("Press a paddle on EACH Click unit to wake them", 5),
+            ("Launch Zwift on the Mac and sign in", 40),
+            ("Reach the device-pairing screen — DO NOT start a ride", 20),
+            ("Pair the trainer and BOTH Click units, via Companion not the Mac's radio", 45),
+            ("Press each paddle a few times and watch them register on screen", 20),
+            ("Sit on the pairing screen, touching nothing — challenge #2 lands ~4.5min in", 330),
+            ("Still nothing — this stretch is buying challenge #3 and a second body", 270),
+            ("★ QUIT ZWIFT — this marker is the zero of the ~24h window", 5),
+            ("Quit Companion, then run: ./android-capture.py --pull --scenario authorise", 5),
+        ],
+        "note": (
+            "The ~10 minutes of sitting is the whole point and is NOT padding. On the "
+            "2026-07-29 capture the first challenge drew only the empty ff 04 00; the "
+            "21-byte body did not appear until the second challenge at +270.6s after "
+            "the handshake. A 60-second pairing session collects nothing we do not "
+            "already have. Buffer headroom is not the constraint it was thought to be: "
+            "that same bugreport carried 138.9 minutes of capture. If the bridge does "
+            "not come up — the Mac grabbing the BLE directly is experiments/15 §6.0's "
+            "failure mode, and --watch shows it as devices that never appear — fall "
+            "back to the Mac's own Bluetooth and skip the capture. Phase 4 needs the "
+            "window open more than we need the bytes."
+        ),
+    },
 }
 
 

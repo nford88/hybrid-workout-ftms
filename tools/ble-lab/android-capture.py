@@ -16,7 +16,10 @@ BEFORE the ride, once per phone (both verified by --check):
     adb shell settings put system screen_off_timeout 1800000   # 30 min; 30 s cut a run short
     adb shell dumpsys bluetooth_manager | grep sSnoopLogSettingAtEnable   # want FULL
 
-The snoop log is a rolling ~7-minute buffer, so run this IMMEDIATELY after the activity.
+The snoop log is a rolling buffer, so run this IMMEDIATELY after the activity. It is bounded
+by BYTES, not minutes: "~7 minutes" was the equivalent during a ride streaming telemetry, but
+the 2026-07-29 bugreport carried 138.9 minutes of a mostly-idle pairing session. Budget by how
+chatty the session was, and pull promptly regardless.
 """
 
 from __future__ import annotations
