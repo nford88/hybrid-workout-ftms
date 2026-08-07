@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import path from 'node:path'
 
 /**
  * DRY RUN for the hardware experiment rigs.
@@ -23,10 +24,17 @@ const MOCK = `
   }
   window.ftms=new MockFtms(); window.__ftmsMock=window.ftms
 `
-const SCRIPT =
-  '/@fs/Users/nford/Playground/ftms/docs/virtual-shifting/experiments/18-auto-toggle.js'
-const INSTALL =
-  '/@fs/Users/nford/Playground/ftms/docs/virtual-shifting/experiments/18-install-toggle-workout.js'
+/**
+ * Vite's `/@fs/` prefix needs an ABSOLUTE path, resolved at runtime from the repo root.
+ *
+ * These were hardcoded to one machine's checkout: they passed locally and 404'd in CI, and were the
+ * only failure left once the webServer timeout was fixed — introduced by the very commit that added
+ * this spec to make the experiment rig rigorous. `process.cwd()` is the repo root when Playwright
+ * is launched from package.json.
+ */
+const fsUrl = (rel) => `/@fs${path.resolve(process.cwd(), rel)}`
+const SCRIPT = fsUrl('docs/virtual-shifting/experiments/18-auto-toggle.js')
+const INSTALL = fsUrl('docs/virtual-shifting/experiments/18-install-toggle-workout.js')
 
 async function boot(page) {
   await page.route('**/ftms.js*', (r) =>
