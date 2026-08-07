@@ -182,6 +182,60 @@
               <label>Raw hex to SYNC RX <input id="click-raw-hex" placeholder="52 69 64 65 4f 6e" class="border rounded px-1 flex-1 font-mono" /></label>
               <button id="click-raw-send" class="bg-gray-700 text-white px-2 py-1 rounded text-sm">Send</button>
             </div>
+
+            <!-- Experiment 19 rig: the FF 03 challenge / FF 04 answer exchange.
+                 Real Zwift answers every inbound FF 03 on ASYNC with an FF 04 write to
+                 SYNC RX ~0.44-0.50 s later (captures/20260729-164954, +7557.5 and
+                 +7823.3). We have never answered one. This toggle is the whole of
+                 experiment 19's arm B — leave it OFF for arm A. -->
+            <div class="border-t pt-2 space-y-1 text-sm">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="click-answer-ff03" />
+                <span class="font-semibold">Auto-answer the FF 03 challenge</span>
+              </label>
+              <label class="flex items-center gap-1">
+                Reply
+                <select id="click-ff04-variant" class="border rounded px-1 font-mono">
+                  <option value="empty" selected>ff 04 00 (empty body — what Zwift sent first)</option>
+                  <option value="echo33">ff 04 00 + the challenge's own 33-byte key</option>
+                </select>
+              </label>
+              <div class="font-mono text-xs" id="click-challenge-state">challenges 0 · answers 0</div>
+            </div>
+
+            <!-- Gate monitor. The 23-frame stream is press-gated with a ~1.0 s hold-off,
+                 so "no frames" is the NORMAL end of every burst and proves nothing on its
+                 own. Press on a metronome and this line turns silence into evidence. -->
+            <div class="border-t pt-2 text-sm">
+              <div>
+                Keypad gate:
+                <span id="click-gate" class="font-mono font-semibold">—</span>
+              </div>
+            </div>
+
+            <!-- Experiment 19 arm runner. Press ON THE CUE — the run scores each cue as a
+                 hit or a miss, which is the per-press evidence the 2026-08-07 capture had
+                 no way to produce. -->
+            <div class="border-t pt-2 space-y-2">
+              <div id="arm-cue" class="text-center font-bold text-lg py-3 rounded bg-gray-200 text-gray-700">
+                idle
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <button id="arm-run-a" class="bg-amber-600 text-white px-2 py-1 rounded text-sm">
+                  Run arm A (no answer, 240 s)
+                </button>
+                <button id="arm-run-b" class="bg-emerald-600 text-white px-2 py-1 rounded text-sm">
+                  Run arm B (answer FF 04, 300 s)
+                </button>
+                <button id="arm-run-d" class="bg-sky-600 text-white px-2 py-1 rounded text-sm">
+                  Run arm D (right unit, 240 s)
+                </button>
+                <button id="arm-abort" class="bg-gray-500 text-white px-2 py-1 rounded text-sm">
+                  Abort
+                </button>
+              </div>
+              <pre id="arm-results" class="text-xs bg-gray-50 p-2 rounded max-h-64 overflow-auto">no arm run yet</pre>
+            </div>
             <!-- Button discovery: every bit that fires, not just the two paddles the
                  shift detector watches. Our units already disagree with the community
                  table on both paddles (H18), so the honest tool is one that names the BIT
@@ -219,6 +273,7 @@
 
     <script type="module">
       import { parseZapFrame, createShiftEdgeDetector, toHex } from './protocols/zapFrame.js'
+      import { scoreCues, verdictLine } from './protocols/armScore.js'
       import {
         encodeSimParams,
         decodeSimParams,
@@ -400,8 +455,12 @@
                       decoded = parseZapFrame(raw)
                       if (decoded.type === 'click-v1-buttons' || decoded.type === 'v2-buttons') {
                         feedShiftDetector(decoded)
-                        if (label === 'controller') feedButtonDiscovery(decoded.bitmap)
+                        if (label === 'controller') {
+                          feedButtonDiscovery(decoded.bitmap)
+                          noteKeypadFrame()
+                        }
                       }
+                      if (label === 'controller') maybeAnswerChallenge(raw)
                     }
                     log(label, ch.properties.indicate ? 'indicate' : 'notify', ch.uuid, hex, decoded)
                   })
@@ -418,15 +477,33 @@
       // ── all-button discovery ───────────────────────────────────────────────
       // The bitmap is ACTIVE-LOW: a cleared bit means pressed. We edge-detect on the
       // transition (not-cleared -> cleared) so a button held across ~10 frames/second
-      // counts once. Names come from the community table and are shown as a HINT only —
-      // experiments/04 already found both paddles disagree with it on our hardware, so
-      // the bit value is the fact and the name is a guess.
+      // counts once.
+      //
+      // Names below are OUR OWN confirmed map (src/services/clickButtons.ts), not the community
+      // table, which is wrong about our hardware in at least three places. Using the community
+      // names here actively misled a bench run on 2026-08-07: the right unit's `0x80` came up as
+      // "*** UNKNOWN BIT — new finding ***" when it is simply Z, and `0x20`/`0x1000` carried
+      // annotations contradicting `clickButtons.ts`. Community names are retained in brackets so
+      // a reader meeting them in third-party sources can reconcile. The bit value is still the
+      // fact; the name is now a checked claim rather than a guess.
       const V2_BUTTON_NAMES = {
-        0x1: 'LEFT', 0x2: 'UP', 0x4: 'RIGHT', 0x8: 'DOWN',
-        0x10: 'A', 0x20: 'B  [= our RIGHT "+"]', 0x40: 'Y',
-        0x100: 'Z  [= our LEFT "−"]', 0x200: 'SHFT_UP_L', 0x400: 'SHFT_DN_L',
-        0x800: 'POWERUP_L', 0x1000: 'ONOFF_L', 0x2000: 'SHFT_UP_R', 0x4000: 'SHFT_DN_R',
-        0x10000: 'POWERUP_R', 0x20000: 'ONOFF_R',
+        0x1: 'D-pad Left  (LEFT unit)',
+        0x2: 'D-pad Up  (LEFT unit)',
+        0x4: 'D-pad Right  (LEFT unit)',
+        0x8: 'D-pad Down  (LEFT unit)',
+        0x10: 'A  (RIGHT unit)',
+        0x20: 'B  (RIGHT unit)',
+        0x40: 'Y  (RIGHT unit)',
+        0x80: 'Z  (RIGHT unit)',
+        0x100: 'SHIFT DOWN — "−" paddle  (LEFT unit)   [community calls this Z]',
+        0x1000: 'SHIFT UP — "+" paddle  (RIGHT unit)   [community calls this ONOFF_L]',
+        0x200: '(community SHFT_UP_L — never observed on our hardware)',
+        0x400: '(community SHFT_DN_L — never observed on our hardware)',
+        0x800: '(community POWERUP_L — never observed on our hardware)',
+        0x2000: '(community SHFT_UP_R — never observed on our hardware)',
+        0x4000: '(community SHFT_DN_R — never observed on our hardware)',
+        0x10000: '(community POWERUP_R — never observed on our hardware)',
+        0x20000: '(community ONOFF_R — never observed on our hardware)',
       }
       const buttonSeen = new Map() // bit -> {count, firstTs, lastTs}
       let prevBitmap = null
@@ -747,6 +824,12 @@
         return clickConnectedAt === null ? null : (Date.now() - clickConnectedAt) / 1000
       }
 
+      // `Number(null?.toFixed(1))` is NaN, not null — and a NaN silently written into a run
+      // record is worse than a missing value, because it still looks like a measurement.
+      function uptimeRounded(seconds = clickUptimeSeconds()) {
+        return seconds == null ? null : Number(seconds.toFixed(1))
+      }
+
       function startClickUptime() {
         clickConnectedAt = Date.now()
         document.getElementById('click-lastdrop').textContent = ''
@@ -761,11 +844,15 @@
         clearInterval(clickUptimeTimer)
         clickUptimeTimer = null
         clickConnectedAt = null
+        clearInterval(gateTimer)
+        gateTimer = null
         if (held !== null) {
           document.getElementById('click-lastdrop').textContent = ` — dropped after ${held.toFixed(1)}s`
           log('controller', 'note', undefined, undefined, {
             note: `LINK HELD ${held.toFixed(1)}s before dropping`,
             heldSeconds: Number(held.toFixed(1)),
+            challenges: challengeCount,
+            answers: answerCount,
           })
         }
         return held
@@ -833,6 +920,12 @@
           document.getElementById('click-status').textContent = `connected: ${clickDevice.name || '(unnamed)'}`
           log('controller', 'system', undefined, undefined, { event: 'connected', name: clickDevice.name })
           startClickUptime()
+          startGateMonitor()
+          linkServedArm = false
+          challengeCount = 0
+          answerCount = 0
+          lastChallengeAt = null
+          renderChallengeState()
           showClickIdentity(clickDevice)
           await dumpAndSubscribe(clickServer, 'controller', document.getElementById('click-gatt'), clickChars)
         } catch (err) {
@@ -879,6 +972,390 @@
         if (bytes) writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
       }
 
+      // ── experiment 19: the FF 03 / FF 04 challenge exchange ─────────────────
+      //
+      // Real Zwift answers every inbound `ff 03 00 …` on ASYNC with an `ff 04 …` write to
+      // SYNC RX. Measured twice in captures/20260729-164954-bridge-ride.btsnoop on the LEFT
+      // unit: challenge +7557.042 -> answer +7557.479 (empty body), challenge +7822.813 ->
+      // answer +7823.317 (21-byte body). We have never answered one. In the failing
+      // 2026-08-07 capture both challenges went unanswered and the keypad gate closed 30 s
+      // after the second.
+      //
+      // The 21-byte body is computed by the real Zwift client and cannot be synthesised
+      // here. The EMPTY reply is the interesting one: BikeControl sends the same three bytes
+      // as an "I am already unlocked" assertion, and Zwift's first reply was byte-identical.
+      let challengeCount = 0
+      let answerCount = 0
+      let lastChallengeAt = null
+
+      function renderChallengeState() {
+        document.getElementById('click-challenge-state').textContent =
+          `challenges ${challengeCount} · answers ${answerCount}`
+      }
+
+      function maybeAnswerChallenge(raw) {
+        if (raw.length < 3 || raw[0] !== 0xff || raw[1] !== 0x03) return
+        challengeCount += 1
+        const now = performance.now()
+        const sincePrevious = lastChallengeAt === null ? null : (now - lastChallengeAt) / 1000
+        lastChallengeAt = now
+        renderChallengeState()
+        const record = {
+          challengeNumber: challengeCount,
+          uptimeS: uptimeRounded(),
+          sincePreviousChallengeS: sincePrevious === null ? null : Number(sincePrevious.toFixed(1)),
+          bodyLength: raw.length,
+          answered: false,
+        }
+        arm?.challenges.push(record)
+        log('controller', 'note', undefined, undefined, {
+          note: 'FF 03 CHALLENGE received',
+          ...record,
+          answered: 'pending — see the ANSWERED line below, or the arm result',
+        })
+        if (!document.getElementById('click-answer-ff03').checked) return
+
+        let reply = [0xff, 0x04, 0x00]
+        if (document.getElementById('click-ff04-variant').value === 'echo33') {
+          // The challenge's field 1 is `0a 21` + 33 bytes. Echoing it tests whether the
+          // device only checks that we could read the frame, without a key agreement.
+          if (raw[3] === 0x0a && raw[4] === 0x21 && raw.length >= 38) {
+            reply = [0xff, 0x04, 0x00, 0x0a, 0x21, ...raw.slice(5, 38)]
+          }
+        }
+        answerCount += 1
+        record.answered = true
+        renderChallengeState()
+        log('controller', 'note', undefined, undefined, {
+          note: 'ANSWERED challenge with FF 04',
+          challengeNumber: record.challengeNumber,
+          answerNumber: answerCount,
+          reply: toHex(new Uint8Array(reply)),
+        })
+        writeBytesNoResponse(clickSyncRx(), new Uint8Array(reply), 'controller')
+      }
+
+      // ── keypad gate monitor ────────────────────────────────────────────────
+      //
+      // The `23` stream is PRESS-gated: it runs at ~11 Hz and stops 0.90-1.23 s after the
+      // last non-idle bitmap, in every burst of every capture we hold. So "no frames" is the
+      // normal end of every burst and is not evidence of anything on its own. The failing
+      // session's silences are only meaningful because the rider was pressing — and nobody
+      // wrote down when. Press on a metronome and this readout turns silence into evidence.
+      const GATE_ALERT_S = 15
+      let lastKeypadFrameAt = null
+      let gateReportedClosed = false
+      let gateTimer = null
+
+      function noteKeypadFrame() {
+        lastKeypadFrameAt = performance.now()
+        // Score the outstanding cue, if any. Only the most recent one can be open: the
+        // stream runs at ~11 Hz for ~1 s after a press, so everything after the first
+        // frame lands on an already-hit cue and no-ops.
+        if (arm && arm.cues.length) {
+          const cue = arm.cues[arm.cues.length - 1]
+          const dt = lastKeypadFrameAt - cue.t
+          if (!cue.hit && dt >= 0 && dt <= PRESS_MATCH_WINDOW_MS) {
+            cue.hit = true
+            cue.latencyMs = Math.round(dt)
+          }
+        }
+        if (gateReportedClosed) {
+          gateReportedClosed = false
+          log('controller', 'note', undefined, undefined, {
+            note: 'KEYPAD GATE REOPENED',
+            uptimeS: uptimeRounded(),
+          })
+        }
+      }
+
+      function startGateMonitor() {
+        clearInterval(gateTimer)
+        lastKeypadFrameAt = null
+        gateReportedClosed = false
+        gateTimer = setInterval(() => {
+          const el = document.getElementById('click-gate')
+          if (!clickDevice?.gatt?.connected) {
+            el.textContent = '— (link down)'
+            return
+          }
+          if (lastKeypadFrameAt === null) {
+            el.textContent = 'no keypad frame yet — press a paddle'
+            return
+          }
+          const quiet = (performance.now() - lastKeypadFrameAt) / 1000
+          el.textContent = `${quiet.toFixed(0)}s since last keypad frame`
+          if (!gateReportedClosed && quiet > GATE_ALERT_S) {
+            gateReportedClosed = true
+            log('controller', 'note', undefined, undefined, {
+              note: 'KEYPAD GATE CLOSED — no 23-frame while the link is still up',
+              // Outside an arm nothing is cueing presses, so this fires the moment the operator
+              // pauses — during button discovery, say. Only a closure DURING an arm is evidence.
+              duringArm: arm ? arm.name : false,
+              quietS: Number(quiet.toFixed(1)),
+              uptimeS: uptimeRounded(),
+              challenges: challengeCount,
+              answers: answerCount,
+            })
+          }
+        }, 1000)
+      }
+
+      // ── the reset cycle (BikeControl's shipping workaround) ─────────────────
+      //
+      // `Opcode.RESET` = 24 = 0x18, written to SYNC RX without response, reboots the unit.
+      // BikeControl's default "unlock mode" is to do this every 60 s and let the device
+      // reconnect, because the alternative needs the real Zwift app on the LAN. Arm C tests
+      // whether a browser can drive the same cycle. It DOES drop the link each time.
+      let resetTimer = null
+
+      function startResetCycle(periodS) {
+        stopResetCycle()
+        log('controller', 'note', undefined, undefined, {
+          note: `reset cycle ON — writing 0x18 every ${periodS}s`,
+        })
+        resetTimer = setInterval(() => {
+          log('controller', 'note', undefined, undefined, {
+            note: 'RESET (0x18)',
+            uptimeS: uptimeRounded(),
+          })
+          writeBytesNoResponse(clickSyncRx(), new Uint8Array([0x18]), 'controller')
+        }, periodS * 1000)
+      }
+
+      function stopResetCycle() {
+        clearInterval(resetTimer)
+        resetTimer = null
+      }
+
+      // ── experiment 19: the automated arm runner ─────────────────────────────
+      //
+      // The paddle press is the ONE thing here that cannot be automated: the `23` stream is
+      // press-gated, so only a physical press can show the gate is open. Everything around it
+      // can be — and cueing the press, rather than asking the operator to follow a metronome,
+      // produces the thing the 2026-08-07 capture lacked entirely: **a timestamp for every
+      // press**. That turns "the rider says they kept pressing" into a per-cue hit/miss series,
+      // which is a far stronger observable than "the frames went quiet".
+      //
+      // Press ON THE CUE. A miss is scored only if no keypad frame arrives within the window.
+      const PRESS_MATCH_WINDOW_MS = 3000 // generous — this is human reaction time, not protocol
+      const ARM_COOLDOWN_MS = 90000 // let the unit re-advertise cleanly between arms
+
+      let arm = null
+      let audioCtx = null
+      // One arm per link — see prepareClickLink() for why reusing a link corrupts two fields.
+      let linkServedArm = false
+      // The comparable clock is time since the HANDSHAKE, not since connect: the operator may
+      // press "Run arm" any number of seconds after connecting (run 2 of 2026-08-07 waited 35 s),
+      // and everything the device does is timed from the handshake. Reporting only uptime made a
+      // 60.4 s gate closure read as 95.5 s.
+      let lastHandshakeAt = null
+
+      function beep(kind) {
+        // A nicety — never let it fail a run. Autoplay policy is satisfied because every arm
+        // starts from a button click.
+        try {
+          audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)()
+          const osc = audioCtx.createOscillator()
+          const gain = audioCtx.createGain()
+          osc.frequency.value = kind === 'end' ? 440 : 880
+          gain.gain.value = 0.15
+          osc.connect(gain).connect(audioCtx.destination)
+          osc.start()
+          osc.stop(audioCtx.currentTime + (kind === 'end' ? 0.35 : 0.12))
+        } catch {
+          /* no audio; the visual cue still works */
+        }
+      }
+
+      function renderCue(text, live) {
+        const el = document.getElementById('arm-cue')
+        el.textContent = text
+        el.className = live
+          ? 'text-center font-bold text-2xl py-3 rounded bg-green-500 text-white'
+          : 'text-center font-bold text-lg py-3 rounded bg-gray-200 text-gray-700'
+      }
+
+      /**
+       * Re-establish GATT + subscriptions + handshake. No user gesture: the device is already
+       * permitted, so only the FIRST connect of a session needs the chooser.
+       *
+       * ONE ARM PER LINK, enforced. Two reasons, and both silently corrupt a result rather than
+       * failing loudly, which is the dangerous kind (experiments/15 §4):
+       *
+       *   1. Arm A ends with the gate CLOSED. Running arm B on that same link measures whether
+       *      an answer REOPENS a shut gate — a different question from whether it keeps one open,
+       *      and the arm would almost certainly read as a false negative.
+       *   2. `uptimeAtGateCloseS` is measured from connect. Reusing a link carries the previous
+       *      arm's clock forward, inflating it by minutes with no outward sign.
+       */
+      async function prepareClickLink() {
+        if (!clickDevice) throw new Error('press "Connect Click" once first — requestDevice needs a user gesture')
+        if (clickDevice.gatt.connected && linkServedArm) {
+          throw new Error(
+            'this link has already run an arm — press Disconnect, wait ~90 s for the unit to ' +
+              're-advertise, then start the next arm. A fresh link is required: arm A ends with ' +
+              'the gate closed, and the uptime clock must restart.'
+          )
+        }
+        if (!clickDevice.gatt.connected) {
+          clickServer = await clickDevice.gatt.connect()
+          await dumpAndSubscribe(clickServer, 'controller', document.getElementById('click-gatt'), clickChars)
+          startClickUptime()
+          startGateMonitor()
+          linkServedArm = false
+        }
+        challengeCount = 0
+        answerCount = 0
+        lastChallengeAt = null
+        renderChallengeState()
+        lastKeypadFrameAt = null
+        gateReportedClosed = false
+        await writeBytesNoResponse(clickSyncRx(), new Uint8Array([...RIDEON, 0x02, 0x03]), 'controller')
+        lastHandshakeAt = performance.now()
+      }
+
+      function summariseArm(a) {
+        const score = scoreCues(a.cues) // pure + unit-tested: tests/unit/arm-score.test.js
+        const firstTrailingMiss =
+          score.firstTrailingMissIndex === null ? null : a.cues[score.firstTrailingMissIndex]
+        const latencies = a.cues
+          .filter((c) => c.hit)
+          .map((c) => c.latencyMs)
+          .sort((x, y) => x - y)
+        return {
+          arm: a.name,
+          answeredChallenges: a.answerChallenges,
+          durationS: Math.round((a.endedAt - a.startedAt) / 1000),
+          endedEarly: a.endedEarly || null,
+          ...score,
+          uptimeAtGateCloseS: firstTrailingMiss ? uptimeRounded(firstTrailingMiss.uptimeS) : null,
+          gateCloseSinceHandshakeS: firstTrailingMiss ? firstTrailingMiss.sinceHandshakeS : null,
+          medianPressLatencyMs: latencies.length ? latencies[Math.floor(latencies.length / 2)] : null,
+          challenges: a.challenges,
+          answersSent: answerCount,
+          linkStillUp: !!clickDevice?.gatt?.connected,
+          serial: clickSerialSeen,
+        }
+      }
+
+      function renderArmResult(summary) {
+        document.getElementById('arm-results').textContent =
+          `ARM ${summary.arm} — ${verdictLine(summary)}\n\n${JSON.stringify(summary, null, 2)}`
+      }
+
+      async function runArm(opts) {
+        if (arm) throw new Error('an arm is already running — Abort first')
+        const name = opts.name
+        const durationMs = opts.durationMs ?? 240000
+        const pressCueMs = opts.pressCueMs ?? 10000
+
+        // Set the answer policy BEFORE the handshake: the first challenge lands ~7 s after it.
+        document.getElementById('click-answer-ff03').checked = !!opts.answerChallenges
+        if (opts.ff04Variant) document.getElementById('click-ff04-variant').value = opts.ff04Variant
+
+        renderCue(`arm ${name} — connecting…`, false)
+        // dryRun exercises the cue/scoring path with no hardware, so a compressed schedule can
+        // verify the rig before the bench. experiments/18 established this pattern after a rig
+        // bug cost a ride.
+        if (!opts.dryRun) await prepareClickLink()
+
+        arm = {
+          name,
+          cues: [],
+          challenges: [],
+          answerChallenges: !!opts.answerChallenges,
+          startedAt: performance.now(),
+        }
+        log('controller', 'note', undefined, undefined, {
+          note: `ARM ${name} START`,
+          answerChallenges: arm.answerChallenges,
+          durationS: durationMs / 1000,
+          pressCueS: pressCueMs / 1000,
+        })
+
+        await new Promise((resolve) => {
+          let nextCueAt = performance.now()
+          const tick = setInterval(() => {
+            const now = performance.now()
+            if (arm?.aborted) {
+              arm.endedEarly = 'aborted by operator'
+              clearInterval(tick)
+              resolve()
+              return
+            }
+            if (!opts.dryRun && !clickDevice?.gatt?.connected) {
+              arm.endedEarly = 'link dropped'
+              clearInterval(tick)
+              resolve()
+              return
+            }
+            if (now - arm.startedAt >= durationMs) {
+              clearInterval(tick)
+              resolve()
+              return
+            }
+            if (now >= nextCueAt) {
+              nextCueAt = now + pressCueMs
+              const remainingS = Math.round((durationMs - (now - arm.startedAt)) / 1000)
+              arm.cues.push({
+                n: arm.cues.length + 1,
+                t: now,
+                uptimeS: clickUptimeSeconds(),
+                sinceHandshakeS:
+                  lastHandshakeAt === null ? null : Number(((now - lastHandshakeAt) / 1000).toFixed(1)),
+                hit: false,
+                latencyMs: null,
+              })
+              beep('cue')
+              renderCue(`PRESS  ·  cue ${arm.cues.length}  ·  ${remainingS}s left`, true)
+              setTimeout(() => {
+                if (arm && !arm.aborted) renderCue(`arm ${name} — wait for the cue`, false)
+              }, 1200)
+            }
+          }, 200)
+        })
+
+        // Stamp the end BEFORE waiting, or every arm reports its duration 3 s long.
+        arm.endedAt = performance.now()
+        linkServedArm = true
+        // Let the final cue's match window close before scoring it.
+        await new Promise((r) => setTimeout(r, PRESS_MATCH_WINDOW_MS))
+        const summary = summariseArm(arm)
+        arm = null
+        beep('end')
+        renderCue(`arm ${name} done — see results`, false)
+        log('controller', 'note', undefined, undefined, { note: `ARM ${name} RESULT`, ...summary })
+        renderArmResult(summary)
+        return summary
+      }
+
+      async function cooldown(ms) {
+        clickDevice?.gatt?.disconnect()
+        const until = performance.now() + ms
+        while (performance.now() < until) {
+          renderCue(`cooldown — ${Math.ceil((until - performance.now()) / 1000)}s`, false)
+          await new Promise((r) => setTimeout(r, 500))
+        }
+      }
+
+      document.getElementById('arm-run-a').onclick = () =>
+        runArm({ name: 'A', answerChallenges: false, durationMs: 240000 }).catch((e) =>
+          log('controller', 'system', undefined, undefined, { event: 'arm-error', error: String(e) })
+        )
+      document.getElementById('arm-run-b').onclick = () =>
+        runArm({ name: 'B', answerChallenges: true, durationMs: 300000 }).catch((e) =>
+          log('controller', 'system', undefined, undefined, { event: 'arm-error', error: String(e) })
+        )
+      document.getElementById('arm-run-d').onclick = () =>
+        runArm({ name: 'D', answerChallenges: false, durationMs: 240000 }).catch((e) =>
+          log('controller', 'system', undefined, undefined, { event: 'arm-error', error: String(e) })
+        )
+      document.getElementById('arm-abort').onclick = () => {
+        if (arm) arm.aborted = true
+        stopResetCycle()
+      }
+
       // Debug hook for driving exact/concurrent command sequences via evaluate_script,
       // so hands-free experiments (HW-V7/V8/V10/V12) don't need manual button clicks.
       // `sendRaw` intentionally returns the write promise WITHOUT awaiting it here —
@@ -917,6 +1394,54 @@
             return writeBytesNoResponse(clickSyncRx(), bytes, 'controller')
           },
           sendRaw: (bytes) => writeBytesNoResponse(clickSyncRx(), new Uint8Array(bytes), 'controller'),
+          // Experiment 19 arms, so a run is a script rather than a sequence of clicks.
+          answerChallenges: (on, variant) => {
+            document.getElementById('click-answer-ff03').checked = !!on
+            if (variant) document.getElementById('click-ff04-variant').value = variant
+          },
+          challengeStats: () => ({ challenges: challengeCount, answers: answerCount }),
+          /** Can this link start an arm? One arm per link — see prepareClickLink(). */
+          linkReady: () => ({
+            connected: !!clickDevice?.gatt?.connected,
+            servedArm: linkServedArm,
+            canStartArm: !(clickDevice?.gatt?.connected && linkServedArm),
+          }),
+          gateQuietSeconds: () =>
+            lastKeypadFrameAt === null ? null : (performance.now() - lastKeypadFrameAt) / 1000,
+          resetCycle: (periodS) => (periodS ? startResetCycle(periodS) : stopResetCycle()),
+          runArm,
+          abortArm: () => {
+            if (arm) arm.aborted = true
+          },
+          /** Simulates a keypad frame, so a dryRun arm can be scored without hardware. */
+          simulateKeypadFrame: () => noteKeypadFrame(),
+          /** Live view of the arm in progress — mid-run progress, and what drives the dry run. */
+          armState: () =>
+            arm && {
+              name: arm.name,
+              elapsedS: Number(((performance.now() - arm.startedAt) / 1000).toFixed(1)),
+              cues: arm.cues.map((c) => ({ n: c.n, hit: c.hit, latencyMs: c.latencyMs })),
+              challenges: arm.challenges.length,
+            },
+          /**
+           * A then B, unattended apart from the presses. Stops after A if the gate never
+           * closed, because B is uninterpretable without a reproduced failure — that is the
+           * decision rule from experiments/19 §7, enforced rather than remembered.
+           */
+          runPlan: async () => {
+            const results = [await runArm({ name: 'A', answerChallenges: false, durationMs: 240000 })]
+            if (!results[0].gateClosed) {
+              log('controller', 'note', undefined, undefined, {
+                note: 'PLAN STOPPED after arm A — the gate never closed, so arm B would prove nothing',
+                likelyCause: 'inside the ~24 h Zwift authorisation window, or the trainer matters',
+              })
+              renderCue('plan stopped — arm A did not reproduce the failure', false)
+              return results
+            }
+            await cooldown(ARM_COOLDOWN_MS)
+            results.push(await runArm({ name: 'B', answerChallenges: true, durationMs: 300000 }))
+            return results
+          },
           // Exposed so the button-discovery edge detection can be exercised without
           // hardware — a held button spans ~10 frames/second and must count once.
           feedBitmap: (bitmap) => feedButtonDiscovery(bitmap),
