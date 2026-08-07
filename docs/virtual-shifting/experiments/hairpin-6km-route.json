@@ -1,0 +1,854 @@
+{
+ "name": "Rolling Hairpins 6km",
+ "geoPoints": [
+  {
+   "latitude": 0.0,
+   "longitude": 0.0,
+   "elevation": 100.0,
+   "distance": 0.0,
+   "timestamp": 1785000000000
+  },
+  {
+   "latitude": 0.0004496608,
+   "longitude": 0.0,
+   "elevation": 100.0,
+   "distance": 0.05,
+   "timestamp": 1785000015000
+  },
+  {
+   "latitude": 0.0008993216,
+   "longitude": 0.0,
+   "elevation": 100.0,
+   "distance": 0.1,
+   "timestamp": 1785000030000
+  },
+  {
+   "latitude": 0.0013489824,
+   "longitude": 0.0,
+   "elevation": 100.0,
+   "distance": 0.15,
+   "timestamp": 1785000045000
+  },
+  {
+   "latitude": 0.0017986432,
+   "longitude": 0.0,
+   "elevation": 100.0,
+   "distance": 0.2,
+   "timestamp": 1785000060000
+  },
+  {
+   "latitude": 0.002248304,
+   "longitude": 0.0,
+   "elevation": 100.0,
+   "distance": 0.25,
+   "timestamp": 1785000075000
+  },
+  {
+   "latitude": 0.0026979648,
+   "longitude": 0.0,
+   "elevation": 100.075,
+   "distance": 0.3,
+   "timestamp": 1785000090000
+  },
+  {
+   "latitude": 0.0031476256,
+   "longitude": 0.0,
+   "elevation": 100.3,
+   "distance": 0.35,
+   "timestamp": 1785000105000
+  },
+  {
+   "latitude": 0.0035972864,
+   "longitude": 0.0,
+   "elevation": 100.675,
+   "distance": 0.4,
+   "timestamp": 1785000120000
+  },
+  {
+   "latitude": 0.0040469472,
+   "longitude": 0.0,
+   "elevation": 101.2,
+   "distance": 0.45,
+   "timestamp": 1785000135000
+  },
+  {
+   "latitude": 0.004496608,
+   "longitude": 0.0,
+   "elevation": 101.875,
+   "distance": 0.5,
+   "timestamp": 1785000150000
+  },
+  {
+   "latitude": 0.0049462688,
+   "longitude": 0.0,
+   "elevation": 102.679,
+   "distance": 0.55,
+   "timestamp": 1785000165000
+  },
+  {
+   "latitude": 0.0053959296,
+   "longitude": 0.0,
+   "elevation": 103.589,
+   "distance": 0.6,
+   "timestamp": 1785000180000
+  },
+  {
+   "latitude": 0.0058455904,
+   "longitude": 0.0,
+   "elevation": 104.607,
+   "distance": 0.65,
+   "timestamp": 1785000195000
+  },
+  {
+   "latitude": 0.0062952512,
+   "longitude": 0.0,
+   "elevation": 105.732,
+   "distance": 0.7,
+   "timestamp": 1785000210000
+  },
+  {
+   "latitude": 0.006744912,
+   "longitude": 0.0,
+   "elevation": 106.964,
+   "distance": 0.75,
+   "timestamp": 1785000225000
+  },
+  {
+   "latitude": 0.0071945728,
+   "longitude": 0.0,
+   "elevation": 108.304,
+   "distance": 0.8,
+   "timestamp": 1785000240000
+  },
+  {
+   "latitude": 0.0076442337,
+   "longitude": 0.0,
+   "elevation": 109.75,
+   "distance": 0.85,
+   "timestamp": 1785000255000
+  },
+  {
+   "latitude": 0.0080938945,
+   "longitude": 0.0,
+   "elevation": 111.325,
+   "distance": 0.9,
+   "timestamp": 1785000270000
+  },
+  {
+   "latitude": 0.0085435553,
+   "longitude": 0.0,
+   "elevation": 113.05,
+   "distance": 0.95,
+   "timestamp": 1785000285000
+  },
+  {
+   "latitude": 0.0089932161,
+   "longitude": 0.0,
+   "elevation": 114.925,
+   "distance": 1.0,
+   "timestamp": 1785000300000
+  },
+  {
+   "latitude": 0.0094428769,
+   "longitude": 0.0,
+   "elevation": 116.95,
+   "distance": 1.05,
+   "timestamp": 1785000315000
+  },
+  {
+   "latitude": 0.0098925377,
+   "longitude": 0.0,
+   "elevation": 119.125,
+   "distance": 1.1,
+   "timestamp": 1785000330000
+  },
+  {
+   "latitude": 0.0103421985,
+   "longitude": 0.0,
+   "elevation": 121.456,
+   "distance": 1.15,
+   "timestamp": 1785000345000
+  },
+  {
+   "latitude": 0.0107918593,
+   "longitude": 0.0,
+   "elevation": 123.95,
+   "distance": 1.2,
+   "timestamp": 1785000360000
+  },
+  {
+   "latitude": 0.0112415201,
+   "longitude": 0.0,
+   "elevation": 126.606,
+   "distance": 1.25,
+   "timestamp": 1785000375000
+  },
+  {
+   "latitude": 0.0116911809,
+   "longitude": 0.0,
+   "elevation": 129.425,
+   "distance": 1.3,
+   "timestamp": 1785000390000
+  },
+  {
+   "latitude": 0.0121408417,
+   "longitude": 0.0,
+   "elevation": 131.992,
+   "distance": 1.35,
+   "timestamp": 1785000405000
+  },
+  {
+   "latitude": 0.0125905025,
+   "longitude": 0.0,
+   "elevation": 133.892,
+   "distance": 1.4,
+   "timestamp": 1785000420000
+  },
+  {
+   "latitude": 0.0130401633,
+   "longitude": 0.0,
+   "elevation": 135.125,
+   "distance": 1.45,
+   "timestamp": 1785000435000
+  },
+  {
+   "latitude": 0.0134898241,
+   "longitude": 0.0,
+   "elevation": 136.025,
+   "distance": 1.5,
+   "timestamp": 1785000450000
+  },
+  {
+   "latitude": 0.0139394849,
+   "longitude": 0.0,
+   "elevation": 136.925,
+   "distance": 1.55,
+   "timestamp": 1785000465000
+  },
+  {
+   "latitude": 0.0143891457,
+   "longitude": 0.0,
+   "elevation": 137.825,
+   "distance": 1.6,
+   "timestamp": 1785000480000
+  },
+  {
+   "latitude": 0.0148388065,
+   "longitude": 0.0,
+   "elevation": 138.938,
+   "distance": 1.65,
+   "timestamp": 1785000495000
+  },
+  {
+   "latitude": 0.0152884673,
+   "longitude": 0.0,
+   "elevation": 140.475,
+   "distance": 1.7,
+   "timestamp": 1785000510000
+  },
+  {
+   "latitude": 0.0157381281,
+   "longitude": 0.0,
+   "elevation": 142.438,
+   "distance": 1.75,
+   "timestamp": 1785000525000
+  },
+  {
+   "latitude": 0.0161877889,
+   "longitude": 0.0,
+   "elevation": 144.825,
+   "distance": 1.8,
+   "timestamp": 1785000540000
+  },
+  {
+   "latitude": 0.0166374497,
+   "longitude": 0.0,
+   "elevation": 147.117,
+   "distance": 1.85,
+   "timestamp": 1785000555000
+  },
+  {
+   "latitude": 0.0170871105,
+   "longitude": 0.0,
+   "elevation": 148.792,
+   "distance": 1.9,
+   "timestamp": 1785000570000
+  },
+  {
+   "latitude": 0.0175367713,
+   "longitude": 0.0,
+   "elevation": 149.85,
+   "distance": 1.95,
+   "timestamp": 1785000585000
+  },
+  {
+   "latitude": 0.0179864321,
+   "longitude": 0.0,
+   "elevation": 150.6,
+   "distance": 2.0,
+   "timestamp": 1785000600000
+  },
+  {
+   "latitude": 0.0184360929,
+   "longitude": 0.0,
+   "elevation": 151.35,
+   "distance": 2.05,
+   "timestamp": 1785000615000
+  },
+  {
+   "latitude": 0.0188857537,
+   "longitude": 0.0,
+   "elevation": 152.1,
+   "distance": 2.1,
+   "timestamp": 1785000630000
+  },
+  {
+   "latitude": 0.0193354145,
+   "longitude": 0.0,
+   "elevation": 153.1,
+   "distance": 2.15,
+   "timestamp": 1785000645000
+  },
+  {
+   "latitude": 0.0197850753,
+   "longitude": 0.0,
+   "elevation": 154.6,
+   "distance": 2.2,
+   "timestamp": 1785000660000
+  },
+  {
+   "latitude": 0.0202347361,
+   "longitude": 0.0,
+   "elevation": 156.6,
+   "distance": 2.25,
+   "timestamp": 1785000675000
+  },
+  {
+   "latitude": 0.0206843969,
+   "longitude": 0.0,
+   "elevation": 159.1,
+   "distance": 2.3,
+   "timestamp": 1785000690000
+  },
+  {
+   "latitude": 0.0211340577,
+   "longitude": 0.0,
+   "elevation": 161.558,
+   "distance": 2.35,
+   "timestamp": 1785000705000
+  },
+  {
+   "latitude": 0.0215837185,
+   "longitude": 0.0,
+   "elevation": 163.433,
+   "distance": 2.4,
+   "timestamp": 1785000720000
+  },
+  {
+   "latitude": 0.0220333793,
+   "longitude": 0.0,
+   "elevation": 164.725,
+   "distance": 2.45,
+   "timestamp": 1785000735000
+  },
+  {
+   "latitude": 0.0224830401,
+   "longitude": 0.0,
+   "elevation": 165.725,
+   "distance": 2.5,
+   "timestamp": 1785000750000
+  },
+  {
+   "latitude": 0.022932701,
+   "longitude": 0.0,
+   "elevation": 166.725,
+   "distance": 2.55,
+   "timestamp": 1785000765000
+  },
+  {
+   "latitude": 0.0233823618,
+   "longitude": 0.0,
+   "elevation": 167.725,
+   "distance": 2.6,
+   "timestamp": 1785000780000
+  },
+  {
+   "latitude": 0.0238320226,
+   "longitude": 0.0,
+   "elevation": 168.835,
+   "distance": 2.65,
+   "timestamp": 1785000795000
+  },
+  {
+   "latitude": 0.0242816834,
+   "longitude": 0.0,
+   "elevation": 170.165,
+   "distance": 2.7,
+   "timestamp": 1785000810000
+  },
+  {
+   "latitude": 0.0247313442,
+   "longitude": 0.0,
+   "elevation": 171.715,
+   "distance": 2.75,
+   "timestamp": 1785000825000
+  },
+  {
+   "latitude": 0.025181005,
+   "longitude": 0.0,
+   "elevation": 173.485,
+   "distance": 2.8,
+   "timestamp": 1785000840000
+  },
+  {
+   "latitude": 0.0256306658,
+   "longitude": 0.0,
+   "elevation": 175.475,
+   "distance": 2.85,
+   "timestamp": 1785000855000
+  },
+  {
+   "latitude": 0.0260803266,
+   "longitude": 0.0,
+   "elevation": 177.344,
+   "distance": 2.9,
+   "timestamp": 1785000870000
+  },
+  {
+   "latitude": 0.0265299874,
+   "longitude": 0.0,
+   "elevation": 178.75,
+   "distance": 2.95,
+   "timestamp": 1785000885000
+  },
+  {
+   "latitude": 0.0269796482,
+   "longitude": 0.0,
+   "elevation": 179.694,
+   "distance": 3.0,
+   "timestamp": 1785000900000
+  },
+  {
+   "latitude": 0.027429309,
+   "longitude": 0.0,
+   "elevation": 180.175,
+   "distance": 3.05,
+   "timestamp": 1785000915000
+  },
+  {
+   "latitude": 0.0278789698,
+   "longitude": 0.0,
+   "elevation": 180.425,
+   "distance": 3.1,
+   "timestamp": 1785000930000
+  },
+  {
+   "latitude": 0.0283286306,
+   "longitude": 0.0,
+   "elevation": 180.675,
+   "distance": 3.15,
+   "timestamp": 1785000945000
+  },
+  {
+   "latitude": 0.0287782914,
+   "longitude": 0.0,
+   "elevation": 180.925,
+   "distance": 3.2,
+   "timestamp": 1785000960000
+  },
+  {
+   "latitude": 0.0292279522,
+   "longitude": 0.0,
+   "elevation": 181.175,
+   "distance": 3.25,
+   "timestamp": 1785000975000
+  },
+  {
+   "latitude": 0.029677613,
+   "longitude": 0.0,
+   "elevation": 181.26,
+   "distance": 3.3,
+   "timestamp": 1785000990000
+  },
+  {
+   "latitude": 0.0301272738,
+   "longitude": 0.0,
+   "elevation": 181.015,
+   "distance": 3.35,
+   "timestamp": 1785001005000
+  },
+  {
+   "latitude": 0.0305769346,
+   "longitude": 0.0,
+   "elevation": 180.44,
+   "distance": 3.4,
+   "timestamp": 1785001020000
+  },
+  {
+   "latitude": 0.0310265954,
+   "longitude": 0.0,
+   "elevation": 179.535,
+   "distance": 3.45,
+   "timestamp": 1785001035000
+  },
+  {
+   "latitude": 0.0314762562,
+   "longitude": 0.0,
+   "elevation": 178.3,
+   "distance": 3.5,
+   "timestamp": 1785001050000
+  },
+  {
+   "latitude": 0.031925917,
+   "longitude": 0.0,
+   "elevation": 176.871,
+   "distance": 3.55,
+   "timestamp": 1785001065000
+  },
+  {
+   "latitude": 0.0323755778,
+   "longitude": 0.0,
+   "elevation": 175.383,
+   "distance": 3.6,
+   "timestamp": 1785001080000
+  },
+  {
+   "latitude": 0.0328252386,
+   "longitude": 0.0,
+   "elevation": 173.838,
+   "distance": 3.65,
+   "timestamp": 1785001095000
+  },
+  {
+   "latitude": 0.0332748994,
+   "longitude": 0.0,
+   "elevation": 172.233,
+   "distance": 3.7,
+   "timestamp": 1785001110000
+  },
+  {
+   "latitude": 0.0337245602,
+   "longitude": 0.0,
+   "elevation": 170.571,
+   "distance": 3.75,
+   "timestamp": 1785001125000
+  },
+  {
+   "latitude": 0.034174221,
+   "longitude": 0.0,
+   "elevation": 168.85,
+   "distance": 3.8,
+   "timestamp": 1785001140000
+  },
+  {
+   "latitude": 0.0346238818,
+   "longitude": 0.0,
+   "elevation": 167.225,
+   "distance": 3.85,
+   "timestamp": 1785001155000
+  },
+  {
+   "latitude": 0.0350735426,
+   "longitude": 0.0,
+   "elevation": 165.85,
+   "distance": 3.9,
+   "timestamp": 1785001170000
+  },
+  {
+   "latitude": 0.0355232034,
+   "longitude": 0.0,
+   "elevation": 164.725,
+   "distance": 3.95,
+   "timestamp": 1785001185000
+  },
+  {
+   "latitude": 0.0359728642,
+   "longitude": 0.0,
+   "elevation": 163.85,
+   "distance": 4.0,
+   "timestamp": 1785001200000
+  },
+  {
+   "latitude": 0.036422525,
+   "longitude": 0.0,
+   "elevation": 163.225,
+   "distance": 4.05,
+   "timestamp": 1785001215000
+  },
+  {
+   "latitude": 0.0368721858,
+   "longitude": 0.0,
+   "elevation": 162.788,
+   "distance": 4.1,
+   "timestamp": 1785001230000
+  },
+  {
+   "latitude": 0.0373218466,
+   "longitude": 0.0,
+   "elevation": 162.475,
+   "distance": 4.15,
+   "timestamp": 1785001245000
+  },
+  {
+   "latitude": 0.0377715074,
+   "longitude": 0.0,
+   "elevation": 162.288,
+   "distance": 4.2,
+   "timestamp": 1785001260000
+  },
+  {
+   "latitude": 0.0382211683,
+   "longitude": 0.0,
+   "elevation": 162.225,
+   "distance": 4.25,
+   "timestamp": 1785001275000
+  },
+  {
+   "latitude": 0.0386708291,
+   "longitude": 0.0,
+   "elevation": 162.225,
+   "distance": 4.3,
+   "timestamp": 1785001290000
+  },
+  {
+   "latitude": 0.0391204899,
+   "longitude": 0.0,
+   "elevation": 162.225,
+   "distance": 4.35,
+   "timestamp": 1785001305000
+  },
+  {
+   "latitude": 0.0395701507,
+   "longitude": 0.0,
+   "elevation": 162.225,
+   "distance": 4.4,
+   "timestamp": 1785001320000
+  },
+  {
+   "latitude": 0.0400198115,
+   "longitude": 0.0,
+   "elevation": 162.225,
+   "distance": 4.45,
+   "timestamp": 1785001335000
+  },
+  {
+   "latitude": 0.0404694723,
+   "longitude": 0.0,
+   "elevation": 162.35,
+   "distance": 4.5,
+   "timestamp": 1785001350000
+  },
+  {
+   "latitude": 0.0409191331,
+   "longitude": 0.0,
+   "elevation": 162.725,
+   "distance": 4.55,
+   "timestamp": 1785001365000
+  },
+  {
+   "latitude": 0.0413687939,
+   "longitude": 0.0,
+   "elevation": 163.35,
+   "distance": 4.6,
+   "timestamp": 1785001380000
+  },
+  {
+   "latitude": 0.0418184547,
+   "longitude": 0.0,
+   "elevation": 164.225,
+   "distance": 4.65,
+   "timestamp": 1785001395000
+  },
+  {
+   "latitude": 0.0422681155,
+   "longitude": 0.0,
+   "elevation": 165.35,
+   "distance": 4.7,
+   "timestamp": 1785001410000
+  },
+  {
+   "latitude": 0.0427177763,
+   "longitude": 0.0,
+   "elevation": 166.7,
+   "distance": 4.75,
+   "timestamp": 1785001425000
+  },
+  {
+   "latitude": 0.0431674371,
+   "longitude": 0.0,
+   "elevation": 168.25,
+   "distance": 4.8,
+   "timestamp": 1785001440000
+  },
+  {
+   "latitude": 0.0436170979,
+   "longitude": 0.0,
+   "elevation": 170.0,
+   "distance": 4.85,
+   "timestamp": 1785001455000
+  },
+  {
+   "latitude": 0.0440667587,
+   "longitude": 0.0,
+   "elevation": 171.95,
+   "distance": 4.9,
+   "timestamp": 1785001470000
+  },
+  {
+   "latitude": 0.0445164195,
+   "longitude": 0.0,
+   "elevation": 174.1,
+   "distance": 4.95,
+   "timestamp": 1785001485000
+  },
+  {
+   "latitude": 0.0449660803,
+   "longitude": 0.0,
+   "elevation": 176.1,
+   "distance": 5.0,
+   "timestamp": 1785001500000
+  },
+  {
+   "latitude": 0.0454157411,
+   "longitude": 0.0,
+   "elevation": 177.6,
+   "distance": 5.05,
+   "timestamp": 1785001515000
+  },
+  {
+   "latitude": 0.0458654019,
+   "longitude": 0.0,
+   "elevation": 178.6,
+   "distance": 5.1,
+   "timestamp": 1785001530000
+  },
+  {
+   "latitude": 0.0463150627,
+   "longitude": 0.0,
+   "elevation": 179.35,
+   "distance": 5.15,
+   "timestamp": 1785001545000
+  },
+  {
+   "latitude": 0.0467647235,
+   "longitude": 0.0,
+   "elevation": 180.1,
+   "distance": 5.2,
+   "timestamp": 1785001560000
+  },
+  {
+   "latitude": 0.0472143843,
+   "longitude": 0.0,
+   "elevation": 180.85,
+   "distance": 5.25,
+   "timestamp": 1785001575000
+  },
+  {
+   "latitude": 0.0476640451,
+   "longitude": 0.0,
+   "elevation": 181.819,
+   "distance": 5.3,
+   "timestamp": 1785001590000
+  },
+  {
+   "latitude": 0.0481137059,
+   "longitude": 0.0,
+   "elevation": 183.225,
+   "distance": 5.35,
+   "timestamp": 1785001605000
+  },
+  {
+   "latitude": 0.0485633667,
+   "longitude": 0.0,
+   "elevation": 185.069,
+   "distance": 5.4,
+   "timestamp": 1785001620000
+  },
+  {
+   "latitude": 0.0490130275,
+   "longitude": 0.0,
+   "elevation": 187.35,
+   "distance": 5.45,
+   "timestamp": 1785001635000
+  },
+  {
+   "latitude": 0.0494626883,
+   "longitude": 0.0,
+   "elevation": 189.663,
+   "distance": 5.5,
+   "timestamp": 1785001650000
+  },
+  {
+   "latitude": 0.0499123491,
+   "longitude": 0.0,
+   "elevation": 191.6,
+   "distance": 5.55,
+   "timestamp": 1785001665000
+  },
+  {
+   "latitude": 0.0503620099,
+   "longitude": 0.0,
+   "elevation": 193.163,
+   "distance": 5.6,
+   "timestamp": 1785001680000
+  },
+  {
+   "latitude": 0.0508116707,
+   "longitude": 0.0,
+   "elevation": 194.35,
+   "distance": 5.65,
+   "timestamp": 1785001695000
+  },
+  {
+   "latitude": 0.0512613315,
+   "longitude": 0.0,
+   "elevation": 195.038,
+   "distance": 5.7,
+   "timestamp": 1785001710000
+  },
+  {
+   "latitude": 0.0517109923,
+   "longitude": 0.0,
+   "elevation": 195.1,
+   "distance": 5.75,
+   "timestamp": 1785001725000
+  },
+  {
+   "latitude": 0.0521606531,
+   "longitude": 0.0,
+   "elevation": 194.538,
+   "distance": 5.8,
+   "timestamp": 1785001740000
+  },
+  {
+   "latitude": 0.0526103139,
+   "longitude": 0.0,
+   "elevation": 193.35,
+   "distance": 5.85,
+   "timestamp": 1785001755000
+  },
+  {
+   "latitude": 0.0530599747,
+   "longitude": 0.0,
+   "elevation": 192.1,
+   "distance": 5.9,
+   "timestamp": 1785001770000
+  },
+  {
+   "latitude": 0.0535096356,
+   "longitude": 0.0,
+   "elevation": 191.35,
+   "distance": 5.95,
+   "timestamp": 1785001785000
+  },
+  {
+   "latitude": 0.0539592964,
+   "longitude": 0.0,
+   "elevation": 191.1,
+   "distance": 6.0,
+   "timestamp": 1785001800000
+  }
+ ],
+ "totalDistance": 6.0,
+ "averageGrade": 1.518
+}
