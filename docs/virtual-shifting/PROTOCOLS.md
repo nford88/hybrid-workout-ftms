@@ -168,6 +168,46 @@ ASYNC. Different mechanism. **makinolo documents no `0xFF` family at all**, so t
 under-documented externally — likely the Click-v2 vendor unlock (H16). Full comparison and
 reasoning: `experiments/13`.
 
+#### Keypad frames are gated INDEPENDENTLY of the link — CONFIRMED 2026-08-07
+
+A Click v2 stops emitting `0x23` keypad frames **while the ACL link stays up and other
+notifications on the same characteristic keep flowing**. This is a device-side gate on one message
+type, not a disconnect, and the distinction matters because every symptom above the HCI layer looks
+identical either way.
+
+Evidence — Android btsnoop, `captures/20260807-112224-click-drop-with-trainer.btsnoop`, Click
+`f4:c4:59:3d:51:a6` on ACL handle `0x0003` (the `H30` **primary**; serial `34C4593D51A6` read
+straight out of its `FF 05` frames):
+
+| Frame type | First | Last | Behaviour |
+|---|---|---|---|
+| `23 08 …` keypad | +3.208 s | **+51.565 s** | **stops** |
+| `19 10 5a` battery | +4.465 s | **+57.627 s** (final packet in capture) | **continues** |
+| ACL link `0x0003` | +169.2 s (capture clock) | — | **never dropped** |
+
+The rider kept pressing paddles for a further 20–30 s after `+51.565 s`; nothing was emitted. The
+keypad bitmaps seen are `ff fd ff ff 0f` (`0x0100`, left "−") and `ff df ff ff 0f` (`0x1000`, right
+"+"), which independently re-confirms the button map above.
+
+**Practical consequences for any client:**
+
+- **Do not infer a disconnect from silent buttons.** Base liveness on the frame *type*: battery
+  arrives roughly every 5 s unprompted, so battery-without-keypad is the signature of the gate.
+  `src/services/clickBle.ts` logs this as `NO FRAMES … (link still connected)`.
+- **A reconnect is not obviously the right recovery** — the link was never broken. Whether
+  re-running the handshake re-opens the gate is UNKNOWN.
+- Observed keypad lifetimes vary and are **not a fixed timer**: 33 s, ~48 s and ~70 s across three
+  sessions on two hosts. Do not code against a constant.
+
+Two inbound `FF 03` key-agreement frames appeared *during* the working window (+6.780 s, 85 B and
++22.256 s, 103 B), and three `FF 05` status frames straddle the cutoff (+2.929 s, +4.467 s,
++52.603 s) with **differing varints** in the candidate-countdown field — which is exactly the
+second observation `experiments/13` §5 said would settle whether that field is a timer. Not yet
+decoded; see `.claude/artifacts/click-lock-investigation-prompt.md`.
+
+Every `0xFF` frame we have ever captured is **inbound**. Whether the official client *writes* one —
+and whether that write is the unlock — is the open question.
+
 ### 1.5 Client→device commands (SYNC RX)
 
 - **Vibrate/haptic**: `12 12 08 0A 06 08 02 10 00 18 <pattern>` — pattern `0x20` = ok

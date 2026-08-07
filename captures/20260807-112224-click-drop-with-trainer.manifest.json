@@ -1,0 +1,88 @@
+{
+  "scenario": "click-drop-with-trainer",
+  "backend": "android-bugreport",
+  "operator_notes": "trainer first at HH:MM:SS, click at HH:MM:SS, last press at HH:MM:SS",
+  "hardware": {
+    "capture_host": "Android phone (adb)"
+  },
+  "firmware": {},
+  "environment": {
+    "platform": "Android",
+    "snoop_mode": "FULL"
+  },
+  "software": {
+    "official_app": "Zwift Companion / Zwift game (bridged)"
+  },
+  "markers": [
+    {
+      "ts": 1786090501.702,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "application"
+    },
+    {
+      "ts": 1786090528.867,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1786091400.75,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "application"
+    },
+    {
+      "ts": 1786092606.948,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1786092608.799,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "application"
+    },
+    {
+      "ts": 1786092617.036,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1786092635.638,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1786094318.75,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1786101091.154,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1786101476.55,
+      "label": "KICKR CORE C26B CONNECTED",
+      "kind": "action",
+      "detail": "address ff:a1:82:dd:f0:79"
+    },
+    {
+      "ts": 1786101494.115,
+      "label": "Zwift Click CONNECTED",
+      "kind": "action",
+      "detail": "address f4:c4:59:3d:51:a6"
+    }
+  ],
+  "capture_files": [
+    "20260807-112224-click-drop-with-trainer.btsnoop"
+  ],
+  "marker_source": "the phone's own logcat (blelab/androidlog.py), not a human at a keyboard \u2014 same clock as the rest of the phone, and available retroactively"
+}
