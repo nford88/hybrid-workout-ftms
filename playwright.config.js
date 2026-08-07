@@ -25,6 +25,14 @@ export default defineConfig({
     // browser talking to whatever else holds the port.
     url: BASE_URL,
     reuseExistingServer: true,
-    timeout: 20000,
+    // 60s because a cold CI container has no optimizeDeps cache. Locally it is ~2s.
+    timeout: 60000,
+    /**
+     * Pipe the server's output. Without this Playwright swallows it, and a `webServer` timeout in
+     * CI reports only "Timed out waiting Nms" with nothing to diagnose — which is why the E2E job
+     * failed on every push from 2026-07-30 to 2026-08-07 without anyone being able to see why.
+     */
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 })

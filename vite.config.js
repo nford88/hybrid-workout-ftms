@@ -55,8 +55,15 @@ export default defineConfig({
   // Development server
   server: {
     port: 3000,
-    open: true,
-    cors: true
+    // Never try to launch a browser in CI: the Playwright container has no desktop, and vite's
+    // `open` shells out to xdg-open. A dev server started by Playwright's `webServer` must come
+    // up headless and silent.
+    open: !process.env.CI,
+    cors: true,
+    // Bind on all interfaces under CI. Vite otherwise listens on `localhost` only, and inside a
+    // container `localhost` can resolve to ::1 while the poller connects to 127.0.0.1 — which
+    // presents exactly as "Timed out waiting for config.webServer" with no error to show for it.
+    host: process.env.CI ? true : undefined
   },
   
   // Preview server (for testing build)
