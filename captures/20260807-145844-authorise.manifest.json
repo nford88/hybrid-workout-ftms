@@ -1,0 +1,75 @@
+{
+  "scenario": "authorise",
+  "started_at": 1786111124.756614,
+  "backend": "android",
+  "operator_notes": "\u26a0\ufe0f MARKERS ARE NOT RELIABLE. The operator performed the physical steps out of sync with capture.py's interactive prompts, so these timestamps do NOT mark when the actions happened. Kept only as a record that the run was attempted. The authoritative timeline for 2026-08-07 phase 2 comes from Zwift's own log: session 15:19:05-15:37:01 IST, Click 51A6 paired to the live game 15:23:44-15:37:01. PHASE-2 WINDOW ZERO = 15:37:01 IST. See captures/20260807-153551-authorise.manifest.json and HYPOTHESES.md \u00a7E.",
+  "hardware": {
+    "trainer": "Wahoo KICKR CORE C26B",
+    "controller": "Zwift Click (Left+Right pair)",
+    "capture_host": "this machine"
+  },
+  "firmware": {
+    "trainer": "1.5.36",
+    "controller": "1.2"
+  },
+  "environment": {
+    "platform": "macOS-26.6-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.6",
+    "hostname": "QTX4CCXQTQ",
+    "tz": "IST+0100",
+    "tshark": "TShark (Wireshark) 4.4.9 (Git commit 18457223d1eb).",
+    "macos_bt_firmware": "Address: BC:D0:74:81:F6:07; Chipset: BCM_4387; Firmware Version: 23.5.636.5344"
+  },
+  "software": {
+    "official_app": "Zwift for Mac",
+    "our_harness": "src/dev/ble-lab.html"
+  },
+  "markers": [
+    {
+      "ts": 1786111196.222573,
+      "label": "Quit Chrome / anything holding the Click \u2014 only one GATT client at a time",
+      "kind": "action",
+      "detail": "step 1/12"
+    },
+    {
+      "ts": 1786111207.91439,
+      "label": "On the phone: open Zwift Companion and put it in bridge mode",
+      "kind": "action",
+      "detail": "step 2/12"
+    },
+    {
+      "ts": 1786111244.2277749,
+      "label": "In another terminal: ./android-capture.py --watch --expect f4:c4:59:3d:51:a6",
+      "kind": "action",
+      "detail": "step 3/12"
+    },
+    {
+      "ts": 1786111273.571713,
+      "label": "Press a paddle on EACH Click unit to wake them",
+      "kind": "action",
+      "detail": "step 4/12"
+    },
+    {
+      "ts": 1786111348.784811,
+      "label": "Launch Zwift on the Mac and sign in",
+      "kind": "action",
+      "detail": "step 5/12"
+    },
+    {
+      "ts": 1786111394.8748548,
+      "label": "Reach the device-pairing screen \u2014 DO NOT start a ride",
+      "kind": "action",
+      "detail": "step 6/12"
+    },
+    {
+      "ts": 1786111490.5201678,
+      "label": "Pair the trainer and BOTH Click units, via Companion not the Mac's radio",
+      "kind": "action",
+      "detail": "step 7/12"
+    }
+  ],
+  "finished_at": null,
+  "capture_files": [],
+  "started_at_iso": "2026-08-07T13:58:44.756Z"
+}

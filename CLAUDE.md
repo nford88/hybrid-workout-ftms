@@ -17,6 +17,13 @@ npm run build        # production build to dist/
 
 Run `npm test`, `npm run lint`, and `npm run typecheck` before considering a change done.
 
+A dev server is normally **already running on :3000** — check before starting one
+(`curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/`). Open
+`http://localhost:3000/dev/ble-lab.html` rather than spawning a second server on another port:
+Web Bluetooth device permissions and `device.id` are **origin-scoped**, so a device permitted on
+:3000 is not permitted on another port, and you would be testing a different origin from the one
+in front of you.
+
 ## Architecture (important — README.md is stale on this)
 
 React 19 + TypeScript shell over a legacy vanilla-JS core, bridged by `window` globals

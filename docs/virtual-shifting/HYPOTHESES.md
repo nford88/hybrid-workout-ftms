@@ -19,7 +19,7 @@ in sync.
 | H14 | (New, unplanned) The KICKR Core's Zwift-service ASYNC characteristic (`00000002-19ca-…`) pushes unsolicited notifications with no handshake | ✅ TRUE (raw observation); **INFERRED** that it's firmware debug/log telemetry (interpretation of the decoded ASCII, not verified against any source) | `experiments/01-dual-connection-smoke-test.md`, 2026-07-28 — 3 frames decoded to `"ATX 01, STX 00"`, `"ATX 01, STX 01"`, `"gap_params_change(0): 72, 72, 0, 600"`, all before any write was sent to the trainer's Zwift service |
 | H15 | Our Click unit(s) are v2/Ride-family (type `0x23` bitmap frames), not v1 (`0x37`) | ✅ TRUE (the `0x23` finding). ⚠️ **The "bare echo" half is superseded 2026-07-29** — that was our own client's doing: we wrote 6 bytes so we got 6 back. Real Zwift writes **`RideOn 02 03`** and the Click echoes `02 03` (`experiments/16` §2, L19) | Live capture, 2026-07-28: RideOn handshake echoed bare (no status-byte suffix, unlike documented `01 03`/`02 03`), then all ASYNC frames were type `0x23`. Idle/all-released = `23 08 ff ff ff ff 0f` exactly as documented |
 | H16 | Click v2's ~60s-without-real-Zwift-unlock disconnect (R2) affects our units, and pairing once with the real Zwift app fixes it | ⚠️ **RE-FRAMED 2026-08-07 — it is NOT A DISCONNECT AT ALL.** Android btsnoop (`captures/20260807-112224-click-drop-with-trainer`) shows the Click stops emitting `0x23` keypad frames at **+51.565 s** while `19 10 5a` battery frames keep arriving on the same characteristic to **+57.627 s** (the final packet) and the **ACL link never drops** — still up when the capture ended, with the rider pressing for a further 20-30 s. So the device **gates one message type** and stays connected. Every prior measurement of this phenomenon was taken above HCI, where a gate and a drop are indistinguishable; macOS's `GATT disconnected after 78.4s` was a *consequence* of a link left partially quiet, not the cause. The **keypad lifetime is not a fixed timer**: 33 s / ~48 s / ~70 s across three sessions on two hosts. What remains genuinely open is the ORIGINAL claim — whether a real Zwift session unlocks it — and it is now sharper: every `0xFF` frame we have ever captured is **inbound**, so if the official client *writes* one, that write is the unlock. `experiments/13` §5's decisive test is also now answerable: three `FF 05` frames straddle the 2026-08-07 cutoff with differing varints in the candidate-countdown field. See §E 2026-08-07 and `.claude/artifacts/click-lock-investigation-prompt.md`. Earlier reading retained below for provenance. Previous status: ⚠️ **MECHANISM LIKELY NOT AUTHORISATION — see H29 (2026-07-29, `experiments/16`).** The *disconnects* remain confirmed, but the authorisation framing now looks wrong: an authorised bridged session held a Click link through **225.8 s of complete ATT silence**, and the one link in the same file that died on a supervision timeout was the one that **never sent `RideOn`**. The discriminating variable is the **handshake**, not authorisation and not traffic (H28 falsified). Earlier reading retained below for provenance. Previous status: ⚠️ **MECHANISM STILL OPEN — competing explanation H28.** The disconnects are confirmed; which mechanism causes them is not. A capture that day showed Zwift **Companion** dropping a Click V2 link at **73.5 s** (HCI `0x08`, supervision timer expired after 70 s of silence, then 12 failed reconnects). **This does not discriminate H16 from H28**: Companion is not the app BikeControl says performs the unlock, so both hypotheses predict it. An intermediate claim that this capture *refuted* H16 was **wrong and is retracted** — it rested on misreading `com.zwift.android.prod` as the game app (`experiments/15-zwift-app-click-session.md` §3.3, correction block). Original reading, retained: ✅ **LIKELY TRUE — and user confirms this is a required first step, not just a fix-it-if-broken workaround.** Zwift Companion pairing is "the sync process" that must happen before third-party BLE clients (our web harness included) get a usable connection at all. **Filed as base validation BV2** (`experiments/00-test-matrix.md` §6) — one clean before/after pair, not yet a repeated controlled trial | Live capture, 2026-07-28: pre-sync, repeated connect→disconnect cycles at ~44–90s intervals (e.g. 13:51:21→13:52:29 = 68s). Post-sync (paired both units in Zwift Companion once), the next connection held **5+ minutes straight** with zero drops (`experiments/03-click-buttons-partial.md`). User confirmation, this turn: treat Companion sync as mandatory onboarding, not optional |
-| H17 | The Left/Right Click pair has a primary/secondary relay relationship — only one physical unit needs a BLE connection to receive both controllers' button events | ✅ **CONFIRMED** | Live capture, 2026-07-28: Left D-pad + "−" presses arrived on the exact same BLE connection already serving Right's buttons, with zero new connect/disconnect events in between (`experiments/04-click-mapping-and-relay-confirmed.md`). **Major simplification**: production adapter needs one GATT connection, not two |
+| H17 | ✅ **CONFIRMED IN BOTH DIRECTIONS 2026-08-07** — §E. The productive direction is now measured in the product: a live SIM workout on a **single** Click link (`clickBle.ts` connects exactly one device) carried **both** `SHIFT_DOWN 0x100` (left paddle) and `SHIFT_UP 0x1000` (right paddle), so the right unit's presses reach the left unit's connection. Earlier same-day verdict, still true and now the *only* qualification — ⚠️ the relay is ONE-DIRECTIONAL ([`19`](experiments/19-click-v2-challenge-and-gate.md) §0.6): with **only the RIGHT unit connected, the LEFT unit's presses never arrive** — only the right's own five bits (A `0x10`, B `0x20`, Y `0x40`, Z `0x80`, "+" paddle `0x1000`) fired. The relay flows **toward the left unit**, so connecting the right alone costs the D-pad and the "−" paddle. This is the half `experiments/16` §7.1 left untested. Original claim follows: The Left/Right Click pair has a primary/secondary relay relationship — only one physical unit needs a BLE connection to receive both controllers' button events | ✅ **CONFIRMED** | Live capture, 2026-07-28: Left D-pad + "−" presses arrived on the exact same BLE connection already serving Right's buttons, with zero new connect/disconnect events in between (`experiments/04-click-mapping-and-relay-confirmed.md`). **Major simplification**: production adapter needs one GATT connection, not two |
 | H18 | Full Left/Right button→bit mapping | ⚠️ **CORRECTED 2026-07-29 — the Right "+" paddle is `0x1000`, not `0x20`.** `0x20` is the **B** face button. Every button was pressed and labelled in one browser session (`experiments/16` Phase 1), giving a contiguous face-button run `0x10` A / `0x20` B / `0x40` Y / `0x80` Z with both paddles outside it (`0x100` Left "−", `0x1000` Right "+"). The old `0x20` reading — marked *"confirmed 4x independently"* — put `shiftUp` on the B button, so the paddle never produced a shift event; the 2026-07-29 bench log shows `up: 0` across hundreds of frames while `shiftDown` worked, which is the symptom. **Real bug fixed in `src/dev/protocols/zapFrame.js`** (`OUR_CLICK_PADDLES.RIGHT_PLUS`), with a regression test asserting `0x20` is *not* a shift. Also: our **Z is `0x80`**, a bit the community table does not list at all. Previous status: ✅ **CONFIRMED for what we need** | `experiments/04-click-mapping-and-relay-confirmed.md`: Right "+"=`0x20`, Left "−"=`0x100` (neither matches the community-borrowed "SHFT_UP_R"/"SHFT_DN_L" names); D-pad (Left) and Y/Z/A (Right) match the community table exactly. "B" unconfirmed (likely mixed up with adjacent "+" paddle) |
 | H19 | KICKR Core's Reset (0x01) opcode revokes control (per FTMS §4.16.2.1) | ❌ **FALSE, for the ATT-level claim only** — Reset ack'd Success, then a Sim Params write with no re-Request-Control was ALSO accepted (`80 11 01`, not the spec-predicted `80 11 05` Control Not Permitted). This part is a solid protocol fact. **Corrected** (user challenge, same session): the follow-on claim that this also produced a *genuine, confound-free* resistance change (based on a power-trace rise) was overreach from a single uncontrolled trial — rider effort isn't controlled for. Demoted to a base validation, BV1 in `experiments/00-test-matrix.md` §6, pending a Machine-Status-based or blinded-repeat retest | `experiments/05-ftms-conformance-hw-v10.md`, 2026-07-28 + addendum |
 | H20 | A Web Bluetooth client can provoke a real "concurrent unserialized write" race against the trainer (to test its ATT-level conflict handling) | ❌ **FALSE, structurally** | `experiments/05-ftms-conformance-hw-v10.md`: Chrome's own GATT layer rejects the second same-characteristic write client-side (`NetworkError: GATT operation already in progress`) before it reaches the peripheral — the race the test wanted to observe can't happen from one Chrome tab. Would need two independent BLE clients |
@@ -76,7 +76,9 @@ in sync.
 | U13 | ~~Whether the two Click units have some left/right-specific behavior~~ **ANSWERED**: they're a relay pair (H17) — one unit's BLE connection carries both controllers' button events | Scopes the input adapter's connection model | `experiments/04-click-mapping-and-relay-confirmed.md` |
 | U14 | (New, 2026-07-28) QZ's hub handshake sends a command with code `0x41` (`init1 = 41 08 05`, `ftmsbike.cpp:203-243`) that does not correspond to any command code in the full `Zwift hub.proto` file (`0x00/0x03/0x04/0x07/0x12/0x19/0x23/0x37/0x3c`) | Unknown whether this write is required for the KICKR to accept the subsequent gear commands, or is a no-op/vestige; affects whether Plan A′'s handshake can be simplified or must replicate it exactly | HW-V9 (try the recipe with and without `init1`) |
 | U16 | (New, 2026-07-28) `VIRTUAL_SHIFTING_DESIGN.md` §4.3's baseline-identity property (`r_gear=r_phys` ⇒ `G_send=G` exactly) requires knowing the rider's actual current physical gear ratio — the design's example default (Zwift table gear 12, ratio 2.40) is just an illustrative starting point, not a measured value, and this session found it does NOT match the test rider's actual trainer gear (back-solved from measured speed/cadence: real `r_phys≈1.85`, closest table entry 1.86). Using the wrong assumed `r_phys` breaks the baseline-identity property and inflates candidate (b)'s computed target power dramatically (≈355W vs a corrected ≈218W) purely via the aero term on an over-large virtual speed | Confirms the drivetrain implementation must derive `r_phys` from an initial calibration/measurement step (e.g. from IBD speed+cadence at a stable moment), not assume any fixed default — a real implementation requirement, not just a bench-test artifact | Will be implicitly re-verified when HW-V12 candidate (b) is actually run next session using the corrected `r_phys≈1.85`; `experiments/08-hw-v12-bakeoff-partial.md` |
-| H30 | (New, 2026-07-29 — now the leading explanation) The 44–90 s drop is a **relay-role** effect, not a protocol one: unit `f4:c4:59:3d:51:a6` is the **primary** of the `H17` relay pair and `f4:c4:59:81:d9:a1` is the **secondary**. A direct link to the secondary has no role — its inputs are published via the primary — so the device sleeps it on a hard ~61 s timer, while the primary holds a browser link **20+ minutes** and streams buttons at ~10 Hz and battery every ~5 s. Their `FF 05` status frames carry **different protobuf fields entirely** (secondary: f2=8, f3=95; primary: f4=battery%, f5, f6, f7), and the secondary publishes *nothing at all* after a correct, correctly-echoed handshake | If TRUE the whole drop problem dissolves into **"connect the primary"** — no unlock, no authcode, no keepalive — and `R2`/`H16` stop being risks. It also means every drop measurement before 2026-07-29 was taken on the wrong unit | **Connect a browser to the PRIMARY only and press the SECONDARY's buttons.** If they arrive, done. `experiments/16` Phases 2–3 |
+| H33 | ❌❌ **FALSIFIED OUTRIGHT 2026-08-07 (phase 3, bench)** — §E. Authorised, the challenge **arrived, went unanswered, and the gate stayed open 238 s**. Answering is neither necessary (this run) nor sufficient (phase 1); the `FF 03`/`FF 04` exchange is **decoupled from the keypad gate**. Earlier same-day verdict, now subsumed — ❌ FALSIFIED for the empty `ff 04 00` form — [`19`](experiments/19-click-v2-challenge-and-gate.md) §0.5. Paired runs on the LEFT unit, lapsed, differing only in whether we answered: gate closed at **+60.8 s** (no answer) and **+60.4 s** (answered twice) after the handshake; challenge bodies **85 then 103 bytes** in both; retry interval **16.4 s** vs **15.5 s**; **6 cues hit before closure in both**. The device's re-challenge interval matches the *unanswered* case (15.5 s), not the *accepted* one (265.8 s) — so `ff 04 00` is a **non-answer**, consistent with BikeControl's `if (isPersistedUnlocked)` guard. Only the 21-byte body remains, and §3/§6 argue it is not computable by us. ~~The keypad gate closes because the device's `FF 03` challenge went **unanswered**.~~ Real Zwift replies with an `FF 04` write to SYNC RX `0003` ~0.45 s after every challenge — twice in `20260729-164954`, once with an **empty** body (`ff 04 00`) and once with a **21-byte** body. In the failing 08-07 session both challenges were ignored (retry 15.5 s later with a longer body) and the gate closed 30.2 s after the second. We have never answered one | If TRUE **and the empty form is accepted**, the fix is a 3-byte reply in `clickBle.ts` — no crypto, no timer, no server. If only the 21-byte form is accepted, the browser is out: the challenge carries a fresh ephemeral P-256 point per connection, and BikeControl **proxies the real Zwift app** rather than computing the answer | **`experiments/19` §7 arm B.** Auto-answer toggle now in `src/dev/ble-lab.html`. Note `experiments/16` run 5 did *not* test this: it wrote `ff 04 00` unsolicited on the **silent** unit, which issues no challenge |
+| H32 | ✅ **STRONGLY SUPPORTED 2026-08-07 (phase 3, bench)** — §E. Paired difference on the same unit/client/cue-schedule, only time-since-Zwift differing: lapsed → gate closed +60.8 s, 6 cues; authorised → **gate open the full 240 s, 24/24 cues**. Phase 4 (≥25 h) still owed, to show it is reversible. Original: (New, 2026-08-07 — **the explanation to beat**) The gate is a lapsed **~24 h authorisation window**, and the `FF 03`/`FF 04` exchange is how it is refreshed rather than the thing that fails. The rider's working workout was 2026-07-29 ~19:21, **2.5 h after** an authorised bridged Zwift game session; the 08-07 failure is **nine days later** with no Zwift in between. Nothing in our client changed. BikeControl documents the same window and the same ~1-minute cutoff | If TRUE there is no byte we can send: the fix is "open Zwift for 30 s every 24 h", or BikeControl's shipping workaround of rebooting the unit every 60 s (`Opcode.RESET` = `0x18`) | **`experiments/19` §7.-1 — a paired 2×2**, the rider's design and better than the one-sided control originally written: run arms A/B **lapsed** (before any Zwift), authorise with the **game**, re-run A **authorised**, then re-run A **≥25 h later**. Same unit, same client; only time-since-Zwift differs. ⚠️ **Ordering is time-critical** — the lapsed state is perishable and opening Zwift destroys it for ~24 h, so the lapsed arms must go first |
+| H30 | ❌ **The two units are the wrong way round — measured 2026-08-07** ([`19`](experiments/19-click-v2-challenge-and-gate.md) §0.5). Serial-confirmed `34C4593D51A6` (LEFT), the unit H30 calls the working **primary**, is the one whose keypad gate **closes at ~60.5 s** when lapsed; the other unit ran **9 minutes across two runs, 54/54 cued presses, zero `FF 03` challenges, gate never closed**, and emits *only* `23` keypad frames — no battery, no `FF 05`, no challenge. **INFERRED reconciliation**: H30's 20-minute run was 2026-07-29, *inside* the authorisation window, so it measured a real asymmetry but attributed it to relay role rather than to which unit carries the authorisation. **The external sources were right and we were wrong** — BikeControl's `unlock_rightSideNeedsNoUnlock` and qdomyos-zwift#4456 both say the left locks and the right does not. ⚠️ **Not yet a product answer**: only `0x1000` ('+') has been observed from the right unit, so shift-down needs a second bit — pressing every button on the right unit is the gating test. ~~Left/right polarity contested:~~ BikeControl's UI (`unlock_rightSideNeedsNoUnlock`) and qdomyos-zwift#4456 both say the **left** unit is the one that locks and the right needs nothing, while we measure the opposite — our chatty/primary `3d:51:a6` is the **LEFT** unit by `experiments/16`'s button map, and the right one is the inert one. One of the two accounts is wrong; `experiments/19` §7 arm D is the test. The 44–90 s drop is a **relay-role** effect, not a protocol one: unit `f4:c4:59:3d:51:a6` is the **primary** of the `H17` relay pair and `f4:c4:59:81:d9:a1` is the **secondary**. A direct link to the secondary has no role — its inputs are published via the primary — so the device sleeps it on a hard ~61 s timer, while the primary holds a browser link **20+ minutes** and streams buttons at ~10 Hz and battery every ~5 s. Their `FF 05` status frames carry **different protobuf fields entirely** (secondary: f2=8, f3=95; primary: f4=battery%, f5, f6, f7), and the secondary publishes *nothing at all* after a correct, correctly-echoed handshake | If TRUE the whole drop problem dissolves into **"connect the primary"** — no unlock, no authcode, no keepalive — and `R2`/`H16` stop being risks. It also means every drop measurement before 2026-07-29 was taken on the wrong unit | **Connect a browser to the PRIMARY only and press the SECONDARY's buttons.** If they arrive, done. `experiments/16` Phases 2–3 |
 | H29 | ❌ **FALSIFIED 2026-07-29** (`experiments/16` Phases 2–3): five consecutive runs on the silent unit gave **60.5 / 60.7 / 60.8 / 61.0 / 61.2 s** — a 0.7 s spread — with `RideOn 02 03`, with bare `RideOn`, and with `ff 04 00` sent twice. Every handshake was echoed correctly, so the device was responsive; the form of the handshake changes **nothing**. ~~What keeps a Click V2 link alive is **completing the ZAP handshake**~~, not an authcode, not a Zwift-server session, and not traffic volume. Basis: in one snoop file, a Companion link that **never sent `RideOn`** died at 73.5 s on a supervision timeout, while a bridged-game link that sent **`RideOn 02 03`** at +17 s then sat **225.8 s with zero ATT traffic** and was still up at +310 s. Every other teardown in the bridged session was `0x16` local-host (deliberate), and there was **no supervision timeout anywhere in it** | If TRUE the drop problem is *already solved* — our harness sends `RideOn`, just the **bare 6-byte** form where Zwift sends **8 bytes (`RideOn 02 03`)**. A 2-byte change, no unlock, no authcode, no capture | **Send `RideOn 02 03` from `src/dev/ble-lab.html` and re-time the drop** (`experiments/16` §7.1). Loose end to resolve: `03`'s pre-sync drops happened to a harness that *did* send bare `RideOn`, so if the 2-byte change is not sufficient, next candidates are Zwift's `0300` (notify+indicate) CCCD values on `0002`/`0004`, then the `FF 04 00` write |
 | H28 | ❌ **FALSIFIED 2026-07-29** (`experiments/16` §1): the authorised link went **225.8 s with zero ATT traffic in either direction** — three times the 73.5 s drop — and did not disconnect. Traffic volume is not what holds the link. ~~The Click V2's 44–90 s disconnect is an **idle/inactivity timeout**~~ — the device sleeps its radio when no ZAP traffic flows — rather than an authorisation timeout that third-party clients suffer and Zwift pairing cures. Basis: the **official Zwift app** was captured dropping a Click V2 link at 73.7 s on HCI reason `0x08` (supervision timeout; the Click stopped answering) after 70 s of zero traffic, and the one variable that tracks all three observations we have — our idle harness dropping at 44–90 s, our harness holding 5+ min *while paddles were being pressed*, and Zwift itself dropping while idle — is **whether traffic was flowing**, not who the client was | If TRUE, the drop is defeatable with a keepalive or periodic read and needs no unlock at all, which makes most of the `11`/`12` capture programme optional and unblocks the Click from the browser today. If FALSE, H16 stands and the unlock is genuinely required | **A 10-minute browser test, no capture, no phone**: right-side Click alone from `src/dev/ble-lab.html`, two 180 s arms — idle vs. a paddle press every 30 s — both with no recent Zwift contact. `experiments/15-zwift-app-click-session.md` §6.1. Confound to control: the captured Zwift session never completed pairing, so it may not represent a fully-onboarded Zwift link |
 | U17 | (New, 2026-07-29) What the `2901` User Description descriptors on `0100`/`0101`/`0102` say (handles `0x0025`/`0x0029`/`0x002d`). Zwift discovered all three and read none | They may name the unlock characteristics outright — no source we have, BikeControl included, documents `0102` at all | Free from Web Bluetooth: `getDescriptor('gatt.characteristic_user_description')` then `readValue()`. `experiments/15` §6.2 |
@@ -85,7 +87,138 @@ in sync.
 
 ## E. Result log
 
+### 2026-08-07 (post-phase-3, live SIM workout) — ★★ dual shifting works end to end, and the relay is confirmed in the productive direction
+
+Console log of a real SIM workout on route "Leap Lane Hills", run inside the authorisation
+window. **Both shift directions fired repeatedly and were acted on**, walking the gear across
+most of its range (12→14 up, 14→…→6 down, 6→…→14 up, and back) with a `[GEAR] n -> m/24` and a
+`[CLICK] shiftX → performed` for every one. The session ran from route 0 m past 260 m with shifts
+throughout — far beyond the ~60 s lapsed gate closure.
+
+**★ This confirms the relay right→left, which `H17` had left untested.** The argument is from
+code, and it is tight:
+
+- `src/services/clickBle.ts:87` performs **one** `requestDevice` and holds **one** `device` — the
+  app cannot connect two Clicks.
+- `src/services/clickButtons.ts:23-24` maps `SHIFT_DOWN = 0x100` (**left** "−" paddle) and
+  `SHIFT_UP = 0x1000` (**right** "+" paddle).
+- Both fired on that single link. `0x1000` lives on the right unit, so the right unit's presses
+  **must** have arrived over the left unit's connection.
+- It cannot have been the right unit that was connected: phase 1 arm D showed the right unit
+  alone receives *only* its own five bits, so `0x100` would never have appeared.
+
+So the `§0.6` table's "Left unit alone → …*plus the right's presses via the relay*" row is now
+**measured in the product**, not inferred from `experiments/04` plus the rider's recollection.
+
+⚠️ **Two things this does NOT show.** (a) It does not test the gate — the run was inside the
+window, so an open gate is the *expected* result and this is a corroboration of phase 3 in the
+real app rather than an independent test. (b) The connected unit's serial was not recorded in
+this log (it starts after the Click connected); the identification above is inference from code.
+Cheap to make direct: log the sniffed serial on connect.
+
+**Consequence for the product**: one link gives everything — D-pad, "−", and the right's "+".
+The cost is that the left unit is the one that gates, and because both directions ride that link,
+a closure takes **both** away at once. That is why the failure presents as "shifting stopped"
+rather than "half of shifting stopped".
+
+### 2026-08-07 (phase 3, bench) — ★★ the authorised control PASSES, and the challenge is not the gate
+
+`captures/ble-lab-log-authorised-a.json`. Arm A on the LEFT unit (`34C4593D51A6`), trainer not
+connected. The export's `wallClock` is **genuine UTC** (trailing `Z`), unlike the btsnoop
+timebase — so 14:54:49Z–14:59:33Z is **15:54:49–15:59:33 IST**, starting **17 m 48 s after** the
+authorisation window opened at 15:37:01 IST. Cross-check: the file's mtime is 16:00 local, one
+minute after the arm ended.
+
+| | **Lapsed** (phase 1, same unit/client) | **Authorised** (this run) |
+|---|---|---|
+| Gate | **CLOSED at +60.8 s** after handshake | ✅ **stayed OPEN the full 240 s** |
+| Cues | 6 hit before closure | ✅ **24 / 24 hit**, 0 misses |
+| Challenges | 2, retry at **15.5 s** | **1**, no retry for **≥238 s** |
+| Answered? | no | no (`answersSent: 0`) |
+| Link | still up | still up |
+
+Only time-since-Zwift differed. Median press latency 476 ms; serial verified.
+
+1. **H32 STRENGTHENS to the strongest thing we have.** This is the paired difference §7.-1 was
+   designed around, and it lands cleanly: same unit, same client, same cue schedule, same
+   don't-answer policy, opposite outcome.
+2. **★ H33 is now falsified in its general form, not just for `ff 04 00`.** The challenge
+   **arrived, was ignored, and the gate stayed open for 238 more seconds.** So answering the
+   `FF 03` challenge is not what holds the gate open — in *either* direction: phase 1 showed
+   answering does not help when lapsed, and this shows *not* answering does not hurt when
+   authorised. The `FF 03`/`FF 04` exchange is decoupled from the keypad gate.
+3. **★ The re-challenge interval reads out AUTHORISATION, not whether you answered.** Previously
+   we had 15.5 s (lapsed, unanswered) vs 265.8 s (authorised, answered) and read the difference
+   as acceptance. This run breaks that pairing: **authorised and unanswered → no retry for
+   ≥238 s.** So the interval tracks the authorisation state alone. (Bound only: 238 s < 265.8 s,
+   so we cannot say the 265.8 s retry did not occur just after the arm ended — but 238 s is 15×
+   the lapsed interval, which is the discrimination that matters.)
+4. `bodyLength: 85` on the first challenge, matching phase 1's first-challenge body. Consistent.
+5. ⚠️ **The `KEYPAD GATE CLOSED` line at uptime 291 s is NOT a gate closure.** It is tagged
+   `duringArm: false` and fires 7 s after the arm ended, when the rider stopped pressing —
+   §2's exact "idle rider vs closed gate" trap. The instrument tags it correctly; a reader
+   skimming for the string would get this wrong.
+
+**Still open:** phase 4 (≥25 h, expect the gate to close again) is what converts H32 from
+"fits every observation" to "measured, and reversible, on our own hardware".
+
+### 2026-08-07 (later) — the outbound `FF 04` exists; the countdown does not; and the keypad stream is press-gated
+
+Full working: [`experiments/19`](experiments/19-click-v2-challenge-and-gate.md). Offline
+re-analysis of raw `btsnoop` bytes, no new hardware run. Four results, three of which correct
+something written earlier the same day.
+
+**1. ⚠️ The entry below is wrong about the end of the capture, and so is commit `0bf477c`.**
+`+57.627 s` is **not** "the final packet" — it is where `analyze.py`'s collapsed step list stops.
+The Click link carries **21 more battery frames**, every ~5.6 s, to **+158.876 s**. So the gap
+between the last keypad frame and the end of the Click's traffic is **106.4 s**, not 6 s. The
+gating finding survives and is strengthened; the number was a report artefact. Regenerate that
+report with `--no-collapse`.
+
+**2. ★ The `23` keypad stream is PRESS-gated with a ~1.0 s hold-off, so frame absence proves
+nothing.** Across all 29 bursts in both captures, every burst ends **0.90–1.23 s** after the last
+non-idle bitmap. In the *working* session the keypad stream has healthy silences of **105 / 108 /
+128 / 136 s** — the rider simply not pressing. The failing session's silence is inside that range.
+The only real evidence of a gate is *"a press produced nothing"*, and the capture manifest's
+operator notes were never filled in (`"last press at HH:MM:SS"` is the literal recorded value).
+**Every future run must cue and score its presses.** `src/dev/ble-lab.html` now has an arm runner
+that does exactly this — it beats a 10 s cue, scores each one hit or miss, and prints a verdict.
+
+**3. ★★ The official client DOES write an `0xFF` frame — twice, and we have had the bytes since
+2026-07-29.** In `captures/20260729-164954-bridge-ride.btsnoop` on the primary unit, each inbound
+`FF 03` challenge on ASYNC `0002` is answered ~0.45 s later by a write to SYNC RX `0003`:
+
+```
++7557.042 RX  ff 03 00 0a 21 03 …   →  +7557.479 TX  ff 04 00                     (empty body)
++7822.813 RX  ff 03 00 0a 21 02 …   →  +7823.317 TX  ff 04 00 0a 15 <21 bytes>
+```
+
+In the failing 08-07 session **both challenges went unanswered** (+176.1 s, then a re-challenge
+15.5 s later with a longer body) and the gate closed 30.2 s after the second. Answered → next
+challenge 265.8 s later; unanswered → retry in 15.5 s, then nothing. Note the gate did **not**
+close immediately: nine keypad bursts occurred after the first unanswered challenge.
+
+**4. `FF 05` field 3 is NOT a countdown — `H26`'s countdown clause is FALSIFIED.**
+`experiments/13` §5 flagged `496` as a candidate timer and named the decisive test: *"if the value
+falls between observations, it is a timer."* It does not fall. Across the 08-07 failure boundary it
+**rose 15 → 900** in 48 s, and across sessions it takes 496 / 248 / 15 / 900 with no trend. What
+does look like a marker is **field 2, which flipped 0 → 1 and arrived 0.136 s after the last keypad
+frame** — n=1, unreplicated.
+
+**Also settled**: there is **no keep-alive**. Nine client writes in 786 s of working link, seven of
+them inside the first second of the handshake.
+
+**The explanation that now has to be beaten** (`19` §6.1): the rider's working workout was
+2026-07-29 ~19:21, **2.5 h after** an authorised bridged Zwift game session; the failure is
+2026-08-07, **nine days later** with no Zwift in between. BikeControl documents a ~24 h
+authorisation window. Nothing about our client changed — the device's stored state did. This fits
+every observation *including* the ground truth, so `H32` below must be controlled for, not assumed
+away: **any bench arm run inside 24 h of a Zwift session will pass and prove nothing.**
+
 ### 2026-08-07 — Android btsnoop: the Click GATES keypad frames, it does not disconnect
+
+> ⚠️ **Corrected above.** "+57.627 s, the final packet" is a truncated-report artefact; the real
+> last frame on the Click link is at +158.876 s. Read the rest of this entry with that fixed.
 
 `captures/20260807-112224-click-drop-with-trainer.btsnoop`, taken on Android (Chrome + Web
 Bluetooth) with the trainer connected first, then the Click. Click `f4:c4:59:3d:51:a6` on ACL handle

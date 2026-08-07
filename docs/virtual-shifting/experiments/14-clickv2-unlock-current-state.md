@@ -115,6 +115,13 @@ next connect will show whether our unit exposes them.
 - *"The unlock **requires Zwift's servers**. Users must open the Zwift app and connect their
   device for 10-30 seconds… No offline method is documented."* Notably: *"a paid
   subscription is not required for this step."*
+  > ✅ **CONFIRMED on our own hardware 2026-08-07** ([`19`](19-click-v2-challenge-and-gate.md)
+  > §7). Both claims hold: no subscription **and no ride**. In
+  > `20260729-164954-bridge-ride.btsnoop` the first `FF 04` answer lands **5.3 s after the
+  > handshake** (the empty `ff 04 00`; the 21-byte body follows at +270.6 s, behind the second
+  > challenge), and the trainer received **zero writes after +17 s** across the whole session — so
+  > that authorisation happened on Zwift's **pairing screen**. This matters: the rider has no
+  > subscription, and it is why the two-day experiment is runnable at all.
 - `unlock_bikecontrolAndZwiftNetwork`: *"BikeControl and Zwift must be on the same network or
   device."* ⇒ BikeControl **proxies**: it presents a fake Zwift-compatible peripheral, lets
   the real Zwift app (which holds server auth) perform the unlock, then retains the session.
@@ -136,8 +143,21 @@ negative as literature can give.
 
 `03`, `GOALS.md` non-goals and `RISKS-ROADMAP.md` R2 all record **Zwift Companion** as the
 sync step that fixed our drops. Either Companion also works, or that observation was
-confounded (BV2 was always a single uncontrolled before/after). **Flagged as a genuine
-conflict between our own record and the current external source.**
+confounded (BV2 was always a single uncontrolled before/after). ~~**Flagged as a genuine
+conflict between our own record and the current external source.**~~
+
+> ✅ **RESOLVED 2026-08-07** — see [`19`](19-click-v2-challenge-and-gate.md) §7.-1. Both records
+> are right, because **Companion in bridge mode is a BLE proxy for the game**: it holds the links
+> to the trainer and both Click units and relays one encrypted stream to the game over the LAN
+> (`16` §5 measured that leg — TCP/21588, entropy 7.74/7.91). The protocol decisions are the
+> game's; Companion only moves the bytes.
+>
+> Proof from our own capture: **both `FF 04` writes in `20260729-164954-bridge-ride.btsnoop` are
+> `Sent` from the phone's radio — written by Companion, while it bridged a live game.**
+>
+> So `unlock_openZwift`'s "not the Companion" means *Companion alone is not enough*, which is
+> exactly the configuration `15` measured writing no payload at all. With a game behind it,
+> Companion authorises. **The requirement is a live game session, not a particular BLE route.**
 
 ### 7. `FF 04 00` — hypothesis survives, but conditionally
 

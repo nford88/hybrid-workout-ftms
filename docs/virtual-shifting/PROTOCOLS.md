@@ -181,13 +181,33 @@ straight out of its `FF 05` frames):
 
 | Frame type | First | Last | Behaviour |
 |---|---|---|---|
-| `23 08 …` keypad | +3.208 s | **+51.565 s** | **stops** |
-| `19 10 5a` battery | +4.465 s | **+57.627 s** (final packet in capture) | **continues** |
+| `23 08 …` keypad | +3.208 s | **+51.6 s** (raw: +52.5 s) | **stops** |
+| `19 10 5a` battery | +4.465 s | **+158.876 s** — 21 more frames, every ~5.6 s | **continues** |
 | ACL link `0x0003` | +169.2 s (capture clock) | — | **never dropped** |
 
-The rider kept pressing paddles for a further 20–30 s after `+51.565 s`; nothing was emitted. The
-keypad bitmaps seen are `ff fd ff ff 0f` (`0x0100`, left "−") and `ff df ff ff 0f` (`0x1000`, right
-"+"), which independently re-confirms the button map above.
+> ⚠️ **Corrected 2026-08-07** (`experiments/19` §1): the battery row previously read
+> *"+57.627 s (final packet in capture)"*. That is where `analyze.py`'s **collapsed step list**
+> stops, not where the capture does. The Click link carries 21 further battery frames to
+> **+158.876 s**, so the gap is **106.4 s**, not 6 s. Regenerate that report with `--no-collapse`.
+
+The rider kept pressing paddles for a further 20–30 s after the last keypad frame; nothing was
+emitted. The keypad bitmaps seen are `ff fd ff ff 0f` (`0x0100`, left "−") and `ff df ff ff 0f`
+(`0x1000`, right "+"), which independently re-confirms the button map above.
+
+##### ★ The `0x23` stream is PRESS-gated, so its absence proves nothing on its own
+
+Measured over all 29 bursts in two captures (`experiments/19` §2). Within a burst the device
+streams the full bitmap at **~11 Hz** (0.09 s spacing); every burst ends **0.90–1.23 s** after the
+last *non-idle* bitmap. No exceptions, two hosts, two clients.
+
+Consequence: in a **healthy** session the keypad stream has silences of **105 / 108 / 128 / 136 s**
+— just the rider not pressing. The failing session's silence sits inside that range.
+
+> **Never treat "no `0x23` frames" as evidence of a gate.** The only evidence is *"a press produced
+> nothing"*, which requires knowing when the presses happened. The 2026-08-07 capture's operator
+> notes were never filled in, so its gating claim rests on the rider's recollection alone. Use the
+> arm runner in `src/dev/ble-lab.html`: it **cues** each press on a 10 s beat and scores it hit or
+> miss, so the stimulus is timestamped alongside the response.
 
 **Practical consequences for any client:**
 
@@ -200,20 +220,49 @@ keypad bitmaps seen are `ff fd ff ff 0f` (`0x0100`, left "−") and `ff df ff ff
   sessions on two hosts. Do not code against a constant.
 
 Two inbound `FF 03` key-agreement frames appeared *during* the working window (+6.780 s, 85 B and
-+22.256 s, 103 B), and three `FF 05` status frames straddle the cutoff (+2.929 s, +4.467 s,
-+52.603 s) with **differing varints** in the candidate-countdown field — which is exactly the
-second observation `experiments/13` §5 said would settle whether that field is a timer. Not yet
-decoded; see `.claude/artifacts/click-lock-investigation-prompt.md`.
++22.256 s, 103 B) and **both went unanswered** — the second was a re-challenge 15.5 s after the
+first, with a longer body, and the gate closed 30.2 s after it. Three `FF 05` status frames straddle
+the cutoff (+2.929 s, +4.467 s, +52.603 s).
 
-Every `0xFF` frame we have ever captured is **inbound**. Whether the official client *writes* one —
-and whether that write is the unlock — is the open question.
+> **Resolved 2026-08-07** (`experiments/19` §3–§4), superseding the two paragraphs this note
+> replaced:
+> - ~~"Every `0xFF` frame we have ever captured is inbound."~~ **FALSE.**
+>   `20260729-164954-bridge-ride.btsnoop` contains **two outbound `FF 04` writes** to SYNC RX,
+>   answering `FF 03` challenges ~0.45 s later. Bytes in §1.5.
+> - ~~The `FF 05` candidate-countdown field.~~ **FALSIFIED.** It rose 15 → 900 across the failure
+>   boundary and takes 496 / 248 / 15 / 900 across four sessions. Not a timer. `FF 05` is two
+>   messages: `fa 05` = battery telemetry for the relay pair (this %, partner %, this mV, partner
+>   mV — the failing session read `90 / 255 / 2863 / 0`, i.e. **partner absent**), and `ea 05` =
+>   session state, whose **field 2 flipped 0 → 1** 0.136 s after the last keypad frame (n=1).
+>   BikeControl names these two frames `RESPONSE_STOPPED_CLICK_V2_VARIANT_1` (`ff 05 00 ea 05`)
+>   and `VARIANT_2` (`ff 05 00 fa 05`) — though we observe both at connect time too, so "stopped"
+>   is its label rather than a proven meaning.
 
 ### 1.5 Client→device commands (SYNC RX)
 
 - **Vibrate/haptic**: `12 12 08 0A 06 08 02 10 00 18 <pattern>` — pattern `0x20` = ok
   buzz, `0x60` = "gear limit" buzz (QZ usage).
-- Reset: `18 05` (makinolo).
-- Click v2 post-handshake (BikeControl, when previously unlocked): `FF 04 00`.
+- Reset: `18 05` (makinolo). BikeControl's `Opcode.RESET = 24 = 0x18` plus its
+  `[opcode, ...body]` framing implies a bare **`18`** with no body when the message is null —
+  which is what its 60 s reboot workaround writes. Framing INFERRED (its call site is in a
+  private submodule); the opcode value is CONFIRMED from two independent sources.
+- **Click v2 challenge answer: `FF 04 …` written to SYNC RX `0003`, ~0.45 s after each
+  inbound `FF 03` on ASYNC `0002`.** First-party bytes, `20260729-164954-bridge-ride.btsnoop`,
+  primary unit `f4:c4:59:3d:51:a6` (`experiments/19` §3):
+
+  | Challenge | Reply, ~0.45 s later |
+  |---|---|
+  | `ff 03 00 0a 21 03 …` field 3 = 40 B (first of the session) | `ff 04 00` — **empty body** |
+  | `ff 03 00 0a 21 02 …` field 3 = 43 B (265.8 s later) | `ff 04 00 0a 15` + 21 bytes |
+
+  The `FF 03` challenge is invariant in shape: field 1 = 33-byte **compressed** P-256 point,
+  fresh every connection; field 2 = `0x02030000` in all six frames ever observed; field 3 =
+  40 bytes on a first challenge, longer on a re-challenge. **The 21-byte reply is not
+  computable by us** — BikeControl caches the inbound `FF 03` and replays it *upstream to the
+  real Zwift app*, which computes the answer. The empty form is the same three bytes
+  BikeControl sends only `if (isPersistedUnlocked)`, i.e. an assertion, not a proof.
+- **No periodic write of any kind.** Nine client writes in 786 s of a working Click link,
+  seven of them inside the first second of the handshake (`experiments/19` §5).
 
 ### 1.6 Lifecycle quirks
 

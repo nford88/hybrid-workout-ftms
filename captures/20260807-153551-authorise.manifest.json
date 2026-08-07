@@ -1,0 +1,46 @@
+{
+  "scenario": "authorise",
+  "backend": "android-bugreport",
+  "operator_notes": "TIMEBASE: btsnoop renders +1h ahead (README gotcha 4 \u2014 Android writes local time, tshark reads it as UTC). SUBTRACT 1 HOUR from every rendered timestamp. Proof: the first frame's raw epoch is ~10 min in the future, and phone/Mac clocks agree to the second. TRUE SPAN 14:57:37-15:34:12 IST (UTC+1). It DOES overlap the Zwift session (15:19:05-15:37:01) by 15m07s and captures the handover: Companion's link to Click 51A6 ended 15:23:43, the Mac's CoreBluetooth connected it 15:23:44 \u2014 one second later \u2014 and held it to 15:37:01. The TRAINER stayed bridged throughout (phone link 0x0002, 14:59:46-15:33:34). NO FF 04 ANYWHERE: the only FF frames are two unanswered FF 03 challenges at 15:01:08 and 15:01:24 (15.46s lapsed cadence) on a Companion-only link with no game behind it; the later Companion links carried no RideOn at all, so drew no challenge. The authorisation itself happened on the Mac's radio and is invisible here. PHASE-2 WINDOW ZERO = 2026-08-07 15:37:01 IST.",
+  "hardware": {
+    "capture_host": "Android phone (adb)"
+  },
+  "firmware": {},
+  "environment": {
+    "platform": "Android",
+    "snoop_mode": "FULL"
+  },
+  "software": {
+    "official_app": "Zwift Companion / Zwift game (bridged)"
+  },
+  "markers": [
+    {
+      "ts": 1786110121.255,
+      "label": "display OFF",
+      "kind": "environment",
+      "detail": "OFF"
+    },
+    {
+      "ts": 1786110490.477,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    },
+    {
+      "ts": 1786110493.432,
+      "label": "screen OFF",
+      "kind": "environment",
+      "detail": "timeout"
+    },
+    {
+      "ts": 1786110494.148,
+      "label": "screen ON",
+      "kind": "environment",
+      "detail": "power_button"
+    }
+  ],
+  "capture_files": [
+    "20260807-153551-authorise.btsnoop"
+  ],
+  "marker_source": "the phone's own logcat (blelab/androidlog.py), not a human at a keyboard \u2014 same clock as the rest of the phone, and available retroactively"
+}

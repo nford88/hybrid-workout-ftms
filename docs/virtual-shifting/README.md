@@ -84,12 +84,41 @@ concurrently.
   `tools/ble-lab` defects** (lost ATT payloads, cross-device UUID leakage, a lossy address
   filter, and HCI events excluded so the whole connection lifecycle was invisible) — fixed,
   self-test 70/70 → **111/111** — and overturned `11`'s "tshark does all ATT dissection" decision.
-- **(next)** — Two tracks. **Free/browser**: the H28 idle-vs-active A/B (`experiments/15`
-  §6.1, ~10 min), read the three `2901` User Descriptions (§6.2), subscribe to
-  `0100`/`0101`/`0102` as Companion does (§6.3), then the `FF 04 00` A/B from `13`.
-  **The capture that gets the unlock**: the bridged-Companion session in §6.0 —
-  `tools/ble-lab/android-capture.py --pull` does the pull, marker extraction and analysis in
-  one command, and `--check` verifies the two phone settings that have already bitten us.
+- **2026-08-07** — Two passes. The Android btsnoop settled *what* the failure is: the Click
+  **gates keypad frames on a live link** rather than disconnecting (`HYPOTHESES.md` §E, three
+  claims retracted). A later offline re-analysis of the raw bytes (`experiments/19`) then found
+  three things the generated reports had hidden. ★★ **The outbound `0xFF` write exists** — real
+  Zwift answers every inbound `FF 03` challenge with an **`FF 04` write to SYNC RX `0003`**
+  ~0.45 s later, once with an empty body and once with a **21-byte** body, and both have been
+  sitting in `20260729-164954-bridge-ride.btsnoop` since July. ★ **The `0x23` stream is
+  press-gated with a ~1.0 s hold-off**, so *frame absence proves nothing* — the healthy session
+  has 136-second keypad silences — which means every future bench run must **cue and score its
+  presses**, which the new arm runner does. ⚠️ **A published number is wrong**: `+57.627 s` is where `analyze.py`'s collapsed
+  step list stops, not where the capture does; the real gap is **106.4 s**. And `experiments/13`'s
+  candidate **countdown is FALSIFIED** — it rose 15 → 900 across the failure. Sources confirm the
+  unlock is a live negotiation that BikeControl **proxies to the real Zwift app** rather than
+  computing, so the 21-byte reply is out of reach; its shipping workaround is instead
+  `Opcode.RESET` = `0x18` every 60 s. **New H32 is the explanation to beat**: the rider's working
+  workout was 2.5 h after an authorised Zwift session, the failure 9 days later.
+- **(next)** — ⭐ **Run `experiments/19` §7.-1**, a paired 2×2 over the authorisation window.
+  ⚠️ **Time-critical ordering**: the device is lapsed *right now* (that is what the 08-07 capture
+  shows) and opening Zwift destroys that condition for ~24 h — so the lapsed arms go **first**,
+  before any Zwift contact. Phase 1 (lapsed, today): arm A to reproduce the gate, then ⭐ arm B,
+  the decisive cell — auto-answer `ff 04 00`, the test `16` believed it had run and had not —
+  then arm D (right unit), and arm C (`0x18` reset) only if B fails. Phase 2: authorise from Zwift's
+  **pairing screen — no ride, no subscription** (measured, not assumed: the first `FF 04` answer
+  lands **5.3 s** after the handshake, and the trainer got **zero writes after +17 s** in that
+  session, so no ride was running). Either BLE route works, since Companion in bridge mode is a
+  proxy for the game — which **resolves `14` §6's Companion conflict**: both `FF 04` writes in the
+  07-29 capture were *sent by Companion* while bridging. Record the wall-clock disconnect time, and
+  capture it if bridged — a second 21-byte `FF 04` would test the "not replayable" conclusion.
+  ⚠️ **Sit ~10 minutes, not ~60 s**: the 21-byte body rides the *second* challenge at **+270.6 s**,
+  so a one-minute session collects only the empty `ff 04 00` we already hold (`19` §7). Phase 3:
+  re-run arm A authorised — the positive control, never yet measured with our own client.
+  Phase 4, tomorrow ≥25 h later: re-run arm A cold. The instrument is built and verified:
+  `npm run dev:ble`. Also free: read the three `2901` User Descriptions
+  (`experiments/15` §6.2), subscribe to `0100`/`0101`/`0102` as Companion does (§6.3), and
+  regenerate the 08-07 report with `--no-collapse`.
   Independently: resume HW-V12 (candidates (b)-(f), see
   `experiments/08-hw-v12-bakeoff-partial.md`); run the intervals.icu calibration script
   (`experiments/intervals-icu-power-model-chart.js`) against real ride data.

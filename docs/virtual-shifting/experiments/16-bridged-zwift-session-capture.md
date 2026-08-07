@@ -113,6 +113,18 @@ hub-style queries:
 +8.61  TX  WRITE  0003   ff 04 00                       ← Companion's reply
 ```
 
+> **2026-08-07: there is a SECOND exchange in this same capture, and its reply is not empty.**
+> 265.8 s later the device challenges again and the client answers with a **21-byte body**:
+>
+> ```
+> +7822.813 RX NOTIFY 0002  ff 03 00 0a 21 02 13ecb9be…      (field 3 = 43 bytes, not 40)
+> +7823.317 TX WRITE  0003  ff 04 00 0a 15 a5 6d ef 98 b0 95 57 7f 39 a5
+>                           3c 1f 0e 0e 39 64 2f 6e 29 15 d9
+> ```
+>
+> So `FF 04` is not always empty, and the challenge/answer is a **repeating** exchange rather
+> than a one-shot at connect. See [`19`](19-click-v2-challenge-and-gate.md) §3.
+
 [`13`](13-ff-family-frame-decode.md) decoded the `FF 03` frame from our own captures and argued
 that `PROTOCOLS.md` §1.5's `FF 04 00` was *"an empty-bodied assertion we have never sent"*,
 testable in minutes. **It is now confirmed as real Zwift behaviour**, sent in direct response to
@@ -386,6 +398,14 @@ about which characteristics are writable. Fixed by naming the nine properties ex
      live handshaken link, and the drop came at 61.2 s like every other run. This kills
      [`13`](13-ff-family-frame-decode.md)'s central actionable prediction and
      `CONNECTION-RECIPE.md`'s step 10.
+
+     > ⚠️ **Scope corrected 2026-08-07 ([`19`](19-click-v2-challenge-and-gate.md) §7 arm B).**
+     > This run was on the **silent** unit, which issues **no `FF 03` challenge at all** — so
+     > `ff 04 00` went out **unsolicited**, to a device that had asked nothing, on a link whose
+     > failure mode is a hard 61 s *link drop* rather than a keypad *gate*. It is sound as
+     > written ("`ff 04 00` is not a keep-awake"), but it does **not** test the thing that
+     > matters: replying `ff 04 00` to a live `FF 03` on the **primary** unit. Real Zwift does
+     > exactly that, 0.44 s after the challenge, and we have never tried it.
    - **The drop is a hard timer, not flakiness**: 60.5 / 60.7 / 60.8 / 61.0 / 61.2 s — a spread
      of **0.7 s across five runs**. Nothing that varied (handshake form, write count, time to
      first write) moved it. That is a designed timeout being enforced.

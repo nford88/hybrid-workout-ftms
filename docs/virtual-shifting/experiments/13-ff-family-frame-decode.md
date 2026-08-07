@@ -199,12 +199,14 @@ On the keep-awake half of the question:
 - **Nothing in these three frames is a client→device keepalive.** All three are
   inbound. Consistent with `PROTOCOLS.md` §1.6 ("No client→device keepalive needed")
   and with `RESEARCH.md`'s "No client keepalive needed".
-- **But `FF05-B` field 3 = 496 looks like a countdown**, and 496 s = 8 min 16 s is a
-  plausible session/unlock remaining-time. `03` guessed this; the decode now shows it
-  is a clean standalone integer field rather than a fragment of something else. **A
-  second capture of the same frame type is decisive**: if the value falls between
-  observations, it is a timer, and its rate tells us the units. `analyze.py`'s payload
-  catalogue plus `diff.py`'s byte-stability pass answer this from two runs.
+- ~~**But `FF05-B` field 3 = 496 looks like a countdown**, and 496 s = 8 min 16 s is a
+  plausible session/unlock remaining-time.~~ ❌ **FALSIFIED 2026-08-07 —
+  see [`19`](19-click-v2-challenge-and-gate.md) §4.** The decisive test this paragraph
+  named was run against the captures that now exist: the value does **not** fall. Across
+  the 2026-08-07 failure boundary it **rose 15 → 900** in 48 s, and across four sessions
+  it takes 496 / 248 / 15 / 900 with no trend and no relation to elapsed time. It is not
+  a timer. What does track the gate closing is **field 2**, which flipped 0 → 1 and
+  arrived 0.136 s after the last keypad frame (n=1, unreplicated).
 - **`FF05-A` reads as battery telemetry for both relay-paired units**: `(100, 100,
   2863, 2863)` is the shape of (percent, percent, millivolts, millivolts), and 2.863 V
   is a sensible partly-used coin cell. Two identical pairs fits H17's confirmed
@@ -237,8 +239,15 @@ did diligently — is what made this possible a day later with no hardware.
    clients: `PROTOCOLS.md` §1.5's documented **`FF 04 00`** is an empty-bodied
    assertion, and the unlock state appears to persist in the Click itself. **Our
    harness has never sent it.** (**INFERRED**, but testable in the browser in minutes.)
-5. No client→device keep-awake frame is evidenced. `FF05-B` field 3 = 496 is a clean
-   candidate countdown; two captures settle it.
+5. No client→device keep-awake frame is evidenced. ~~`FF05-B` field 3 = 496 is a clean
+   candidate countdown; two captures settle it.~~ ❌ **Settled and FALSIFIED** — see §5
+   above and [`19`](19-click-v2-challenge-and-gate.md) §4. The "no keepalive" half stands:
+   `19` §5 counts nine client writes in 786 s of a working link, none periodic.
+
+> **Postscript, 2026-08-07.** §3's *"the open question is only what the app writes back"*
+> was the right question, and the answer was already in the repo. `20260729-164954-bridge-ride.btsnoop`
+> contains **two outbound `FF 04` writes** to SYNC RX, each ~0.45 s after an inbound `FF 03`:
+> `ff 04 00` (empty) and `ff 04 00 0a 15 <21 bytes>`. See [`19`](19-click-v2-challenge-and-gate.md) §3.
 
 ### Immediate action this unlocks — no capture required
 
